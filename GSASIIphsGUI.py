@@ -6076,6 +6076,12 @@ D.A. Keen, M.T. Dove, A.L. Goodwin and Q. Hui, Jour. Phys.: Cond. Matter (2007),
             mainSizer.Add(wx.StaticText(G2frame.FRMC,label=' Select one histogram for Bragg processing:'),0)
             histoSizer = wx.BoxSizer(wx.HORIZONTAL)
             histo = wx.ComboBox(G2frame.FRMC,choices=histNames,style=wx.CB_DROPDOWN|wx.TE_READONLY) 
+            hist_tmp = histo.GetStringSelection()
+            if RMCPdict['histogram'][0] == '':
+                histo.SetStringSelection(hist_tmp)
+                RMCPdict['histogram'][0] = hist_tmp
+            else:
+                histo.SetStringSelection(RMCPdict['histogram'][0])
             histo.SetStringSelection(RMCPdict['histogram'][0])
             histo.Bind(wx.EVT_COMBOBOX,OnHisto)
             histoSizer.Add(histo,0,WACV)
