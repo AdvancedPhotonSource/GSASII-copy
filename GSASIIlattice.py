@@ -32,11 +32,11 @@ Note that GSAS-II variables ``p:h:Dij`` (i,j = 1, 2, 3) and ``p`` is a phase num
 and ``h`` a histogram number are used for the *Dij* values.
 '''
 ########### SVN repository information ###################
-# $Date: 2023-03-14 08:05:42 -0500 (Tue, 14 Mar 2023) $
-# $Author: toby $
-# $Revision: 5512 $
+# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
+# $Author: vondreele $
+# $Revision: 5513 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIlattice.py $
-# $Id: GSASIIlattice.py 5512 2023-03-14 13:05:42Z toby $
+# $Id: GSASIIlattice.py 5513 2023-03-14 13:25:52Z vondreele $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import math
@@ -51,7 +51,7 @@ import GSASIIpath
 import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
-GSASIIpath.SetVersionNumber("$Revision: 5512 $")
+GSASIIpath.SetVersionNumber("$Revision: 5513 $")
 # trig functions in degrees
 sind = lambda x: np.sin(x*np.pi/180.)
 asind = lambda x: 180.*np.arcsin(x)/np.pi
@@ -2687,14 +2687,18 @@ def H2ThPh(H,Bmat,Q):
     QA = G2mth.AVdeg2Q(A,np.array([0.,0.,1.0]))
     Q2 = G2mth.prodQQ(QA,QR)
     Qmat = G2mth.Q2Mat(Q2)
-    CH = np.inner(H,Bmat)
+    CH = np.inner(H,Bmat.T)
     CH = np.inner(CH,Qmat)
-    CH /= nl.norm(CH,axis=1)[:,nxs]
+    N = nl.norm(CH,axis=1)
+    N = np.where(N,N,1.)
+    CH /= N[:,nxs]
     H3 = np.array([0,0,1.])
     DHR = np.inner(CH,H3)
     Ph = np.where(DHR <= 1.0,acosd(DHR),0.0)    #polar angle 0<=Ph<=180.
     TH = CH*np.array([1.,1.,0.])[nxs,:]     #projection of CH onto xy plane
-    TH /= nl.norm(TH,axis=1)[:,nxs]
+    N = nl.norm(TH,axis=1)
+    N = np.where(N,N,1.)
+    TH /= N[:,nxs]
     Th = atan2d(TH[:,0],TH[:,1])                #azimuth angle 0<=Th<360<
     Th = np.where(Th<0.,Th+360.,Th)
     return Th,Ph        #azimuth,polar angles

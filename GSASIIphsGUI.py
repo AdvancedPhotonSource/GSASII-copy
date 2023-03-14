@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - phase data display routines
 #========== SVN repository information ###################
-# $Date: 2023-03-01 11:55:04 -0600 (Wed, 01 Mar 2023) $
+# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5510 $
+# $Revision: 5513 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIphsGUI.py $
-# $Id: GSASIIphsGUI.py 5510 2023-03-01 17:55:04Z vondreele $
+# $Id: GSASIIphsGUI.py 5513 2023-03-14 13:25:52Z vondreele $
 #========== SVN repository information ###################
 '''
 *GSASIIphsGUI: Phase GUI*
@@ -44,7 +44,7 @@ import subprocess as subp
 import distutils.file_util as disfile
 import scipy.optimize as so
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5510 $")
+GSASIIpath.SetVersionNumber("$Revision: 5513 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -2948,8 +2948,9 @@ def UpdatePhaseData(G2frame,Item,data):
         UseList = newPhase['Histograms']
         for hist in UseList:
             UseList[hist]['Scale'] /= detTrans      #scale by 1/volume ratio
-            UseList[hist]['Mustrain'][4:6] = [NShkl*[0.01,],NShkl*[False,]]
-            UseList[hist]['HStrain'] = [NDij*[0.0,],NDij*[False,]]
+            if 'P' in UseList[hist]['Type']:
+                UseList[hist]['Mustrain'][4:6] = [NShkl*[0.01,],NShkl*[False,]]
+                UseList[hist]['HStrain'] = [NDij*[0.0,],NDij*[False,]]
         newPhase['General']['Map'] = mapDefault.copy()
         sub = G2frame.GPXtree.AppendItem(parent=
             G2gd.GetGPXtreeItemId(G2frame,G2frame.root,'Phases'),text=phaseName)
@@ -11452,14 +11453,15 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     if not any(Q):
                         raise ValueError
                     RBObj['Orient'][0] = Q
-                    newXYZ = G2mth.UpdateRBXYZ(Bmat,RBObj,RBData,rbType)[0]
-                    maxFrac = 0.0
-                    for Id in RBObj['Ids']:
-                        maxFrac = max(maxFrac,data['Atoms'][AtLookUp[Id]][cx+3])
-                    for i,Id in enumerate(RBObj['Ids']):
-                        data['Atoms'][AtLookUp[Id]][cx:cx+3] = newXYZ[i]
-                        data['Atoms'][AtLookUp[Id]][cx+3] = maxFrac
-                    data['Atoms'] = G2lat.RBsymCheck(data['Atoms'],ct,cx,cs,AtLookUp,Amat,RBObj['Ids'],SGData)
+                    if rbType != 'Spin':
+                        newXYZ = G2mth.UpdateRBXYZ(Bmat,RBObj,RBData,rbType)[0]
+                        maxFrac = 0.0
+                        for Id in RBObj['Ids']:
+                            maxFrac = max(maxFrac,data['Atoms'][AtLookUp[Id]][cx+3])
+                        for i,Id in enumerate(RBObj['Ids']):
+                            data['Atoms'][AtLookUp[Id]][cx:cx+3] = newXYZ[i]
+                            data['Atoms'][AtLookUp[Id]][cx+3] = maxFrac
+                        data['Atoms'] = G2lat.RBsymCheck(data['Atoms'],ct,cx,cs,AtLookUp,Amat,RBObj['Ids'],SGData)
                     data['Drawing']['Atoms'] = []
                     UpdateDrawAtoms()
                     G2plt.PlotStructure(G2frame,data)
@@ -11578,6 +11580,7 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                 RBObj['SHC'].append({})
                 for name in ['atColor','atType','Natoms','nSH','radius','RBname','RBsym']:
                     RBObj[name].append(rbData[name])
+                RBObj['hide'].append(False)
                 RBData['Spin'][rbIds[selection]]['useCount'] += 1
                 G2plt.PlotStructure(G2frame,data)
                 wx.CallAfter(FillRigidBodyGrid,True,spnId=rbId)
@@ -12885,12 +12888,13 @@ of the crystal structure.
                 dups.append(key)
             else:
                 rbNames[key] = ['Residue',rbRes]
-        for rbSpn in RBData.get('Spin',{}):     #patch get for old files
-            key = RBData['Spin'][rbSpn]['RBname']
-            if key in rbNames:
-                dups.append(key)
-            else:
-                rbNames[key] = ['Spin',rbSpn]
+        if data['General']['Type'] == 'nuclear': #exclude other phase types
+            for rbSpn in RBData.get('Spin',{}):     #patch get for old files
+                key = RBData['Spin'][rbSpn]['RBname']
+                if key in rbNames:
+                    dups.append(key)
+                else:
+                    rbNames[key] = ['Spin',rbSpn]
                 
         if dups:
             msg = 'Two or more rigid bodies have the same name. This must be corrected before bodies can be added.'

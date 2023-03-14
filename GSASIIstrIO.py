@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-03-01 11:55:04 -0600 (Wed, 01 Mar 2023) $
+# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5510 $
+# $Revision: 5513 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrIO.py $
-# $Id: GSASIIstrIO.py 5510 2023-03-01 17:55:04Z vondreele $
+# $Id: GSASIIstrIO.py 5513 2023-03-14 13:25:52Z vondreele $
 ########### SVN repository information ###################
 '''
 *GSASIIstrIO: structure I/O routines*
@@ -32,7 +32,7 @@ else:
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5510 $")
+GSASIIpath.SetVersionNumber("$Revision: 5513 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -1512,16 +1512,16 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
             Atom = Atoms[atomIndx[atId][1]]
             XYZ = Atom[cx:cx+3]
         pfxRB = pfx+'RB'+rbKey+'O'        
-        A,V = G2mth.Q2AV(XYZ)
+        A,V = G2mth.Q2AV(RB['Orient'][0])
         fixAxis = [0, np.abs(V).argmax()+1]
         for i in range(4):
             name = pfxRB+ostr[i]+':'+sfx
             phaseDict[name] = RB['Orient'][0][i]
             if RB['Orient'][1] == 'AV' and i:
                 phaseVary += [name,]
-            elif RB['Orient'][1] == 'A' and not i:
+            elif 'A' in RB['Orient'][1] and not i:
                 phaseVary += [name,]
-            elif RB['Orient'][1] == 'V' and i not in fixAxis:
+            elif RB['Orient'][1] == 'V' and i:
                 phaseVary += [name,]
         if rbKey != 'S':
             name = pfx+'RB'+rbKey+'f:'+sfx

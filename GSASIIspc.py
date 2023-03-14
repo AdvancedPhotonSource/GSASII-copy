@@ -8,11 +8,11 @@ stored in a :ref:`Space Group (SGData)<SGData_table>` object.
 
 """
 ########### SVN repository information ###################
-# $Date: 2022-02-07 18:47:05 -0600 (Mon, 07 Feb 2022) $
+# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5171 $
+# $Revision: 5513 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIspc.py $
-# $Id: GSASIIspc.py 5171 2022-02-08 00:47:05Z vondreele $
+# $Id: GSASIIspc.py 5513 2023-03-14 13:25:52Z vondreele $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import numpy as np
@@ -23,7 +23,7 @@ import copy
 import os.path as ospath
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5171 $")
+GSASIIpath.SetVersionNumber("$Revision: 5513 $")
 
 npsind = lambda x: np.sin(x*np.pi/180.)
 npcosd = lambda x: np.cos(x*np.pi/180.)
@@ -1334,7 +1334,7 @@ def GenMagOps(SGData):
     if SGData['SGFixed']:
         SpnFlp = SGData['SpnFlp']
     else:
-        SpnFlp = np.ones(Nsym,dtype=np.int)
+        SpnFlp = np.ones(Nsym,dtype=np.int32)
         GenFlg = SGData.get('GenFlg',[0])
         Ngen = len(SGData['SGGen'])
         Nfl = len(GenFlg)
