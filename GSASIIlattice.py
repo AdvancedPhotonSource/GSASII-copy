@@ -32,11 +32,11 @@ Note that GSAS-II variables ``p:h:Dij`` (i,j = 1, 2, 3) and ``p`` is a phase num
 and ``h`` a histogram number are used for the *Dij* values.
 '''
 ########### SVN repository information ###################
-# $Date: 2023-02-23 12:34:07 -0600 (Thu, 23 Feb 2023) $
-# $Author: vondreele $
-# $Revision: 5503 $
+# $Date: 2023-03-14 08:05:42 -0500 (Tue, 14 Mar 2023) $
+# $Author: toby $
+# $Revision: 5512 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIlattice.py $
-# $Id: GSASIIlattice.py 5503 2023-02-23 18:34:07Z vondreele $
+# $Id: GSASIIlattice.py 5512 2023-03-14 13:05:42Z toby $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import math
@@ -51,7 +51,7 @@ import GSASIIpath
 import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
-GSASIIpath.SetVersionNumber("$Revision: 5503 $")
+GSASIIpath.SetVersionNumber("$Revision: 5512 $")
 # trig functions in degrees
 sind = lambda x: np.sin(x*np.pi/180.)
 asind = lambda x: 180.*np.arcsin(x)/np.pi
@@ -1038,7 +1038,7 @@ def Uij2Ueqv(Uij,GS,Amat):
     :param GS: Uij too betaij conversion matrix
     :param Amat: crystal to Cartesian transformation matrix
     :returns: 1/3 trace of diagonalized U matrix
-    :returns: True if nonpositive-definate; False otherwise
+    :returns: True if nonpositive-definite; False otherwise
     '''
     U = np.multiply(U6toUij(Uij),GS)
     U = np.inner(Amat,np.inner(U,Amat).T)
