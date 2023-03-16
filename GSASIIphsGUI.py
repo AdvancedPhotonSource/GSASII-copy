@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - phase data display routines
 #========== SVN repository information ###################
-# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5513 $
+# $Date: 2023-03-16 17:16:45 -0500 (Thu, 16 Mar 2023) $
+# $Author: toby $
+# $Revision: 5517 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIphsGUI.py $
-# $Id: GSASIIphsGUI.py 5513 2023-03-14 13:25:52Z vondreele $
+# $Id: GSASIIphsGUI.py 5517 2023-03-16 22:16:45Z toby $
 #========== SVN repository information ###################
 '''
 *GSASIIphsGUI: Phase GUI*
@@ -44,7 +44,7 @@ import subprocess as subp
 import distutils.file_util as disfile
 import scipy.optimize as so
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5513 $")
+GSASIIpath.SetVersionNumber("$Revision: 5517 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -6075,7 +6075,9 @@ D.A. Keen, M.T. Dove, A.L. Goodwin and Q. Hui, Jour. Phys.: Cond. Matter (2007),
             histNames = list(histograms.keys())
             mainSizer.Add(wx.StaticText(G2frame.FRMC,label=' Select one histogram for Bragg processing:'),0)
             histoSizer = wx.BoxSizer(wx.HORIZONTAL)
-            histo = wx.ComboBox(G2frame.FRMC,choices=histNames,style=wx.CB_DROPDOWN|wx.TE_READONLY) 
+            histo = wx.ComboBox(G2frame.FRMC,choices=histNames,style=wx.CB_DROPDOWN|wx.TE_READONLY)
+            if RMCPdict['histogram'][0] == '':
+                RMCPdict['histogram'][0] = histo.GetStringSelection()
             histo.SetStringSelection(RMCPdict['histogram'][0])
             histo.Bind(wx.EVT_COMBOBOX,OnHisto)
             histoSizer.Add(histo,0,WACV)
