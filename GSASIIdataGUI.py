@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIdataGUI - Main GUI routines
 #========== SVN repository information ###################
-# $Date: 2023-02-26 10:06:15 -0600 (Sun, 26 Feb 2023) $
+# $Date: 2023-03-26 21:26:51 -0500 (Sun, 26 Mar 2023) $
 # $Author: toby $
-# $Revision: 5504 $
+# $Revision: 5524 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIdataGUI.py $
-# $Id: GSASIIdataGUI.py 5504 2023-02-26 16:06:15Z toby $
+# $Id: GSASIIdataGUI.py 5524 2023-03-27 02:26:51Z toby $
 #=========- SVN repository information ###################
 '''
 *GSASIIdataGUI: Main GSAS-II GUI*
@@ -63,7 +63,7 @@ try:
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5504 $")
+GSASIIpath.SetVersionNumber("$Revision: 5524 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIfiles as G2fil
@@ -3183,7 +3183,7 @@ class GSASII(wx.Frame):
         self.MagLines = []  # lines used for plot magnification
         self.itemPicked = None
         self.Interpolate = 'nearest'
-        self.ContourColor = GSASIIpath.GetConfigValue('Contour_color','Paired')
+        self.ContourColor = GSASIIpath.GetConfigValue('Contour_color','GSPaired')
         self.VcovColor = 'RdYlGn'
         self.RamaColor = 'Blues'
         self.Projection = 'equal area'
@@ -7894,7 +7894,9 @@ def UpdatePWHKPlot(G2frame,kind,item):
     G2frame.PatternId = item
     if kind in ['PWDR','SASD','REFD',]:
         NewPlot = True
-        if 'xylim' in dir(G2frame):
+        if 'Contour' in dir(G2frame) and G2frame.Contour:
+            pass
+        elif 'xylim' in dir(G2frame):
             NewPlot = False
         G2plt.PlotPatterns(G2frame,plotType=kind,newPlot=NewPlot)
     elif kind == 'HKLF':
@@ -8287,12 +8289,17 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
         #     imp.reload(G2plt)
         #     print('reloading G2pdG')
         G2pdG.UpdatePeakGrid(G2frame,data)
-        G2plt.PlotPatterns(G2frame)
+        newPlot = False
+        if hasattr(G2frame,'Contour'):
+            if G2frame.Contour:
+                G2frame.Contour = False
+                newPlot = True
+        G2plt.PlotPatterns(G2frame,newPlot)
     elif G2frame.GPXtree.GetItemText(item) == 'Background':
         G2frame.PatternId = G2frame.GPXtree.GetItemParent(item)
         data = G2frame.GPXtree.GetItemPyData(item)
         G2pdG.UpdateBackground(G2frame,data)
-        G2plt.PlotPatterns(G2frame)
+        G2plt.PlotPatterns(G2frame,True)
     elif G2frame.GPXtree.GetItemText(item) == 'Limits':
         G2frame.PatternId = G2frame.GPXtree.GetItemParent(item)
         datatype = G2frame.GPXtree.GetItemText(G2frame.PatternId)[:4]
@@ -8335,7 +8342,7 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
             G2frame.GPXtree.SetItemPyData(item,data)
     
         G2pdG.UpdateSampleGrid(G2frame,data)
-        G2plt.PlotPatterns(G2frame,plotType=datatype)
+        G2plt.PlotPatterns(G2frame,True,plotType=datatype)
     elif G2frame.GPXtree.GetItemText(item) == 'Index Peak List':
         G2frame.PatternId = G2frame.GPXtree.GetItemParent(item)
         for i in G2frame.ExportPeakList: i.Enable(True)
@@ -8349,7 +8356,12 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
         if 'PKS' in G2frame.GPXtree.GetItemText(G2frame.PatternId):
             G2plt.PlotPowderLines(G2frame)
         else:
-            G2plt.PlotPatterns(G2frame)
+            newPlot = False
+            if hasattr(G2frame,'Contour'):
+                if G2frame.Contour:
+                    G2frame.Contour = False
+                    newPlot = True
+            G2plt.PlotPatterns(G2frame,newPlot)
     elif G2frame.GPXtree.GetItemText(item) == 'Unit Cells List':
         G2frame.PatternId = G2frame.GPXtree.GetItemParent(item)
         data = G2frame.GPXtree.GetItemPyData(item)
@@ -8376,6 +8388,12 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
         if 'PKS' in G2frame.GPXtree.GetItemText(G2frame.PatternId):
             G2plt.PlotPowderLines(G2frame)
         else:
+            newPlot = False
+            if hasattr(G2frame,'Contour'):
+                if G2frame.Contour:
+                    G2frame.Contour = False
+                    newPlot = True
+            G2plt.PlotPatterns(G2frame,newPlot)
             G2plt.PlotPatterns(G2frame)
     elif G2frame.GPXtree.GetItemText(item) == 'Reflection Lists':   #powder reflections
         G2frame.dataWindow.HideShow.Enable(False)
@@ -8385,7 +8403,12 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
         if len(data):
             G2frame.RefList = list(data.keys())[0]
         G2pdG.UpdateReflectionGrid(G2frame,data)
-        G2plt.PlotPatterns(G2frame)
+        newPlot = False
+        if hasattr(G2frame,'Contour'):
+            if G2frame.Contour:
+                G2frame.Contour = False
+                newPlot = True
+        G2plt.PlotPatterns(G2frame,newPlot)
     elif G2frame.GPXtree.GetItemText(item) == 'Reflection List':    #HKLF reflections
         G2frame.dataWindow.HideShow.Enable(True)
         G2frame.PatternId = G2frame.GPXtree.GetItemParent(item)

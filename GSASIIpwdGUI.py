@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIpwdGUI - powder data display routines
 ########### SVN repository information ###################
-# $Date: 2023-03-14 17:46:50 -0500 (Tue, 14 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5514 $
+# $Date: 2023-03-23 17:55:18 -0500 (Thu, 23 Mar 2023) $
+# $Author: toby $
+# $Revision: 5521 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpwdGUI.py $
-# $Id: GSASIIpwdGUI.py 5514 2023-03-14 22:46:50Z vondreele $
+# $Id: GSASIIpwdGUI.py 5521 2023-03-23 22:55:18Z toby $
 ########### SVN repository information ###################
 '''
 *GSASIIpwdGUI: Powder Pattern GUI routines*
@@ -37,7 +37,7 @@ else:
     import pickle as cPickle
 import scipy.interpolate as si
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5514 $")
+GSASIIpath.SetVersionNumber("$Revision: 5521 $")
 import GSASIImath as G2mth
 import GSASIIpwd as G2pwd
 import GSASIIfiles as G2fil
@@ -2296,6 +2296,10 @@ def UpdateInstrumentGrid(G2frame,data):
         for item in copyList:
             Id = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,item)
             instData = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Id,'Instrument Parameters'))[0]
+            if 'Bank' not in data:
+                data['Bank'] = [1,1,0]
+            if 'Source' not in data:
+                data['Source'] = ['','']
             if 'Bank' not in instData:
                 instData['Bank'] = [1,1,0]
             if 'Source' not in instData:

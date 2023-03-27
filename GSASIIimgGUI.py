@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - image data display routines
 ########### SVN repository information ###################
-# $Date: 2023-01-09 11:00:59 -0600 (Mon, 09 Jan 2023) $
+# $Date: 2023-03-21 14:26:14 -0500 (Tue, 21 Mar 2023) $
 # $Author: toby $
-# $Revision: 5468 $
+# $Revision: 5519 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIimgGUI.py $
-# $Id: GSASIIimgGUI.py 5468 2023-01-09 17:00:59Z toby $
+# $Id: GSASIIimgGUI.py 5519 2023-03-21 19:26:14Z toby $
 ########### SVN repository information ###################
 '''
 *GSASIIimgGUI: Image GUI*
@@ -29,7 +29,7 @@ import matplotlib as mpl
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5468 $")
+GSASIIpath.SetVersionNumber("$Revision: 5519 $")
 import GSASIIimage as G2img
 import GSASIImath as G2mth
 import GSASIIElem as G2elem
@@ -1632,6 +1632,8 @@ def UpdateImageControls(G2frame,data,masks,useTA=None,useMask=None,IntegrateOnly
         if G2frame.autoIntFrame: # ensure only one open at a time
             G2frame.autoIntFrame.Raise()
             return
+        else:
+            print('Auto-integration window already open')
         PollTime = GSASIIpath.GetConfigValue('Autoint_PollTime',30.)
         G2frame.autoIntFrame = AutoIntFrame(G2frame,PollTime=PollTime)
         # debug code to reload code for window on each use

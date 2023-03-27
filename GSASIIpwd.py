@@ -8,11 +8,11 @@ This version hacked to provide Laue Fringe fitting.
 
 '''
 ########### SVN repository information ###################
-# $Date: 2023-02-27 21:52:10 -0600 (Mon, 27 Feb 2023) $
+# $Date: 2023-03-25 11:11:14 -0500 (Sat, 25 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5509 $
+# $Revision: 5523 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpwd.py $
-# $Id: GSASIIpwd.py 5509 2023-02-28 03:52:10Z vondreele $
+# $Id: GSASIIpwd.py 5523 2023-03-25 16:11:14Z vondreele $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import sys
@@ -36,8 +36,8 @@ import scipy.special as sp
 import scipy.signal as signal
 
 import GSASIIpath
-filversion = "$Revision: 5509 $"
-GSASIIpath.SetVersionNumber("$Revision: 5509 $")
+filversion = "$Revision: 5523 $"
+GSASIIpath.SetVersionNumber("$Revision: 5523 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -2920,6 +2920,7 @@ def MakeRMCPdat(PWDdata,Name,Phase,RMCPdict):
     BraggWt = RMCPdict['histogram'][1]
     inst = PWDdata['Instrument Parameters'][0]
     try:
+        pName = Phase['General']['Name']
         refList = PWDdata['Reflection Lists'][Name]['RefList']
     except TypeError:
         return 'Error - missing reflection list; you must do Refine first'

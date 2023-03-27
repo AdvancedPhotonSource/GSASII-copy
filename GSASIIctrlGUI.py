@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIctrlGUI - Custom GSAS-II GUI controls
 ########### SVN repository information ###################
-# $Date: 2023-02-27 13:57:27 -0600 (Mon, 27 Feb 2023) $
-# $Author: toby $
-# $Revision: 5508 $
+# $Date: 2023-03-25 11:11:14 -0500 (Sat, 25 Mar 2023) $
+# $Author: vondreele $
+# $Revision: 5523 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIctrlGUI.py $
-# $Id: GSASIIctrlGUI.py 5508 2023-02-27 19:57:27Z toby $
+# $Id: GSASIIctrlGUI.py 5523 2023-03-25 16:11:14Z vondreele $
 ########### SVN repository information ###################
 '''
 *GSASIIctrlGUI: Custom GUI controls*
@@ -176,7 +176,7 @@ except ImportError:
     from matplotlib.backends.backend_wx import FigureCanvas as Canvas
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5508 $")
+GSASIIpath.SetVersionNumber("$Revision: 5523 $")
 import GSASIIdataGUI as G2gd
 import GSASIIpwdGUI as G2pdG
 import GSASIIspc as G2spc
@@ -3866,8 +3866,7 @@ class OrderBox(wxscroll.ScrolledPanel):
         
 ################################################################################
 def GetImportFile(G2frame, message, defaultDir="", defaultFile="",
-                      style=wx.FD_OPEN, parent=None,
-                      *args, **kwargs):
+    style=wx.FD_OPEN, parent=None,*args, **kwargs):
     '''Uses a customized dialog that gets files from the appropriate import directory. 
     Arguments are used the same as in :func:`wx.FileDialog`. Selection of
     multiple files is allowed if argument style includes wx.FD_MULTIPLE.
@@ -3886,8 +3885,7 @@ def GetImportFile(G2frame, message, defaultDir="", defaultFile="",
     #if GSASIIpath.GetConfigValue('debug'):
     #    print('debug: GetImportFile from '+defaultDir)
     #    print('debug: GetImportFile pth '+pth)
-    dlg = wx.FileDialog(parent, message, defaultDir, defaultFile, *args,
-                        style=style, **kwargs)
+    dlg = wx.FileDialog(parent, message, defaultDir, defaultFile, *args,style=style, **kwargs)
 #    dlg.CenterOnParent()
     if not defaultDir and pth: dlg.SetDirectory(pth)
     try:
@@ -3930,8 +3928,7 @@ def GetImportPath(G2frame):
         if os.path.exists(pth):
             return pth
         elif GSASIIpath.GetConfigValue('debug'):
-            print('Ignoring Config Import_directory value: '+
-                      GSASIIpath.GetConfigValue('Import_directory'))
+            print('Ignoring Config Import_directory value: '+GSASIIpath.GetConfigValue('Import_directory'))
     if G2frame.LastImportDir:
         if os.path.exists(G2frame.LastImportDir):
             return G2frame.LastImportDir
@@ -5315,9 +5312,7 @@ def askSaveDirectory(G2frame):
     :returns: a directory name (str) or None if Cancel is pressed
     '''
     pth = GetExportPath(G2frame)
-    dlg = wx.DirDialog(
-            G2frame, 'Input directory where file(s) will be written', pth,
-            wx.DD_DEFAULT_STYLE)
+    dlg = wx.DirDialog(G2frame,'Input directory where file(s) will be written',pth,wx.DD_DEFAULT_STYLE)
     dlg.CenterOnParent()
     try:
         if dlg.ShowModal() == wx.ID_OK:
