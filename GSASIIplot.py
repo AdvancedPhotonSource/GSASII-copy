@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-03-26 21:26:51 -0500 (Sun, 26 Mar 2023) $
+# $Date: 2023-04-13 11:17:53 -0500 (Thu, 13 Apr 2023) $
 # $Author: toby $
-# $Revision: 5524 $
+# $Revision: 5537 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIplot.py $
-# $Id: GSASIIplot.py 5524 2023-03-27 02:26:51Z toby $
+# $Id: GSASIIplot.py 5537 2023-04-13 16:17:53Z toby $
 ########### SVN repository information ###################
 '''
 *GSASIIplot: plotting routines*
@@ -135,13 +135,13 @@ try:
     import matplotlib.figure as mplfig
     import matplotlib.collections as mplC
     import mpl_toolkits.mplot3d.axes3d as mp3d
-    from scipy.ndimage.interpolation import map_coordinates
+    from scipy.ndimage import map_coordinates
 except (ImportError, ValueError) as err:
     print('GSASIIplot: matplotlib not imported')
     if GSASIIpath.GetConfigValue('debug'): print('error msg:',err)
 
 Clip_on = GSASIIpath.GetConfigValue('Clip_on',True)
-GSASIIpath.SetVersionNumber("$Revision: 5524 $")
+GSASIIpath.SetVersionNumber("$Revision: 5537 $")
 import GSASIIdataGUI as G2gd
 import GSASIIimage as G2img
 import GSASIIpwd as G2pwd
@@ -257,7 +257,10 @@ try:
     obtained from mpl.cm.datad.keys() (currently 10 places in GSAS-II code)
     '''
     oldpaired = mpl.colors.LinearSegmentedColormap('GSPaired',_Old_Paired_data,N=256)
-    mpl.cm.register_cmap(cmap=oldpaired,name='GSPaired')   
+    try:
+        mpl.colormaps.register(oldpaired,name='GSPaired')
+    except:
+        mpl.cm.register_cmap(cmap=oldpaired,name='GSPaired')       #deprecated
     blue = [tuple(1.-np.array(item)) for item in _Old_Paired_data['blue']]
     blue.reverse()
     green = [tuple(1.-np.array(item)) for item in _Old_Paired_data['green']]
@@ -266,10 +269,12 @@ try:
     red.reverse()
     Old_Paired_data_r = {'blue':blue,'green':green,'red':red}
     oldpaired_r = mpl.colors.LinearSegmentedColormap('GSPaired_r',Old_Paired_data_r,N=256)
-    mpl.cm.register_cmap(cmap=oldpaired_r,name='GSPaired_r')   
+    try:
+        mpl.colormaps.register(oldpaired_r,name='GSPaired_r')
+    except:
+        mpl.cm.register_cmap(cmap=oldpaired_r,name='GSPaired_r')   #deprecated
 except Exception as err:
-    pass
-#    print(u'error: {}'.format(err))
+    if GSASIIpath.GetConfigValue('debug'): print('\nMPL CM setup error: {}\n'.format(err))
 
 # options for publication-quality Rietveld plots
 plotOpt = {}
@@ -1190,9 +1195,7 @@ def uneqImgShow(figure,ax,Xlist,Ylist,cmap,vmin,vmax,Ylbls=[]):
         For the series [1,2,3,5] this will be [0.5,1.5,2.5,4,6]
         Note that n+1 points are returned for input of n points
         '''
-        return np.concatenate( [[1.5*x[0] - x[1]/2], 
-                                (x[:-1]+x[1:])/2, 
-                                [1.5*x[-1] - x[-2]/2]] )
+        return np.concatenate( [[1.5*x[0] - x[1]/2], (x[:-1]+x[1:])/2, [1.5*x[-1] - x[-2]/2]] )
 
     lenX = len(Xlist) 
     if lenX != len(Ylist): 
@@ -1453,7 +1456,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
     '''1D Structure factor plotting package - displays reflections as sticks proportional
         to F, F**2, etc. as requested
     '''
-    global xylim,X
+    global xylim,X,hkl
     Name = G2frame.GPXtree.GetItemText(G2frame.PatternId)
     def OnKeyPress(event):
         if event.key == 'q':
@@ -1463,6 +1466,10 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
         elif event.key == 'v':
             Page.vaxis = not Page.vaxis
         Draw()
+        
+    def OnPick(event):
+        H = hkl[:,event.ind[0]]
+        Page.SetToolTipString('#%d: %d,%d,%d'%(event.ind[0],H[0],H[1],H[2]))
 
     def OnMotion(event):
         global X
@@ -1494,24 +1501,30 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
             ypos = event.ydata
             SetCursor(Page)
             try:
-                G2frame.G2plotNB.status.SetStatusText('d =%9.3f F^2 =%9.3f'%(Xpos,ypos),1)                   
+                if Page.vaxis:
+                    if Page.faxis:
+                        G2frame.G2plotNB.status.SetStatusText('Fo =%9.3f Fc =%9.3f; press & hold LB to identify'%(Xpos,ypos),1)
+                    else:
+                        G2frame.G2plotNB.status.SetStatusText('Fo^2 =%9.3f Fc^2 =%9.3f; press & hold LB to identify'%(Xpos,ypos),1)
+                else:
+                    G2frame.G2plotNB.status.SetStatusText('d =%9.3f F^2 =%9.3f'%(Xpos,ypos),1)
             except TypeError:
                 G2frame.G2plotNB.status.SetStatusText('Select '+Title+Name+' pattern first',1)
             Page.SetToolTipString(s)
                 
     def Draw():
-        global xylim
+        global xylim,hkl
         Plot.clear()
         Plot.set_title(Title)
         Plot.set_xlabel(r'd, '+Angstr,fontsize=14)
         Plot.set_ylabel(r'F'+super2,fontsize=14)
         colors=['b','r','g','c','m','k']
         Page.keyPress = OnKeyPress
-        
+        hkl = hklRef.T[:3]
         if 'HKLF' in Name:
             Fosq,sig,Fcsq = hklRef.T[5+Super:8+Super]
         else:
-            Fosq,sig,Fcsq = hklRef.T[8+Super],1.0,hklRef.T[9+Super]
+            Fosq,sig,Fcsq = hklRef.T[8+Super],np.nan_to_num(np.sqrt(hklRef.T[8+Super])),hklRef.T[9+Super]
         d = hklRef.T[4+Super].copy()
 
         if Page.vaxis:
@@ -1535,7 +1548,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
         if Page.faxis and not Page.vaxis:
             Plot.set_ylabel(r'F',fontsize=14)
             Y = np.nan_to_num(np.sqrt(Fcsq))
-            Z = np.sqrt(Fosq)
+            Z = np.nan_to_num(np.sqrt(Fosq))
         elif not Page.vaxis:            
             Y = Fcsq.copy()
             Z = Fosq.copy()
@@ -1552,7 +1565,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
             lines = mplC.LineCollection(XD,color=colors[2])
             Plot.add_collection(lines)
         else:
-            Plot.errorbar(X, Y, yerr=Z, fmt='.', color='b')
+            Plot.errorbar(X, Y, yerr=Z, fmt='.', color='b',picker=True,pickradius=5)
             Plot.plot(X, X, color='r')
 
         xylim = np.array([[np.min(X),np.max(X)],[np.min(Y-Z-Ymax/10.),np.max(np.concatenate((Y,Z)))]])
@@ -1587,6 +1600,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
         Page.vaxis = False
         Page.canvas.mpl_connect('key_press_event', OnKeyPress)
         Page.canvas.mpl_connect('motion_notify_event', OnMotion)
+        Page.canvas.mpl_connect('pick_event', OnPick)
         Page.Offset = [0,0]
     
     Page.Choice = (' key press','g: toggle grid','f: toggle Fhkl/F^2hkl plot','q: toggle q/d plot','v: toggle Fo/Fc plot')
@@ -3705,16 +3719,12 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             elif Page.plotStyle['dPlot'] and 'PWDR' in plottype and not ifLimits:
                 lims = G2lat.Pos2dsp(Parms,lims)
             # limit lines
-            Lines.append(Plot.axvline(lims[0][0],color='g',dashes=(5,5),
-                                    picker=True,pickradius=3.))    
-            Lines.append(Plot.axvline(lims[0][1],color='r',dashes=(5,5),
-                                    picker=True,pickradius=3.)) 
+            Lines.append(Plot.axvline(lims[0][0],color='g',dashes=(5,5),picker=True,pickradius=3.))    
+            Lines.append(Plot.axvline(lims[0][1],color='r',dashes=(5,5),picker=True,pickradius=3.)) 
             # excluded region lines
             for i,item in enumerate(lims[1:]):
-                Lines.append(Plot.axvline(item[0],color='m',dashes=(5,5),
-                                    picker=True,pickradius=3.))    
-                Lines.append(Plot.axvline(item[1],color='m',dashes=(5,5),
-                                    picker=True,pickradius=3.))
+                Lines.append(Plot.axvline(item[0],color='m',dashes=(5,5),picker=True,pickradius=3.))    
+                Lines.append(Plot.axvline(item[1],color='m',dashes=(5,5),picker=True,pickradius=3.))
                 exclLines += [2*i+2,2*i+3]
         if G2frame.Contour:
             if Page.plotStyle['chanPlot']:
@@ -3843,8 +3853,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                         DZ = (xye[1]-xye[3])*np.sqrt(wtFactor*xye[2])
                         if 'PWDR' in plottype and len(limits[2:]):
                             DZ = ma.array(DZ,mask=Emask)   # weighted difference is always masked
-                    DifLine = Plot1.plot(X,DZ,colors[3],
-                        picker=True,pickradius=1.,label=incCptn('diff'))                    #(Io-Ic)/sig(Io)
+                    DifLine = Plot1.plot(X,DZ,colors[3],picker=True,pickradius=1.,label=incCptn('diff'))                    #(Io-Ic)/sig(Io)
                     Plot1.axhline(0.,color='k')
                     
                 if Page.plotStyle['logPlot']:
@@ -3853,8 +3862,8 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                             Plot.set_yscale("log",nonpositive='mask') # >=3.3
                         except:
                             Plot.set_yscale("log",nonpositive='mask')
-                        Plot.plot(X,Y,marker=pP,color=colors[0],linewidth=lW,
-                            picker=True,pickradius=3.,clip_on=Clip_on,label=incCptn('obs'))
+                        Plot.plot(X,Y,marker=pP,color=colors[0],linewidth=lW,picker=True,pickradius=3.,
+                            clip_on=Clip_on,label=incCptn('obs'))
                         if G2frame.SinglePlot or G2frame.plusPlot:
                             Plot.plot(X,Z,colors[1],picker=False,label=incCptn('calc'),linewidth=1.5)
                             if G2frame.plusPlot:
@@ -4059,7 +4068,8 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
     
     if G2frame.Contour:
         time0 = time.time()
-        acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+#        acolor = mpl.cm.get_cmap(G2frame.ContourColor) #deprecated
+        acolor = mpl.colormaps[G2frame.ContourColor]
         Vmin = Ymax*G2frame.Cmin
         Vmax = Ymax*G2frame.Cmax
         if unequalArrays:
@@ -9986,7 +9996,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
     def RenderTextureSphere(x,y,z,radius,color,shape=[20,10],Fade=None):
         SpFade = np.zeros(list(Fade.shape)+[4,],dtype=np.dtype('B'))
         SpFade[:,:,:3] = Fade[:,:,nxs]*list(color)
-        SpFade[:,:,3] = 128
+        SpFade[:,:,3] = 60
         spID = GL.glGenTextures(1)
         GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
         GL.glEnable(GL.GL_BLEND)
@@ -10470,14 +10480,13 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                             radius = ballScale*drawingData['sizeH']
                     else:
                         radius = 0.0
-                elif 'Q' in atom[ct]:       #spinning rigid body
-                    for Srb in RBdata.get('Spin',[]):
-                        if Srb == generalData['SpnIds'][atom[ci]]:
-                            radius = [RBdata['Spin'][Srb]['radius'],]
-                            fade = True
-                            Info = G2elem.GetAtomInfo(RBdata['Spin'][Srb]['atType'])
-                            atColor = [Info['Color'],]
-                            break
+                # elif 'Q' in atom[ct]:       #spinning rigid body - set shell color
+                #     for Srb in RBdata.get('Spin',[]):
+                #         if Srb == generalData['SpnIds'][atom[ci]]:
+                #             fade = True
+                #             Info = G2elem.GetAtomInfo(RBdata['Spin'][Srb]['atType'])
+                #             atColor = [Info['Color'],]
+                #             break
                 else:
                     if 'vdW' in atom[cs]:
                         radius = vdwScale*vdWRadii[atNum]
@@ -10496,7 +10505,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                         symAxis = np.array(SpnData.get('symAxis',[0,0,1]))
                         Npsi,Ngam = 60,30       #seems acceptable - don't use smaller!
                         QA = G2mth.invQ(SpnData['Orient'][0])       #rotate about chosen axis
-                        QB = G2mth.make2Quat(np.array([0,0,1.]),symAxis)[0]     #position obj polar axis
+                        QB = G2mth.make2Quat(symAxis,np.array([0,0,1.]))[0]     #position obj polar axis
                         QP = G2mth.AVdeg2Q(360./Npsi,np.array([0,0,1.])) #this shifts by 1 azimuth pixel
                         Q = G2mth.prodQQ(QB,QA)
                         Q = G2mth.prodQQ(Q,QP)
@@ -10506,14 +10515,15 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                         Rp,PSIp,GAMp = G2mth.RotPolbyQ(np.ones_like(PSI),PSI,GAM,Q)
                         SpnData['hide'] = SpnData.get('hide',[False for i in range(len(SpnData['atType']))])
                         for ish,nSH in enumerate(SpnData['nSH']):
-                            if nSH > 0 and not SpnData['hide'][ish]:
-                                SHC = SpnData['SHC'][ish]
-                                P = G2lat.SHarmcal(SytSym,SHC,PSIp,GAMp).reshape((Npsi,Ngam))
-                                if np.min(P) < np.max(P):
-                                    P = (P-np.min(P))/(np.max(P)-np.min(P))
-                                RenderTextureSphere(x,y,z,radius[ish][0],atColor[ish],shape=[Npsi,Ngam],Fade=P.T)
-                        else:
-                            RenderSphere(x,y,z,radius[ish][0],atColor[ish],fade,shape=[60,30])
+                            if not SpnData['hide'][ish]:
+                                if nSH > 0: 
+                                    SHC = SpnData['SHC'][ish]
+                                    P = G2lat.SHarmcal(SytSym,SHC,PSIp,GAMp).reshape((Npsi,Ngam))
+                                    if np.min(P) < np.max(P):
+                                        P = (P-np.min(P))/(np.max(P)-np.min(P))
+                                    RenderTextureSphere(x,y,z,radius[ish][0],atColor[ish],shape=[Npsi,Ngam],Fade=P.T)
+                                else:
+                                    RenderSphere(x,y,z,radius[ish][0],atColor[ish],True,shape=[60,30])
                 else:
                     RenderSphere(x,y,z,radius,atColor)
                 if 'sticks' in atom[cs]:
@@ -10592,8 +10602,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
             # find and display atoms within atomsExpandRadius A
             if atomsExpandRadius > 0:
                 distances2Atoms(x,y,z,atomsExpandRadius,atomsdistRadius,Amat,matRot)
-        elif len(Ind) == 1 and (pageName == 'Map peaks' or
-                                    pageName == 'Draw Options'):
+        elif len(Ind) == 1 and (pageName == 'Map peaks' or pageName == 'Draw Options'):
             # one peak has been selected, show as selected by draw options
             PeakDistRadius = drawingData['PeakDistRadius']
             atomsExpandRadius = drawingData['atomsExpandRadius']
@@ -10632,7 +10641,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                 radius = 0.2
                 Fade = False
                 if testRBObj['rbType'] == 'Spin':
-                    radius = testRBObj['AtInfo'][aType][0][0]
+                    radius = testRBObj['AtInfo'][aType][0]
                     Fade = True
                 color = np.array(testRBObj['AtInfo'][aType][1])
                 if 'RBhighLight' in testRBObj and testRBObj['RBhighLight'] == ind: # highlighted atom is green
@@ -10642,9 +10651,8 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                 if testRBObj['rbType'] != 'Spin':
                     RenderBonds(x,y,z,rbBonds[ind],0.03,Gr)
                 RenderLabel(x,y,z,name,0.2,wxOrange,matRot)
-            RenderRBtriplet(testRBObj['rbObj']['Orig'][0],
-                            testRBObj['rbObj']['Orient'][0],
-                            Bmat,testRBObj['rbObj'].get('symAxis'))
+            RenderRBtriplet(testRBObj['rbObj']['Orig'][0],testRBObj['rbObj']['Orient'][0],
+                Bmat,testRBObj['rbObj'].get('symAxis'))
         if len(mcsaModels) > 1 and pageName == 'MC/SA':             #skip the default MD entry
             for ind,[x,y,z] in enumerate(mcsaXYZ):
                 aType = mcsaTypes[ind]
@@ -10652,7 +10660,8 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                 color = np.array(MCSA['AtInfo'][aType][1])
                 RenderSphere(x,y,z,0.2,color/255.)
                 RenderBonds(x,y,z,mcsaBonds[ind],0.03,Gr/255.)
-                RenderLabel(x,y,z,name,0.3,wxOrange,matRot)
+                if MCSA.get('showLabels',False):
+                    RenderLabel(x,y,z,name,0.3,wxOrange,matRot)
         if Backbones:
             for chain in Backbones:
                 Backbone = Backbones[chain]

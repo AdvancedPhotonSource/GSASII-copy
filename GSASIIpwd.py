@@ -8,11 +8,11 @@ This version hacked to provide Laue Fringe fitting.
 
 '''
 ########### SVN repository information ###################
-# $Date: 2023-03-25 11:11:14 -0500 (Sat, 25 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5523 $
+# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
+# $Author: toby $
+# $Revision: 5529 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpwd.py $
-# $Id: GSASIIpwd.py 5523 2023-03-25 16:11:14Z vondreele $
+# $Id: GSASIIpwd.py 5529 2023-04-02 19:20:32Z toby $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import sys
@@ -36,8 +36,8 @@ import scipy.special as sp
 import scipy.signal as signal
 
 import GSASIIpath
-filversion = "$Revision: 5523 $"
-GSASIIpath.SetVersionNumber("$Revision: 5523 $")
+filversion = "$Revision: 5529 $"
+GSASIIpath.SetVersionNumber("$Revision: 5529 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -5369,8 +5369,8 @@ class profileObj(FP.FP_profile):
         asym =  self.param_dicts[me]['asym']
         ttlist = np.linspace(pos-ttwid/2,pos+ttwid/2,len(self._epsb2))
         Qs = np.pi * 4 * np.sin(np.deg2rad(ttlist/2)) / wave
-        w =  np.exp(-10**((damp-asym) * (Qs - posQ)**2))
-        w2 = np.exp(-10**((damp+asym) * (Qs - posQ)**2))
+        w =  np.exp(-1*10**((damp-asym) * (Qs - posQ)**2))
+        w2 = np.exp(-1*10**((damp+asym) * (Qs - posQ)**2))
         w[len(w)//2:] = w2[len(w)//2:]
         weqdiv = w * np.sin(Qs * ncell * co2)**2 / (np.sin(Qs * co2)**2)
         weqdiv[:np.searchsorted(Qs,posQ - np.pi/self.param_dicts[me]['clat'])] = 0  # isolate central peak, if needed

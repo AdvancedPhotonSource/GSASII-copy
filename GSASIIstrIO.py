@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
+# $Date: 2023-03-30 15:08:28 -0500 (Thu, 30 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5520 $
+# $Revision: 5526 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrIO.py $
-# $Id: GSASIIstrIO.py 5520 2023-03-23 18:03:34Z vondreele $
+# $Id: GSASIIstrIO.py 5526 2023-03-30 20:08:28Z vondreele $
 ########### SVN repository information ###################
 '''
 *GSASIIstrIO: structure I/O routines*
@@ -32,7 +32,7 @@ else:
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5520 $")
+GSASIIpath.SetVersionNumber("$Revision: 5526 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -4193,10 +4193,10 @@ def WriteRBObjSHCAndSig(pfx,rbfx,rbsx,parmDict,sigDict,SHC):
     out = []
     name = pfx+rbfx+'Radius'+rbsx
     namstr = '  names :%12s'%'Radius'
-    valstr = '  values:%12.4f'%parmDict[name]
+    valstr = '  values:%12.5f'%parmDict[name]
     sigstr = '  esds  :'
     if name in sigDict:
-        sigstr += '%12.4f'%sigDict[name]
+        sigstr += '%12.5f'%sigDict[name]
         [name]
     else:
         sigstr += 12*' '
@@ -4204,9 +4204,9 @@ def WriteRBObjSHCAndSig(pfx,rbfx,rbsx,parmDict,sigDict,SHC):
     for item in SHC:
         name = pfx+rbfx+item+rbsx
         namstr += '%12s'%(item)
-        valstr += '%12.4f'%(parmDict[name])
+        valstr += '%12.5f'%(parmDict[name])
         if name in sigDict:
-            sigstr += '%12.4f'%(sigDict[name])
+            sigstr += '%12.5f'%(sigDict[name])
         else:
             sigstr += 12*' '
     out.append(namstr+'\n')

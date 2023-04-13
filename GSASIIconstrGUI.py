@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIconstrGUI - constraint GUI routines
 ########### SVN repository information ###################
-# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
+# $Date: 2023-03-30 15:08:28 -0500 (Thu, 30 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5520 $
+# $Revision: 5526 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIconstrGUI.py $
-# $Id: GSASIIconstrGUI.py 5520 2023-03-23 18:03:34Z vondreele $
+# $Id: GSASIIconstrGUI.py 5526 2023-03-30 20:08:28Z vondreele $
 ########### SVN repository information ###################
 '''
 *GSASIIconstrGUI: Constraint GUI routines*
@@ -28,7 +28,7 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as nl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5520 $")
+GSASIIpath.SetVersionNumber("$Revision: 5526 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 import GSASIIstrIO as G2stIO
@@ -3033,8 +3033,8 @@ create a Vector or Residue rigid body.
         namelist = [data['Spin'][key]['RBname'] for key in data['Spin']]
         name = G2obj.MakeUniqueLabel(name,namelist)
         atColor = G2elem.GetAtomInfo(atType)['Color']
-        data['Spin'][rbid] = {'RBname':name,'Natoms':Natoms,'atType':atType,'rbType':rbType,
-            'useCount':0,'nSH':0,'SHC':[{},],'Radius':[1.0,False],'Matrix':np.eye(3),'rbPos':np.zeros(3),'atColor':atColor}
+        data['Spin'][rbid] = {'RBname':name,'Natoms':Natoms,'atType':atType,'rbType':rbType,'atColor':atColor,
+            'useCount':0,'nSH':0,'SHC':[{},],'Radius':[1.0,False],'Matrix':np.eye(3),'rbPos':np.zeros(3)}
         data['RBIds']['Spin'].append(rbid)
         UpdateSpinRB()
         

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIdataGUI - Main GUI routines
 #========== SVN repository information ###################
-# $Date: 2023-03-26 21:26:51 -0500 (Sun, 26 Mar 2023) $
+# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
 # $Author: toby $
-# $Revision: 5524 $
+# $Revision: 5529 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIdataGUI.py $
-# $Id: GSASIIdataGUI.py 5524 2023-03-27 02:26:51Z toby $
+# $Id: GSASIIdataGUI.py 5529 2023-04-02 19:20:32Z toby $
 #=========- SVN repository information ###################
 '''
 *GSASIIdataGUI: Main GSAS-II GUI*
@@ -63,7 +63,7 @@ try:
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5524 $")
+GSASIIpath.SetVersionNumber("$Revision: 5529 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIfiles as G2fil
@@ -3250,7 +3250,7 @@ class GSASII(wx.Frame):
         self.dirname = os.path.abspath(os.path.expanduser('~'))       #start in the users home directory by default; may be meaningless
         self.TutorialImportDir = None  # location to read tutorial files, set when a tutorial is viewed
         self.LastImportDir = None # last-used directory where an import was done
-        self.LastGPXdir = None    # directory where a GPX file was last read
+        self.LastGPXdir = None    # directory where a GPX file was last  or saved
         self.LastExportDir = None  # the last directory used for exports, if any.
         self.dataDisplay = None
         self.init_vars()
@@ -4626,7 +4626,8 @@ class GSASII(wx.Frame):
                 self.CheckNotebook()
                 G2IO.ProjFileSave(self)
                 self.SetTitleByGPX()
-                os.chdir(dlg.GetDirectory())           # to get Mac/Linux to change directory!
+                self.LastGPXdir = dlg.GetDirectory()
+                os.chdir(self.LastGPXdir) 
                 config = G2G.GetConfigValsDocs()
                 GSASIIpath.addPrevGPX(self.GSASprojectfile,config)
                 G2G.SaveConfigVars(config)
@@ -6761,8 +6762,8 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         self.MaskEdit.Append(G2G.wxID_MASKSAVE,'Save mask','Save mask to file')
         self.MaskEdit.Append(G2G.wxID_MASKLOADNOT,'Load mask','Load mask from file; ignoring threshold')
         self.MaskEdit.Append(G2G.wxID_MASKLOAD,'Load mask w/threshold','Load mask from file keeping the threshold value')
-        self.MaskEdit.Append(G2G.wxID_FINDSPOTS,'Spot mask search','Search for spot mask; NB: slow')
-        self.MaskEdit.Append(G2G.wxID_AUTOFINDSPOTS,'Auto spot mask search','Auto spot mask ssearch; NB: slow')
+        self.MaskEdit.Append(G2G.wxID_FINDSPOTS,'Pixel mask search','Search for pixels to mask; NB: slow')
+        self.MaskEdit.Append(G2G.wxID_AUTOFINDSPOTS,'Multi-IMG pixel mask search','Search multiple images for pixels to mask; NB: slow')
         self.MaskEdit.Append(G2G.wxID_DELETESPOTS,'Delete spot masks','Delete all spot masks')
         submenu.Append(G2G.wxID_NEWMASKARC,'Arc mask','Create an arc mask with mouse input')
         submenu.Append(G2G.wxID_NEWMASKFRAME,'Frame mask','Create a frame mask with mouse input')

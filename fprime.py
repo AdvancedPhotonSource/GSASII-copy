@@ -11,7 +11,7 @@ import numpy as np
 import sys
 import matplotlib as mpl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4837 $")
+GSASIIpath.SetVersionNumber("$Revision: 5534 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 
@@ -242,7 +242,9 @@ without arguments fprime uses CuKa as default (Wave=1.54052A, E=8.0478keV)
         PE = G2elemGUI.PickElements(self,ElList)
         if PE.ShowModal() == wx.ID_OK:
             Elems = PE.Elem
-        PE.Destroy()
+        else:
+            return
+#        PE.Destroy()
         if Elems:
             for El in Elems:
                 ElemSym = El.strip().upper()
@@ -410,8 +412,8 @@ without arguments fprime uses CuKa as default (Wave=1.54052A, E=8.0478keV)
             ff = []
             ffo = []
             for S in Stl: 
-                ff.append(G2elem.ScatFac(Elem[2],S)+res)
-                ffo.append(G2elem.ScatFac(Elem[2],S))
+                ff.append(G2elem.ScatFac(Elem[2],S*S)+res)
+                ffo.append(G2elem.ScatFac(Elem[2],S*S))
                 if self.FFxaxis == 'S':
                     X.append(S)
                 elif self.FFxaxis == 'T':

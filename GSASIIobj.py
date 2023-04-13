@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIobj - data objects for GSAS-II
 ########### SVN repository information ###################
-# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
+# $Date: 2023-03-30 15:08:28 -0500 (Thu, 30 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5520 $
+# $Revision: 5526 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIobj.py $
-# $Id: GSASIIobj.py 5520 2023-03-23 18:03:34Z vondreele $
+# $Id: GSASIIobj.py 5526 2023-03-30 20:08:28Z vondreele $
 ########### SVN repository information ###################
 
 '''
@@ -1393,7 +1393,7 @@ import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import numpy as np
 
-GSASIIpath.SetVersionNumber("$Revision: 5520 $")
+GSASIIpath.SetVersionNumber("$Revision: 5526 $")
 
 DefaultControls = {
     'deriv type':'analytic Hessian',
@@ -2040,7 +2040,7 @@ def CompileVarDesc():
         'RBSAtNo' : 'Atom number for spinning rigid body',
         'RBSO([aijk])' : 'Spinning rigid body orientation parameter \\1',
         'RBSP([xyz])' : 'Spinning rigid body \\1 position parameter',
-        'RBSShRadius' : 'Spinning rigid body radius',
+        'RBSShRadius' : 'Spinning rigid body shell radius',
         'RBSShC([1-20,1-20])'  : 'Spinning rigid body sph. harmonics term',
         'constr([0-9]*)' : 'Generated degree of freedom from constraint',
         'nv-(.+)' : 'New variable assignment with name \\1',
