@@ -32,11 +32,11 @@ Note that GSAS-II variables ``p:h:Dij`` (i,j = 1, 2, 3) and ``p`` is a phase num
 and ``h`` a histogram number are used for the *Dij* values.
 '''
 ########### SVN repository information ###################
-# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
+# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5513 $
+# $Revision: 5520 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIlattice.py $
-# $Id: GSASIIlattice.py 5513 2023-03-14 13:25:52Z vondreele $
+# $Id: GSASIIlattice.py 5520 2023-03-23 18:03:34Z vondreele $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import math
@@ -51,7 +51,7 @@ import GSASIIpath
 import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
-GSASIIpath.SetVersionNumber("$Revision: 5513 $")
+GSASIIpath.SetVersionNumber("$Revision: 5520 $")
 # trig functions in degrees
 sind = lambda x: np.sin(x*np.pi/180.)
 asind = lambda x: 180.*np.arcsin(x)/np.pi
@@ -2705,6 +2705,7 @@ def H2ThPh(H,Bmat,Q):
 
 def SHarmcal(SytSym,SHFln,psi,gam):
     '''Perform a surface spherical harmonics computation.
+    Presently only used for plotting
     Note that the the number of gam values must either be 1 or must match psi
     
     :param str SytSym: sit symmetry - only looking for cubics - remove this

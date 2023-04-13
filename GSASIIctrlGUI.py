@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIctrlGUI - Custom GSAS-II GUI controls
 ########### SVN repository information ###################
-# $Date: 2023-02-27 13:57:27 -0600 (Mon, 27 Feb 2023) $
-# $Author: toby $
-# $Revision: 5508 $
+# $Date: 2023-04-10 08:39:20 -0500 (Mon, 10 Apr 2023) $
+# $Author: vondreele $
+# $Revision: 5536 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIctrlGUI.py $
-# $Id: GSASIIctrlGUI.py 5508 2023-02-27 19:57:27Z toby $
+# $Id: GSASIIctrlGUI.py 5536 2023-04-10 13:39:20Z vondreele $
 ########### SVN repository information ###################
 '''
 *GSASIIctrlGUI: Custom GUI controls*
@@ -176,7 +176,7 @@ except ImportError:
     from matplotlib.backends.backend_wx import FigureCanvas as Canvas
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5508 $")
+GSASIIpath.SetVersionNumber("$Revision: 5536 $")
 import GSASIIdataGUI as G2gd
 import GSASIIpwdGUI as G2pdG
 import GSASIIspc as G2spc
@@ -1134,11 +1134,12 @@ class ASCIIValidator(wxValidator):
             return
         return  # Returning without calling event.Skip, which eats the keystroke
 
-ci = lambda x: int(x + 0.5)  # closest integer       
 class G2Slider(wx.Slider):
     '''Wrapper around wx.Slider widget that implements scaling
     Also casts floats as integers to avoid py3.10+ errors
     '''
+    global ci
+    ci = lambda x: int(x + 0.5)  # closest integer       
     def __init__(self, parent, id=wx.ID_ANY, value=0, minValue=0, maxValue=100, *arg, **kwarg):
         wx.Slider.__init__(self, parent, id, ci(value), ci(minValue), ci(maxValue), *arg, **kwarg)
         self.iscale = 1
@@ -1213,18 +1214,18 @@ def G2SliderWidget(parent,loc,key,label,xmin,xmax,iscale,
     else:
         hSizer = sizer
     hSizer.Add(wx.StaticText(parent,wx.ID_ANY,label),0,wx.ALL|wx.ALIGN_CENTER_VERTICAL)
-    vScale = G2Slider(parent,style=wx.SL_HORIZONTAL,value=int(0.5+iscale*loc[key]))
+    vScale = G2Slider(parent,style=wx.SL_HORIZONTAL,size=(200,25))
     vScale.SetScaling(iscale)
-    vScale.SetScaledValue(loc[key])
     vScale.SetScaledRange(xmin,xmax)
+    vScale.SetScaledValue(loc[key])
     vScale.Bind(wx.EVT_SLIDER, onScale)
     if nDig is None:
         nDig = (10,int(0.9+np.log10(iscale)))
     vEntry = ValidatedTxtCtrl(parent,loc,key,nDig=nDig,OnLeave=onValSet,
                 xmin=xmin,xmax=xmax,typeHint=float,size=size)
     if sizer is None:
-        hSizer.Add(vScale,0,wx.ALL|wx.ALIGN_CENTER_VERTICAL)
         hSizer.Add(vEntry,0,wx.ALL|wx.ALIGN_CENTER_VERTICAL,5)
+        hSizer.Add(vScale,0,wx.ALL|wx.ALIGN_CENTER_VERTICAL,0)
         return hSizer
     else:
         hSizer.Add(vEntry,0,wx.RIGHT|wx.ALIGN_CENTER_VERTICAL,5)
@@ -1505,7 +1506,7 @@ def G2CheckBoxFrontLbl(parent,label,loc,key,OnChange=None):
     label is placed before the CheckBox and returns a sizer rather than the
     G2CheckBox. 
 
-    If the CheckBox is needed, use Sizer.myCheckBox.
+    If the CheckBox is needed, reference Sizer.myCheckBox.
     '''
     Sizer = wx.BoxSizer(wx.HORIZONTAL)
     Sizer.Add(wx.StaticText(parent,label=label),0,WACV)
@@ -3866,8 +3867,7 @@ class OrderBox(wxscroll.ScrolledPanel):
         
 ################################################################################
 def GetImportFile(G2frame, message, defaultDir="", defaultFile="",
-                      style=wx.FD_OPEN, parent=None,
-                      *args, **kwargs):
+    style=wx.FD_OPEN, parent=None,*args, **kwargs):
     '''Uses a customized dialog that gets files from the appropriate import directory. 
     Arguments are used the same as in :func:`wx.FileDialog`. Selection of
     multiple files is allowed if argument style includes wx.FD_MULTIPLE.
@@ -3886,8 +3886,7 @@ def GetImportFile(G2frame, message, defaultDir="", defaultFile="",
     #if GSASIIpath.GetConfigValue('debug'):
     #    print('debug: GetImportFile from '+defaultDir)
     #    print('debug: GetImportFile pth '+pth)
-    dlg = wx.FileDialog(parent, message, defaultDir, defaultFile, *args,
-                        style=style, **kwargs)
+    dlg = wx.FileDialog(parent, message, defaultDir, defaultFile, *args,style=style, **kwargs)
 #    dlg.CenterOnParent()
     if not defaultDir and pth: dlg.SetDirectory(pth)
     try:
@@ -3930,8 +3929,7 @@ def GetImportPath(G2frame):
         if os.path.exists(pth):
             return pth
         elif GSASIIpath.GetConfigValue('debug'):
-            print('Ignoring Config Import_directory value: '+
-                      GSASIIpath.GetConfigValue('Import_directory'))
+            print('Ignoring Config Import_directory value: '+GSASIIpath.GetConfigValue('Import_directory'))
     if G2frame.LastImportDir:
         if os.path.exists(G2frame.LastImportDir):
             return G2frame.LastImportDir
@@ -5315,9 +5313,7 @@ def askSaveDirectory(G2frame):
     :returns: a directory name (str) or None if Cancel is pressed
     '''
     pth = GetExportPath(G2frame)
-    dlg = wx.DirDialog(
-            G2frame, 'Input directory where file(s) will be written', pth,
-            wx.DD_DEFAULT_STYLE)
+    dlg = wx.DirDialog(G2frame,'Input directory where file(s) will be written',pth,wx.DD_DEFAULT_STYLE)
     dlg.CenterOnParent()
     try:
         if dlg.ShowModal() == wx.ID_OK:

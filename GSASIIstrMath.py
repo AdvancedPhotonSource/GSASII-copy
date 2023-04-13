@@ -4,11 +4,11 @@
 -----------------------------------------
 '''
 ########### SVN repository information ###################
-# $Date: 2023-03-16 05:56:09 -0500 (Thu, 16 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5515 $
+# $Date: 2023-04-13 11:17:53 -0500 (Thu, 13 Apr 2023) $
+# $Author: toby $
+# $Revision: 5537 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrMath.py $
-# $Id: GSASIIstrMath.py 5515 2023-03-16 10:56:09Z vondreele $
+# $Id: GSASIIstrMath.py 5537 2023-04-13 16:17:53Z toby $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import time
@@ -21,7 +21,7 @@ import scipy.special as sp
 import multiprocessing as mp
 import pickle
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5515 $")
+GSASIIpath.SetVersionNumber("$Revision: 5537 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -75,12 +75,6 @@ def ApplyRBModels(parmDict,Phases,rigidbodyDict,Update=False):
                 for j in range(len(VRBData[rbId]['VectMag'])):
                     name = '::RBV;'+str(j)+':'+str(i)
                     VRBData[rbId]['VectMag'][j] = parmDict[name]
-    if RBIds['Spin']:
-        SRBData = RBData['Spin']
-        for i,rbId in enumerate(SRBIds):
-            if SRBData[rbId]['useCount']:
-                name = '::RBS;0:'+str(i)
-                SRBData[rbId]['radius'][0] = parmDict[name]
         
     for phase in Phases:
         Phase = Phases[phase]
@@ -170,20 +164,24 @@ def ApplyRBModels(parmDict,Phases,rigidbodyDict,Update=False):
             iAt = AtLookup[RBObj['Ids'][0]]
             jrb = SRBIds.index(RBObj['RBId'][0])
             name = pfx+'RBSOa:%d:%d'%(iAt,jrb)
-            RBObj['Orient'][0][0] = parmDict[name]
+            for i,po in enumerate(['RBSOa:','RBSOi:','RBSOj:','RBSOk:']):
+                name = pfx+'%s%d:%d'%(po,iAt,jrb)
+                RBObj['Orient'][0][i] = parmDict[name]                
             for ish in range(len(RBObj['RBId'])):
                 jrb = SRBIds.index(RBObj['RBId'][ish])
+                name = pfx+'RBSSh;%d;Radius:%d:%d'%(ish,iAt,jrb)
+                RBObj['Radius'][ish][0] = parmDict[name]
                 for item in RBObj['SHC'][ish]:
                     name = pfx+'RBSSh;%d;%s:%d:%d'%(ish,item,iAt,jrb)
                     RBObj['SHC'][ish][item][0] = parmDict[name]
                     
 def ApplyRBModelDervs(dFdvDict,parmDict,rigidbodyDict,Phase):
-    'Computes rigid body derivatives'
+    'Computes rigid body derivatives; there are none for Spin RBs'
     atxIds = ['dAx:','dAy:','dAz:']
     atuIds = ['AU11:','AU22:','AU33:','AU12:','AU13:','AU23:']
     OIds = ['Oa:','Oi:','Oj:','Ok:']
-    RBIds = rigidbodyDict.get('RBIds',{'Vector':[],'Residue':[],'spin':[]})  #these are lists of rbIds
-    if not RBIds['Vector'] and not RBIds['Residue'] and not RBIds['Spin']:
+    RBIds = rigidbodyDict.get('RBIds',{'Vector':[],'Residue':[]})  #these are lists of rbIds
+    if not RBIds['Vector'] and not RBIds['Residue']:
         return
     VRBIds = RBIds['Vector']
     RRBIds = RBIds['Residue']
@@ -203,14 +201,7 @@ def ApplyRBModelDervs(dFdvDict,parmDict,rigidbodyDict,Phase):
     AtLookup = G2mth.FillAtomLookUp(Phase['Atoms'],cia+8)
     pfx = str(Phase['pId'])+'::'
     RBModels =  Phase['RBModels']
-    
-    for irb,RBObj in enumerate(RBModels.get('Spin',[])):
-        name = '::RBS;0:%d'%irb
-        if name in dFdvDict:
-            dFdvDict[name] += dFdvDict[pfx+'RBS;0:%d'%irb]
-        else:            
-            dFdvDict[name] = dFdvDict[pfx+'RBS;0:%d'%irb]
-                   
+                       
     for irb,RBObj in enumerate(RBModels.get('Vector',[])):
         symAxis = RBObj.get('symAxis')
         VModel = RBData['Vector'][RBObj['RBId']]
@@ -382,10 +373,6 @@ def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=Fa
             ThMk,PhMk = MakePolar([SHdat['Oa'],SHdat['Oi'],SHdat['Oj'],SHdat['Ok']-dp],QB)
             QR = np.repeat(twopi*np.sqrt(4.*SQ),HKL.shape[1])     #refl Q for Bessel fxn
             SQR = np.repeat(SQ,HKL.shape[1])
-            Oname = 'Oa:%d:0'%iAt
-            Oiname = 'Oi:%d:0'%iAt
-            Ojname = 'Oj:%d:0'%iAt
-            Okname = 'Ok:%d:0'%iAt
             FF[:,iAt] = 0.
             ishl = 0
 #            dBSdR = np.zeros(HKL.shape[0]*HKL.shape[1])
@@ -393,22 +380,28 @@ def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=Fa
             dSHdOi = np.zeros(HKL.shape[0]*HKL.shape[1])
             dSHdOj = np.zeros(HKL.shape[0]*HKL.shape[1])
             dSHdOk = np.zeros(HKL.shape[0]*HKL.shape[1])
+            if '0' not in SHdat:    #no spin RB for atom Q??
+                break
+            Shell = SHdat['0']
+            Irb = Shell['ShR']
+            Oname = 'Oa:%d:%s'%(iAt,Irb)
+            Oiname = 'Oi:%d:%s'%(iAt,Irb)
+            Ojname = 'Oj:%d:%s'%(iAt,Irb)
+            Okname = 'Ok:%d:%s'%(iAt,Irb)
             while True:
                 shl = '%d'%ishl
                 if shl not in SHdat:
                     break
                 Shell = SHdat[shl]
-                R = Shell['R']
+                R = Shell['Radius']
                 Atm = Shell['AtType']
                 Nat = Shell['Natoms']
                 Irb = Shell['ShR']
                 if 'X' in hType:
                     SFF = G2el.ScatFac(FFtables[Atm],SQR)
-                    dat = G2el.getBLvalues(BLtables)
                 elif 'N' in hType:
-                    dat = G2el.getBLvalues(BLtables)
-                    SFF = dat[Atm]
-                Rname = ';0:%s'%Irb
+                    SFF = G2el.getBLvalues(BLtables)[Atm]
+                Rname = 'Sh;%s;Radius:%d:%s'%(shl,iAt,Irb)
                 R0 = sp.spherical_jn(0,QR*R)/(4.*np.pi)
                 R0P = sp.spherical_jn(0,QR*(R+0.01))/(4.*np.pi)
                 R0M = sp.spherical_jn(0,QR*(R-0.01))/(4.*np.pi)
@@ -439,9 +432,8 @@ def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=Fa
                         FF[:,iAt] += Nat*SFF*BS*SH*Shell[item]
                         name = 'Sh;%s;%s:%d:%s'%(shl,item,iAt,Irb)
                         dFFdS[name] = Nat*SFF*BS*SH
-                        #fill derivatives here wrt iAt,ishl,item or l,m
-                ishl += 1
                 dFFdS[Rname] = dBSdR
+                ishl += 1
             dFFdS[Oname] = dSHdO
             dFFdS[Oiname] = dSHdOi
             dFFdS[Ojname] = dSHdOj
@@ -467,7 +459,7 @@ def GetSHC(pfx,parmDict):
             bits = name.split(';')
             shno = bits[1]
             if shno not in SHCdict[atid]:
-                SHCdict[atid][shno] = {'R':parmDict['::RBS;0:%s'%shno]}
+                SHCdict[atid][shno] = {}
             if 'AtType' in bits[0] or 'Natoms' in bits[0] or 'ShR' in bits[0]:
                 SHCdict[atid][shno][bits[0]] = parmDict[parm]
             elif 'Sh' in name:
@@ -1058,7 +1050,6 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
     Mast = twopisq*np.multiply.outer(ast,ast)
     SGMT = np.array([ops[0].T for ops in SGData['SGOps']])    # must be ops[0].T
     SGT = np.array([ops[1] for ops in SGData['SGOps']])
-    nCent = len(SGData['SGCen'])
     FFtables = calcControls['FFtables']
     BLtables = calcControls['BLtables']
     hType = calcControls[hfx+'histType'] 
@@ -1066,6 +1057,7 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
     nRef = len(refDict['RefList'])
     Tdata,Mdata,Fdata,Xdata,dXdata,IAdata,Uisodata,Uijdata,Gdata = \
         GetAtomFXU(pfx,calcControls,parmDict)
+    atFlg = np.zeros(len(Tdata)) #non zero for Q type atoms - see below
     if not Xdata.size:          #no atoms in phase!
         return {}
     mSize = len(Mdata)
@@ -2904,7 +2896,9 @@ def GetIntensityDerv(refl,im,wave,uniq,G,g,pfx,phfx,hfx,SGData,calcControls,parm
     return dIdsh,dIdsp,dIdPola,dIdPO,dFdODF,dFdSA,dFdAb,dFdEx
         
 def GetSampleSigGam(refl,im,wave,G,GB,SGData,hfx,phfx,calcControls,parmDict):
-    'Needs a doc string'
+    '''Computes the sample-dependent Lorentzian & Gaussian peak width contributions from 
+    size & microstrain parameters
+    '''
     if 'C' in calcControls[hfx+'histType'] or 'B' in calcControls[hfx+'histType']:     #All checked & OK
         costh = cosd(refl[5+im]/2.)
         #crystallite size
@@ -2977,7 +2971,9 @@ def GetSampleSigGam(refl,im,wave,G,GB,SGData,hfx,phfx,calcControls,parmDict):
     return sig,gam
         
 def GetSampleSigGamDerv(refl,im,wave,G,GB,SGData,hfx,phfx,calcControls,parmDict):
-    'Needs a doc string'
+    '''Computes the derivatives on sample-dependent Lorentzian & Gaussian peak widths contributions
+    from size & microstrain parameters
+    '''
     gamDict = {}
     sigDict = {}
     if 'C' in calcControls[hfx+'histType'] or 'B' in calcControls[hfx+'histType']:         #All checked & OK

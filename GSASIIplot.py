@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5513 $
+# $Date: 2023-04-13 11:17:53 -0500 (Thu, 13 Apr 2023) $
+# $Author: toby $
+# $Revision: 5537 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIplot.py $
-# $Id: GSASIIplot.py 5513 2023-03-14 13:25:52Z vondreele $
+# $Id: GSASIIplot.py 5537 2023-04-13 16:17:53Z toby $
 ########### SVN repository information ###################
 '''
 *GSASIIplot: plotting routines*
@@ -33,7 +33,7 @@ plotting routine               action
 :func:`PlotXY`                Simple plot of xy data
 :func:`PlotXYZ`               Simple contour plot of xyz data
 :func:`PlotXYZvect`           Quiver Plot for 3D cartesian vectors
-:func:`Plot3Dxyz`             Surface Plot for 3D vectors
+:func:`Plot3dXYZ`             Surface Plot for 3D vectors
 :func:`PlotAAProb`            Protein "quality" plot 
 :func:`PlotStrain`            Plot of strain data, used for diagnostic purposes
 :func:`PlotSASDSizeDist`      Small angle scattering size distribution plot
@@ -52,7 +52,7 @@ plotting routine               action
 :func:`PlotRigidBody`         show rigid body structures as balls & sticks
 :func:`PlotLayers`            show layer structures as balls & sticks
 :func:`PlotFPAconvolutors`    plots the convolutors from Fundamental Parameters
-:func:'PlotClusterYYZ'        plots the result of cluster analysis
+:func:`PlotClusterXYZ`        plots the result of cluster analysis
 ============================  ===========================================================================
 
 These plotting routines place their graphics in the GSAS-II Plot Window, which contains a
@@ -135,13 +135,13 @@ try:
     import matplotlib.figure as mplfig
     import matplotlib.collections as mplC
     import mpl_toolkits.mplot3d.axes3d as mp3d
-    from scipy.ndimage.interpolation import map_coordinates
+    from scipy.ndimage import map_coordinates
 except (ImportError, ValueError) as err:
     print('GSASIIplot: matplotlib not imported')
     if GSASIIpath.GetConfigValue('debug'): print('error msg:',err)
 
 Clip_on = GSASIIpath.GetConfigValue('Clip_on',True)
-GSASIIpath.SetVersionNumber("$Revision: 5513 $")
+GSASIIpath.SetVersionNumber("$Revision: 5537 $")
 import GSASIIdataGUI as G2gd
 import GSASIIimage as G2img
 import GSASIIpwd as G2pwd
@@ -257,7 +257,10 @@ try:
     obtained from mpl.cm.datad.keys() (currently 10 places in GSAS-II code)
     '''
     oldpaired = mpl.colors.LinearSegmentedColormap('GSPaired',_Old_Paired_data,N=256)
-    mpl.cm.register_cmap(cmap=oldpaired,name='GSPaired')   
+    try:
+        mpl.colormaps.register(oldpaired,name='GSPaired')
+    except:
+        mpl.cm.register_cmap(cmap=oldpaired,name='GSPaired')       #deprecated
     blue = [tuple(1.-np.array(item)) for item in _Old_Paired_data['blue']]
     blue.reverse()
     green = [tuple(1.-np.array(item)) for item in _Old_Paired_data['green']]
@@ -266,10 +269,12 @@ try:
     red.reverse()
     Old_Paired_data_r = {'blue':blue,'green':green,'red':red}
     oldpaired_r = mpl.colors.LinearSegmentedColormap('GSPaired_r',Old_Paired_data_r,N=256)
-    mpl.cm.register_cmap(cmap=oldpaired_r,name='GSPaired_r')   
+    try:
+        mpl.colormaps.register(oldpaired_r,name='GSPaired_r')
+    except:
+        mpl.cm.register_cmap(cmap=oldpaired_r,name='GSPaired_r')   #deprecated
 except Exception as err:
-    pass
-#    print(u'error: {}'.format(err))
+    if GSASIIpath.GetConfigValue('debug'): print('\nMPL CM setup error: {}\n'.format(err))
 
 # options for publication-quality Rietveld plots
 plotOpt = {}
@@ -326,7 +331,7 @@ class G2PlotMpl(_tabPlotWin):
         self.toolbar = GSASIItoolbar(self.canvas,publish=publish)
         self.toolbar.Realize()
         self.plotStyle = {'qPlot':False,'dPlot':False,'sqrtPlot':False,'sqPlot':False,
-            'logPlot':False,'exclude':False,'partials':True}
+            'logPlot':False,'exclude':False,'partials':True,'chanPlot':False}
         
         sizer=wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.canvas,1,wx.EXPAND)
@@ -1160,6 +1165,59 @@ def changePlotSettings(G2frame,Plot):
     #dlg.Show()
     RefreshPlot()
     dlg.ShowModal()
+
+def uneqImgShow(figure,ax,Xlist,Ylist,cmap,vmin,vmax,Ylbls=[]):
+    '''Plots a contour plot where point spacing varies within a dataset 
+    and where the X values may differ between histograms. Note that 
+    the length of Xlist and Ylist must be the same and will be the number
+    of histograms to be plotted 
+
+    :param matplotlib.figure figure:
+        The figure where the plot will be placed.
+    :param matplotlib.axes ax:
+        The axes where the plot will be made.
+    :param list Xlist:
+        A list of X values for each histogram.
+    :param list Ylist:
+        A list of intensities for each histogram.
+    :param matplotlib.colormap cmap: 
+        The colormap used for shading intensities.
+    :param float vmin:
+        Minimum intensity.
+    :param float vmax: float
+        Maximum intensity.
+    :param  list Ylbls: Optional.
+        Label to place on each histogram. The default is [] where the axes
+        are labeled normally with the first histogram numbered starting at 0.
+    '''
+    def midPoints(x):
+        '''Return the pixel corners for a series of steps
+        For the series [1,2,3,5] this will be [0.5,1.5,2.5,4,6]
+        Note that n+1 points are returned for input of n points
+        '''
+        return np.concatenate( [[1.5*x[0] - x[1]/2], (x[:-1]+x[1:])/2, [1.5*x[-1] - x[-2]/2]] )
+
+    lenX = len(Xlist) 
+    if lenX != len(Ylist): 
+        raise Exception("uneqImgShow error: unequal list lengths")
+    figure.subplots_adjust(right=.85)
+    #print('vmin,vmax',vmin,vmax)
+    meshlist = []
+    for i,(X,Y) in enumerate(zip(Xlist,Ylist)):
+        #print(i,'X',min(X),max(X),'Y',min(Y),max(Y))
+        meshlist.append(
+            ax.pcolormesh(midPoints(X), [i-0.5,i+0.5], Y[np.newaxis,:],
+                      cmap=cmap,vmin=vmin,vmax=vmax))
+    # label y axis with provided labels
+    if lenX == len(Ylbls):
+        pos =  np.arange(lenX)
+        ax.set_yticks(pos,Ylbls)
+    # add the colorbar
+    ax1 = figure.add_axes([0.87, 0.1, 0.04, 0.8])
+    mpl.colorbar.ColorbarBase(ax1, cmap=cmap, norm=mpl.colors.Normalize(vmin,vmax))
+    # does not plot grid lines at present
+    # if mpl.rcParams['axes.grid'] 
+    
 #### PlotSngl ################################################################     
 def PlotSngl(G2frame,newPlot=False,Data=None,hklRef=None,Title=''):
     '''Structure factor plotting package - displays zone of reflections as rings proportional
@@ -1398,7 +1456,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
     '''1D Structure factor plotting package - displays reflections as sticks proportional
         to F, F**2, etc. as requested
     '''
-    global xylim,X
+    global xylim,X,hkl
     Name = G2frame.GPXtree.GetItemText(G2frame.PatternId)
     def OnKeyPress(event):
         if event.key == 'q':
@@ -1408,6 +1466,10 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
         elif event.key == 'v':
             Page.vaxis = not Page.vaxis
         Draw()
+        
+    def OnPick(event):
+        H = hkl[:,event.ind[0]]
+        Page.SetToolTipString('#%d: %d,%d,%d'%(event.ind[0],H[0],H[1],H[2]))
 
     def OnMotion(event):
         global X
@@ -1439,25 +1501,30 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
             ypos = event.ydata
             SetCursor(Page)
             try:
-                G2frame.G2plotNB.status.SetStatusText('d =%9.3f F^2 =%9.3f'%(Xpos,ypos),1)                   
+                if Page.vaxis:
+                    if Page.faxis:
+                        G2frame.G2plotNB.status.SetStatusText('Fo =%9.3f Fc =%9.3f; press & hold LB to identify'%(Xpos,ypos),1)
+                    else:
+                        G2frame.G2plotNB.status.SetStatusText('Fo^2 =%9.3f Fc^2 =%9.3f; press & hold LB to identify'%(Xpos,ypos),1)
+                else:
+                    G2frame.G2plotNB.status.SetStatusText('d =%9.3f F^2 =%9.3f'%(Xpos,ypos),1)
             except TypeError:
                 G2frame.G2plotNB.status.SetStatusText('Select '+Title+Name+' pattern first',1)
             Page.SetToolTipString(s)
                 
     def Draw():
-        global xylim
+        global xylim,hkl
         Plot.clear()
         Plot.set_title(Title)
         Plot.set_xlabel(r'd, '+Angstr,fontsize=14)
         Plot.set_ylabel(r'F'+super2,fontsize=14)
         colors=['b','r','g','c','m','k']
         Page.keyPress = OnKeyPress
-        
+        hkl = hklRef.T[:3]
         if 'HKLF' in Name:
             Fosq,sig,Fcsq = hklRef.T[5+Super:8+Super]
         else:
-            Fosq,sig,Fcsq = hklRef.T[8+Super],1.0,hklRef.T[9+Super]
-
+            Fosq,sig,Fcsq = hklRef.T[8+Super],np.nan_to_num(np.sqrt(hklRef.T[8+Super])),hklRef.T[9+Super]
         d = hklRef.T[4+Super].copy()
 
         if Page.vaxis:
@@ -1473,19 +1540,18 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
                 X = Fcsq.copy()
                 Y = Fosq.copy()
                 Z = sig.copy()
-        else:
-            if Page.qaxis:
-                Plot.set_xlabel(r'q, '+Angstr+Pwrm1,fontsize=14)
-                X = 2.*np.pi/d #q
-            else:        
-                X = d #d
-            if Page.faxis:
-                Plot.set_ylabel(r'F',fontsize=14)
-                Y = np.nan_to_num(np.sqrt(Fcsq))
-                Z = np.sqrt(Fosq)
-            else:            
-                Y = Fcsq.copy()
-                Z = Fosq.copy()
+        elif Page.qaxis:
+            Plot.set_xlabel(r'q, '+Angstr+Pwrm1,fontsize=14)
+            X = 2.*np.pi/d   #q
+        else:            
+            X = d  #d
+        if Page.faxis and not Page.vaxis:
+            Plot.set_ylabel(r'F',fontsize=14)
+            Y = np.nan_to_num(np.sqrt(Fcsq))
+            Z = np.nan_to_num(np.sqrt(Fosq))
+        elif not Page.vaxis:            
+            Y = Fcsq.copy()
+            Z = Fosq.copy()
         Ymax = np.max(Y)
         
         if not Page.vaxis:
@@ -1499,7 +1565,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
             lines = mplC.LineCollection(XD,color=colors[2])
             Plot.add_collection(lines)
         else:
-            Plot.errorbar(X, Y, yerr=Z, fmt='.', color='b')
+            Plot.errorbar(X, Y, yerr=Z, fmt='.', color='b',picker=True,pickradius=5)
             Plot.plot(X, X, color='r')
 
         xylim = np.array([[np.min(X),np.max(X)],[np.min(Y-Z-Ymax/10.),np.max(np.concatenate((Y,Z)))]])
@@ -1534,6 +1600,7 @@ def Plot1DSngl(G2frame,newPlot=False,hklRef=None,Super=0,Title=False):
         Page.vaxis = False
         Page.canvas.mpl_connect('key_press_event', OnKeyPress)
         Page.canvas.mpl_connect('motion_notify_event', OnMotion)
+        Page.canvas.mpl_connect('pick_event', OnPick)
         Page.Offset = [0,0]
     
     Page.Choice = (' key press','g: toggle grid','f: toggle Fhkl/F^2hkl plot','q: toggle q/d plot','v: toggle Fo/Fc plot')
@@ -2075,7 +2142,7 @@ def ReplotPattern(G2frame,newPlot,plotType,PatternName=None,PickName=None):
     # for now I am not sure how to regenerate G2frame.HKL
     G2frame.HKL = []  # array of generated reflections
     G2frame.Extinct = [] # array of extinct reflections
-    PlotPatterns(G2frame,newPlot,plotType)
+    PlotPatterns(G2frame,plotType=plotType)
 
 def plotVline(Page,Plot,Lines,Parms,pos,color,pick):
     if Page.plotStyle['qPlot']:
@@ -2118,10 +2185,10 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             print(msg)
         elif G2frame.Weight:
             G2frame.Weight = False
-            PlotPatterns(G2frame,newPlot=newPlot,plotType=plottype,extraKeys=extraKeys)
+            PlotPatterns(G2frame,plotType=plottype,extraKeys=extraKeys)
             PublishRietveldPlot(G2frame,Pattern,Plot,Page)
             G2frame.Weight = True
-            PlotPatterns(G2frame,newPlot=newPlot,plotType=plottype,extraKeys=extraKeys)
+            PlotPatterns(G2frame,plotType=plottype,extraKeys=extraKeys)
             return
         else:
             PublishRietveldPlot(G2frame,Pattern,Plot,Page)
@@ -2230,9 +2297,6 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             else:
                 G2frame.SinglePlot = True                
             G2frame.Contour = not G2frame.Contour
-            if G2frame.Contour:
-                Page.plotStyle['qPlot'] = False
-                Page.plotStyle['dPlot'] = False
         elif (event.key == 'p' and 'PWDR' in plottype and G2frame.SinglePlot):
             Page.plotStyle['partials'] = not Page.plotStyle['partials']
         elif (event.key == 'e' and 'PWDR' in plottype and G2frame.SinglePlot and ifLimits
@@ -2288,20 +2352,23 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             newPlot = True
             if 'PWDR' in plottype:
                 Page.plotStyle['qPlot'] = not Page.plotStyle['qPlot']
-                if Page.plotStyle['qPlot']:
-                    G2frame.Contour = False
                 Page.plotStyle['dPlot'] = False
+                Page.plotStyle['chanPlot'] = False
             elif plottype in ['SASD','REFD']:
                 Page.plotStyle['sqPlot'] = not Page.plotStyle['sqPlot']
+        elif event.key == 'h' and G2frame.Contour:
+            newPlot = True
+            Page.plotStyle['qPlot'] = False
+            Page.plotStyle['dPlot'] = False
+            Page.plotStyle['chanPlot'] = not Page.plotStyle['chanPlot']
+        elif event.key == 'e' and G2frame.Contour:
+            newPlot = True
+            G2frame.TforYaxis = not G2frame.TforYaxis
         elif event.key == 't' and 'PWDR' in plottype and not ifLimits:
-            if G2frame.Contour:
-                G2frame.TforYaxis = not G2frame.TforYaxis
-            else:
-                Page.plotStyle['dPlot'] = not Page.plotStyle['dPlot']
-                if Page.plotStyle['dPlot']:
-                    G2frame.Contour = False                
-                Page.plotStyle['qPlot'] = False
-                newPlot = True      
+            newPlot = True      
+            Page.plotStyle['dPlot'] = not Page.plotStyle['dPlot']
+            Page.plotStyle['qPlot'] = False
+            Page.plotStyle['chanPlot'] = False
         elif event.key == 'm':
             if not G2frame.Contour:                
                 G2frame.SinglePlot = not G2frame.SinglePlot                
@@ -2349,7 +2416,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         wx.CallAfter(PlotPatterns,G2frame,newPlot=newPlot,plotType=plottype,extraKeys=extraKeys)
         
     def OnMotion(event):
-        'Update the status line with info based on the mouse position'
+        'PlotPatterns: Update the status line with info based on the mouse position'
         global PlotList
         SetCursor(Page)
         # excluded region animation
@@ -2406,6 +2473,14 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                 else: # 'C' or  'B' in Parms['Type'][0] or 'PKS' in Parms['Type'][0]:
                     wave = G2mth.getWave(Parms)
                     dT = tolerance*wave*90./(np.pi**2*cosd(xpos/2))
+            elif Page.plotStyle['chanPlot'] and G2frame.Contour:
+                xpos = ma.getdata(X)[min(len(X)-1,int(xpos))]
+                try:
+                    dsp = G2lat.Pos2dsp(Parms,xpos)
+                    q = 2.*np.pi/dsp
+                except:
+                    dsp = -1
+                    q = -1
             elif plottype in ['SASD','REFD']:
                 q = xpos
                 if q <= 0:
@@ -2424,20 +2499,19 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                     G2frame.G2plotNB.status.SetStatusText('d = %9.5f'%dsp)
                     return                
                 dT = tolerance*xpos/dsp
-            elif G2frame.Contour and 'T' in Parms['Type'][0]:
-                xpos = X[int(xpos)]                   
-                dsp = G2lat.Pos2dsp(Parms,xpos)
-                q = 2.*np.pi/dsp
             else:
                 dsp = G2lat.Pos2dsp(Parms,xpos)
                 q = 2.*np.pi/dsp
             statLine = ""
             if G2frame.Contour: #PWDR only
                 try:
+                    pNum = int(ypos+.5)
+                    indx = abs(PlotList[pNum][1][0] - xpos).argmin() # closest point to xpos
+                    val = 'int={:.3g}'.format(ma.getdata(PlotList[pNum][1][1])[indx])
                     if 'T' in Parms['Type'][0]:
-                        statLine = 'TOF =%9.3f d=%9.5f Q=%9.5f pattern ID =%5d, %s'%(xpos,dsp,q,int(ypos+.5),PlotList[int(ypos+.5)][-1])
+                        statLine = 'TOF=%.3f d=%.5f Q=%.5f %s pattern ID=%d, %s'%(xpos,dsp,q,val,pNum,PlotList[pNum][-1])
                     else:
-                        statLine = '2-theta =%9.3f d=%9.5f Q= %9.5f pattern ID =%5d, %s'%(xpos,dsp,q,int(ypos+.5),PlotList[int(ypos+.5)][-1])
+                        statLine = '2-theta=%.3f d=%.5f Q=%.5f %s pattern ID=%d, %s'%(xpos,dsp,q,val,pNum,PlotList[pNum][-1])
                 except IndexError:
                     pass
             else:
@@ -2453,7 +2527,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                         ytmp = ypos
                         if Page.plotStyle['sqrtPlot']:
                             ytmp = ypos**2
-                        statLine = '2-theta=%.3f d=%.5f Q=%.4f Intensity=%.2f'%(xpos,dsp,q,ypos)
+                        statLine = '2-theta=%.3f d=%.5f Q=%.4f Intensity=%.2f'%(xpos,dsp,q,ytmp)
                     elif plottype == 'SASD':
                         statLine = 'q =%12.5g Intensity =%12.5g d =%9.1f'%(q,ypos,dsp)
                     elif plottype == 'REFD':
@@ -3268,15 +3342,19 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         ifLimits = True
         Page.plotStyle['qPlot'] = False
         Page.plotStyle['dPlot'] = False
+    # keys in use for graphics control:
+    #    a,b,c,d,e,f,g,i,l,m,n,o,p,q,r,s,t,u,w,x, (unused: j, k, y, z)
+    #    also: +,/, C,D,S,U
     if G2frame.Contour:
         Page.Choice = (' key press','b: toggle subtract background',
             'd: lower contour max','u: raise contour max',
             'D: lower contour min','U: raise contour min',
             'o: reset contour limits','g: toggle grid',
             'i: interpolation method','S: color scheme','c: contour off',
-            't: temperature for y-axis','s: toggle sqrt plot',
+            'e: toggle temperature for y-axis','s: toggle sqrt plot',
+            'w: toggle w(Yo-Yc) contour plot','h: toggle channel # plot',
+            'q: toggle Q plot','t: toggle d-spacing plot',
             'C: contour plot control window',
-            'w: toggle w(Yo-Yc) contour plot'
             )
     else:
         if 'PWDR' in plottype:
@@ -3293,9 +3371,10 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                         's: toggle sqrt plot','w: toggle (Io-Ic)/sig plot',
                         '+: toggle obs line plot']
             else:
-                Page.Choice += ['q: toggle q plot','s: toggle sqrt plot',
-                    't: toggle d-spacing plot','w: toggle (Io-Ic)/sig plot',
-                    '+: toggle obs line plot']
+                Page.Choice += [
+                        'q: toggle Q plot','t: toggle d-spacing plot',
+                        's: toggle sqrt plot','w: toggle (Io-Ic)/sig plot',
+                        '+: toggle obs line plot']
             if Page.plotStyle['sqrtPlot'] or Page.plotStyle['logPlot']:
                 del Page.Choice[1]
                 del Page.Choice[1]
@@ -3400,7 +3479,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             LimitsList.reverse()
     if timeDebug:
         print('plot build time: %.3f for %dx%d patterns'%(time.time()-time0,len(PlotList[0][1][1]),len(PlotList)))
-    lenX = 0
+    lenX = 0  # length of first histogram, used for contour plots
     Ymax = None
     for ip,Pattern in enumerate(PlotList):
         xye = Pattern[1]
@@ -3422,18 +3501,18 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         Title += ' - background'
     if Page.plotStyle['qPlot'] or plottype in ['SASD','REFD'] and not G2frame.Contour and not ifLimits:
         xLabel = r'$Q, \AA^{-1}$'
-    elif Page.plotStyle['dPlot'] and 'PWDR' in plottype and not G2frame.Contour and not ifLimits:
+    elif Page.plotStyle['dPlot'] and 'PWDR' in plottype and not ifLimits:
         xLabel = r'$d, \AA$'
+    elif Page.plotStyle['chanPlot'] and G2frame.Contour:
+        xLabel = 'Channel no.'
     else:
         if 'T' in ParmList[0]['Type'][0]:
-            if G2frame.Contour:
-                xLabel = r'Channel no.'
-            else:
-                xLabel = r'$TOF, \mathsf{\mu}$s'
+            xLabel = r'$TOF, \mathsf{\mu}$s'
         elif 'E' in ParmList[0]['Type'][0]:
             xLabel = 'E, keV'
         else:
             xLabel = r'$\mathsf{2\theta}$'
+
     if G2frame.Weight and not G2frame.Contour:
         Plot.set_visible(False)         #hide old plot frame, will get replaced below
         GS_kw = {'height_ratios':[4, 1],}
@@ -3478,9 +3557,43 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
     if G2frame.Contour:
         ContourZ = []
         ContourY = []
+        ContourX = None
+        Xlist = []
+        X0 = None
         Nseq = 0
     Nmax = len(PlotList)-1
     time0 = time.time()
+    Plot.figure.subplots_adjust(right=.95)
+    if G2frame.Contour and G2frame.TforYaxis:
+        Plot.set_ylabel('Temperature',fontsize=14)
+    elif G2frame.Contour:
+        Plot.set_ylabel('Data sequence',fontsize=14)
+    unequalArrays = False # set to True for contour plots with unequal pixels
+    avgStep = None
+    if G2frame.Contour:  # detect unequally spaced points in a contour plot
+        for N,Pattern in enumerate(PlotList):
+            xye = np.array(ma.getdata(Pattern[1])) # strips mask = X,Yo,W,Yc,Yb,Yd
+            if Page.plotStyle['qPlot'] and 'PWDR' in plottype and not ifLimits:
+                X = 2.*np.pi/G2lat.Pos2dsp(Parms,xye[0])
+            elif Page.plotStyle['dPlot'] and 'PWDR' in plottype and not ifLimits:
+                X = G2lat.Pos2dsp(Parms,xye[0])
+            else:
+                X = copy.deepcopy(xye[0])
+            if not X0:   
+                X0 = X[0] # save 1st point in 1st pattern
+            elif abs(X0 - X[0]) > 0.05 * X0:
+                unequalArrays = True
+            if Page.plotStyle['qPlot'] or Page.plotStyle['dPlot']:  # not in original units
+                unequalArrays = True
+            elif 'T' in ParmList[0]['Type'][0] and not Page.plotStyle['chanPlot']: # assume TOF is non-linear steps
+                unequalArrays = True
+            # check to see if the average step size changes across the selected patterns
+            elif avgStep is None and not unequalArrays:
+                avgStep = (X[-1]-X[0])/(len(X)-1)
+            elif not unequalArrays and abs(avgStep - (X[-1]-X[0])/(len(X)-1)) > 0.05 * avgStep:
+                unequalArrays = True
+
+    ExMask = []
     for N,Pattern in enumerate(PlotList):
         Parms = ParmList[N]
         Sample = SampleList[N]
@@ -3489,14 +3602,28 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         NoffY = offsetY*(Nmax-N)
         if Pattern[1] is None: continue # skip over uncomputed simulations
         xye = np.array(ma.getdata(Pattern[1])) # strips mask = X,Yo,W,Yc,Yb,Yd
-        xye0 = Pattern[1][0]  # keeps mask
-        if PickId:
+        ExMask.append(np.full(len(xye[0]),False))
+        if PickId:   # when is this not true?
             ifpicked = Pattern[2] == G2frame.GPXtree.GetItemText(PatternId)
             # recompute mask from excluded regions, in case they have changed
+            xye0 = xye[0]  # no mask in case there are no limits
             for excl in limits[2:]:
                 xye0 = ma.masked_inside(xye[0],excl[0],excl[1],copy=False)                   #excluded region mask
-            if not G2frame.Contour:
-                xye0 = ma.masked_outside(xye[0],limits[1][0],limits[1][1],copy=False)            #now mask for limits
+            if unequalArrays:
+                if ma.is_masked(xye0):
+                    ExMask[N] = ma.getmask(xye0)   # save excluded regions
+                xye0 = ma.masked_outside(xye[0],limits[1][0],limits[1][1],copy=False) #now mask for limits
+                Lmask = ma.getmask(xye0)   # limits applied
+                ExMask[N] = ExMask[N][~Lmask] # drop points outside limits
+            elif not G2frame.Contour:
+                xye0 = ma.masked_outside(xye0,limits[1][0],limits[1][1],copy=False) #now mask for limits
+        else:
+            xye0 = Pattern[1][0]  # keeps mask
+            Lmask = Emask = np.full(len(xye0),False)
+
+        if G2frame.Contour:
+            xye0 = xye[0]   # drop mask                
+                
         if Page.plotStyle['qPlot'] and 'PWDR' in plottype and not ifLimits:
             X = 2.*np.pi/G2lat.Pos2dsp(Parms,xye0)
         elif Page.plotStyle['dPlot'] and 'PWDR' in plottype and not ifLimits:
@@ -3585,46 +3712,51 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         if Page.plotStyle['exclude']:
             Y = ma.array(Y,mask=ma.getmask(X))
                 
-        if ifpicked:
+        if ifpicked and not G2frame.Contour: # draw limit & excluded region lines
             lims = limits[1:]
             if Page.plotStyle['qPlot'] and 'PWDR' in plottype and not ifLimits:
                 lims = 2.*np.pi/G2lat.Pos2dsp(Parms,lims)
             elif Page.plotStyle['dPlot'] and 'PWDR' in plottype and not ifLimits:
                 lims = G2lat.Pos2dsp(Parms,lims)
-            # plot limit lines
-            Lines.append(Plot.axvline(lims[0][0],color='g',dashes=(5,5),
-                                    picker=True,pickradius=3.))    
-            Lines.append(Plot.axvline(lims[0][1],color='r',dashes=(5,5),
-                                    picker=True,pickradius=3.)) 
-            # plot excluded region lines
+            # limit lines
+            Lines.append(Plot.axvline(lims[0][0],color='g',dashes=(5,5),picker=True,pickradius=3.))    
+            Lines.append(Plot.axvline(lims[0][1],color='r',dashes=(5,5),picker=True,pickradius=3.)) 
+            # excluded region lines
             for i,item in enumerate(lims[1:]):
-                Lines.append(Plot.axvline(item[0],color='m',dashes=(5,5),
-                                    picker=True,pickradius=3.))    
-                Lines.append(Plot.axvline(item[1],color='m',dashes=(5,5),
-                                    picker=True,pickradius=3.))
+                Lines.append(Plot.axvline(item[0],color='m',dashes=(5,5),picker=True,pickradius=3.))    
+                Lines.append(Plot.axvline(item[1],color='m',dashes=(5,5),picker=True,pickradius=3.))
                 exclLines += [2*i+2,2*i+3]
-        if G2frame.Contour:            
-            if len(X) == lenX :
-                if G2frame.Weight:
-                    ContourZ.append((xye[1]-xye[3])*np.sqrt(xye[2]))
+        if G2frame.Contour:
+            if Page.plotStyle['chanPlot']:
+                if unequalArrays:
+                    X = np.array(range(len(X)),float)
                 else:
-                    ContourZ.append(Y)
-            elif len(X) < lenX:
-                Yext = np.ones(lenX)*Y[-1]
-                Yext[:len(X)] = Y
+                    X = np.array(range(lenX),float)
+                    Lmask = Emask = np.full(len(X),False)
+            if G2frame.Weight:
+                Ytmp = (xye[1]-xye[3])*np.sqrt(xye[2])
+            else:
+                Ytmp = Y
+            # pad or truncate arrays when plotting with mpl.imshow
+            if unequalArrays:
+                ContourZ.append(Ytmp[~Lmask])
+            elif len(Y) < lenX:
+                Yext = np.ones(lenX)*Ytmp[-1]
+                Yext[:len(X)] = Ytmp
                 ContourZ.append(Yext)
+            elif len(Y) > lenX:
+                ContourZ.append(Ytmp[:lenX])
             else:
-                ContourZ.append(Y[:len(X)])
+                ContourZ.append(Ytmp)
+            #if unequalArrays and G2frame.TforYaxis:
+            #    TODO: could set this to temperature and then plot
+            #    against temperature, but this only works if patterns are sorted by T
             ContourY.append(N)
-            if 'C' in ParmList[0]['Type'][0]:        
+            if unequalArrays:
+                Xlist.append(X[~Lmask])
+            elif ContourX is None:
                 ContourX = X
-            else: #'T'OF
-                ContourX = range(lenX)
             Nseq += 1
-            if G2frame.TforYaxis:
-                Plot.set_ylabel('Temperature',fontsize=14)
-            else:
-                Plot.set_ylabel('Data sequence',fontsize=14)
         else:
             if not G2frame.plusPlot:
                 pP = ''
@@ -3721,8 +3853,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                         DZ = (xye[1]-xye[3])*np.sqrt(wtFactor*xye[2])
                         if 'PWDR' in plottype and len(limits[2:]):
                             DZ = ma.array(DZ,mask=Emask)   # weighted difference is always masked
-                    DifLine = Plot1.plot(X,DZ,colors[3],
-                        picker=True,pickradius=1.,label=incCptn('diff'))                    #(Io-Ic)/sig(Io)
+                    DifLine = Plot1.plot(X,DZ,colors[3],picker=True,pickradius=1.,label=incCptn('diff'))                    #(Io-Ic)/sig(Io)
                     Plot1.axhline(0.,color='k')
                     
                 if Page.plotStyle['logPlot']:
@@ -3731,8 +3862,8 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                             Plot.set_yscale("log",nonpositive='mask') # >=3.3
                         except:
                             Plot.set_yscale("log",nonpositive='mask')
-                        Plot.plot(X,Y,marker=pP,color=colors[0],linewidth=lW,
-                            picker=True,pickradius=3.,clip_on=Clip_on,label=incCptn('obs'))
+                        Plot.plot(X,Y,marker=pP,color=colors[0],linewidth=lW,picker=True,pickradius=3.,
+                            clip_on=Clip_on,label=incCptn('obs'))
                         if G2frame.SinglePlot or G2frame.plusPlot:
                             Plot.plot(X,Z,colors[1],picker=False,label=incCptn('calc'),linewidth=1.5)
                             if G2frame.plusPlot:
@@ -3934,26 +4065,46 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                     Plot.legend(handles,legends,title='Phases & Data',loc='best')
                 else:
                     Plot.legend(handles,legends,title='Data',loc='best')
-                    
+    
     if G2frame.Contour:
         time0 = time.time()
-        acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+#        acolor = mpl.cm.get_cmap(G2frame.ContourColor) #deprecated
+        acolor = mpl.colormaps[G2frame.ContourColor]
         Vmin = Ymax*G2frame.Cmin
         Vmax = Ymax*G2frame.Cmax
-        if G2frame.Weight:
-            Vmin = np.min(ContourZ)
-            Vmax = np.max(ContourZ)
-        Page.Img = Plot.imshow(ContourZ,cmap=acolor,vmin=Vmin,vmax=Vmax,
-            interpolation=G2frame.Interpolate,extent=[ContourX[0],ContourX[-1],ContourY[0]-.5,ContourY[-1]+.5],
-            aspect='auto',origin='lower')
-        if G2frame.TforYaxis:
-            imgAx = Page.Img.axes
-            ytics = imgAx.get_yticks()
-            # ytics = np.where(ytics<len(Temps),ytics,-1)
-            # imgAx.set_yticks(ytics)
-            ylabs = [Temps[int(i)] for i in ytics[:-1]]
-            imgAx.set_yticklabels(ylabs)
-        Page.figure.colorbar(Page.Img)
+        if unequalArrays:
+            if G2frame.Weight:  
+                #Vmin = min([i.min() for i in ContourZ])
+                Vmin = min([ma.array(i,mask=m).min() for i,m in zip(ContourZ,ExMask)]) # don't count excluded points in limits
+                #Vmax = max([i.max() for i in ContourZ])
+                Vmax = max([ma.array(i,mask=m).max() for i,m in zip(ContourZ,ExMask)])
+            if G2frame.TforYaxis:
+                imgLbls = Temps
+            else:
+                imgLbls = []
+            uneqImgShow(Plot.figure,Plot,Xlist,ContourZ,cmap=acolor,
+                         vmin=Vmin,vmax=Vmax,Ylbls=imgLbls)
+            Page.Img = None   # don't have an overall image
+            if G2frame.TforYaxis:
+                Plot.yaxis.set_label_coords(-.1, .5)
+            else:
+                Plot.yaxis.set_label_coords(-.05, .5)
+            Plot.xaxis.set_label_coords(0.5, -.07)
+        else:
+            if G2frame.Weight:
+                Vmin = np.min(ContourZ)
+                Vmax = np.max(ContourZ)
+            Page.Img = Plot.imshow(ContourZ,cmap=acolor,vmin=Vmin,vmax=Vmax,
+                interpolation=G2frame.Interpolate,extent=[ContourX[0],ContourX[-1],ContourY[0]-.5,ContourY[-1]+.5],
+                aspect='auto',origin='lower')
+            if G2frame.TforYaxis:
+                imgAx = Page.Img.axes
+                ytics = imgAx.get_yticks()
+                # ytics = np.where(ytics<len(Temps),ytics,-1)
+                # imgAx.set_yticks(ytics)
+                ylabs = [Temps[int(i)] for i in ytics[:-1]]
+                imgAx.set_yticklabels(ylabs)
+            Page.figure.colorbar(Page.Img)
         if timeDebug:
             print('Contour display time: %.3f'%(time.time()-time0))
     else:
@@ -6063,7 +6214,7 @@ def PlotXYZvect(G2frame,X,Y,Z,R,labelX=r'X',labelY=r'Y',labelZ=r'Z',Title='',Plo
         
 #### Plot3dXYZ ################################################################################
 def Plot3dXYZ(G2frame,nX,nY,Zdat,labelX=r'X',labelY=r'Y',labelZ=r'Z',newPlot=False,Title='',Centro=False):
-    
+    '''Creates a surface Plot for 3D vectors'''
     def OnMotion(event):
         xpos = event.xdata
         if xpos:                                        #avoid out of frame mouse position
@@ -9845,7 +9996,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
     def RenderTextureSphere(x,y,z,radius,color,shape=[20,10],Fade=None):
         SpFade = np.zeros(list(Fade.shape)+[4,],dtype=np.dtype('B'))
         SpFade[:,:,:3] = Fade[:,:,nxs]*list(color)
-        SpFade[:,:,3] = 128
+        SpFade[:,:,3] = 60
         spID = GL.glGenTextures(1)
         GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
         GL.glEnable(GL.GL_BLEND)
@@ -10329,14 +10480,13 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                             radius = ballScale*drawingData['sizeH']
                     else:
                         radius = 0.0
-                elif 'Q' in atom[ct]:       #spinning rigid body
-                    for Srb in RBdata.get('Spin',[]):
-                        if Srb == generalData['SpnIds'][atom[ci]]:
-                            radius = [RBdata['Spin'][Srb]['radius'],]
-                            fade = True
-                            Info = G2elem.GetAtomInfo(RBdata['Spin'][Srb]['atType'])
-                            atColor = [Info['Color'],]
-                            break
+                # elif 'Q' in atom[ct]:       #spinning rigid body - set shell color
+                #     for Srb in RBdata.get('Spin',[]):
+                #         if Srb == generalData['SpnIds'][atom[ci]]:
+                #             fade = True
+                #             Info = G2elem.GetAtomInfo(RBdata['Spin'][Srb]['atType'])
+                #             atColor = [Info['Color'],]
+                #             break
                 else:
                     if 'vdW' in atom[cs]:
                         radius = vdwScale*vdWRadii[atNum]
@@ -10350,12 +10500,12 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                         break
                     if SpnData is not None:
                         SytSym = G2spc.SytSym(atom[cx:cx+3],SGData)[0]
-                        radius = SpnData['radius']
+                        radius = SpnData.get('Radius',[[1.0,False],])   #patch for missing Radius
                         atColor = SpnData['atColor']
                         symAxis = np.array(SpnData.get('symAxis',[0,0,1]))
                         Npsi,Ngam = 60,30       #seems acceptable - don't use smaller!
                         QA = G2mth.invQ(SpnData['Orient'][0])       #rotate about chosen axis
-                        QB = G2mth.make2Quat(np.array([0,0,1.]),symAxis)[0]     #position obj polar axis
+                        QB = G2mth.make2Quat(symAxis,np.array([0,0,1.]))[0]     #position obj polar axis
                         QP = G2mth.AVdeg2Q(360./Npsi,np.array([0,0,1.])) #this shifts by 1 azimuth pixel
                         Q = G2mth.prodQQ(QB,QA)
                         Q = G2mth.prodQQ(Q,QP)
@@ -10365,14 +10515,15 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                         Rp,PSIp,GAMp = G2mth.RotPolbyQ(np.ones_like(PSI),PSI,GAM,Q)
                         SpnData['hide'] = SpnData.get('hide',[False for i in range(len(SpnData['atType']))])
                         for ish,nSH in enumerate(SpnData['nSH']):
-                            if nSH > 0 and not SpnData['hide'][ish]:
-                                SHC = SpnData['SHC'][ish]
-                                P = G2lat.SHarmcal(SytSym,SHC,PSIp,GAMp).reshape((Npsi,Ngam))
-                                if np.min(P) < np.max(P):
-                                    P = (P-np.min(P))/(np.max(P)-np.min(P))
-                                RenderTextureSphere(x,y,z,radius[ish][0],atColor[ish],shape=[Npsi,Ngam],Fade=P.T)
-                        else:
-                            RenderSphere(x,y,z,radius[ish][0],atColor[ish],fade,shape=[60,30])
+                            if not SpnData['hide'][ish]:
+                                if nSH > 0: 
+                                    SHC = SpnData['SHC'][ish]
+                                    P = G2lat.SHarmcal(SytSym,SHC,PSIp,GAMp).reshape((Npsi,Ngam))
+                                    if np.min(P) < np.max(P):
+                                        P = (P-np.min(P))/(np.max(P)-np.min(P))
+                                    RenderTextureSphere(x,y,z,radius[ish][0],atColor[ish],shape=[Npsi,Ngam],Fade=P.T)
+                                else:
+                                    RenderSphere(x,y,z,radius[ish][0],atColor[ish],True,shape=[60,30])
                 else:
                     RenderSphere(x,y,z,radius,atColor)
                 if 'sticks' in atom[cs]:
@@ -10451,8 +10602,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
             # find and display atoms within atomsExpandRadius A
             if atomsExpandRadius > 0:
                 distances2Atoms(x,y,z,atomsExpandRadius,atomsdistRadius,Amat,matRot)
-        elif len(Ind) == 1 and (pageName == 'Map peaks' or
-                                    pageName == 'Draw Options'):
+        elif len(Ind) == 1 and (pageName == 'Map peaks' or pageName == 'Draw Options'):
             # one peak has been selected, show as selected by draw options
             PeakDistRadius = drawingData['PeakDistRadius']
             atomsExpandRadius = drawingData['atomsExpandRadius']
@@ -10491,7 +10641,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                 radius = 0.2
                 Fade = False
                 if testRBObj['rbType'] == 'Spin':
-                    radius = testRBObj['AtInfo'][aType][0][0]
+                    radius = testRBObj['AtInfo'][aType][0]
                     Fade = True
                 color = np.array(testRBObj['AtInfo'][aType][1])
                 if 'RBhighLight' in testRBObj and testRBObj['RBhighLight'] == ind: # highlighted atom is green
@@ -10501,9 +10651,8 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                 if testRBObj['rbType'] != 'Spin':
                     RenderBonds(x,y,z,rbBonds[ind],0.03,Gr)
                 RenderLabel(x,y,z,name,0.2,wxOrange,matRot)
-            RenderRBtriplet(testRBObj['rbObj']['Orig'][0],
-                            testRBObj['rbObj']['Orient'][0],
-                            Bmat,testRBObj['rbObj'].get('symAxis'))
+            RenderRBtriplet(testRBObj['rbObj']['Orig'][0],testRBObj['rbObj']['Orient'][0],
+                Bmat,testRBObj['rbObj'].get('symAxis'))
         if len(mcsaModels) > 1 and pageName == 'MC/SA':             #skip the default MD entry
             for ind,[x,y,z] in enumerate(mcsaXYZ):
                 aType = mcsaTypes[ind]
@@ -10511,7 +10660,8 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
                 color = np.array(MCSA['AtInfo'][aType][1])
                 RenderSphere(x,y,z,0.2,color/255.)
                 RenderBonds(x,y,z,mcsaBonds[ind],0.03,Gr/255.)
-                RenderLabel(x,y,z,name,0.3,wxOrange,matRot)
+                if MCSA.get('showLabels',False):
+                    RenderLabel(x,y,z,name,0.3,wxOrange,matRot)
         if Backbones:
             for chain in Backbones:
                 Backbone = Backbones[chain]

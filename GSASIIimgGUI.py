@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - image data display routines
 ########### SVN repository information ###################
-# $Date: 2023-01-09 11:00:59 -0600 (Mon, 09 Jan 2023) $
+# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
 # $Author: toby $
-# $Revision: 5468 $
+# $Revision: 5529 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIimgGUI.py $
-# $Id: GSASIIimgGUI.py 5468 2023-01-09 17:00:59Z toby $
+# $Id: GSASIIimgGUI.py 5529 2023-04-02 19:20:32Z toby $
 ########### SVN repository information ###################
 '''
 *GSASIIimgGUI: Image GUI*
@@ -29,7 +29,7 @@ import matplotlib as mpl
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5468 $")
+GSASIIpath.SetVersionNumber("$Revision: 5529 $")
 import GSASIIimage as G2img
 import GSASIImath as G2mth
 import GSASIIElem as G2elem
@@ -1632,6 +1632,8 @@ def UpdateImageControls(G2frame,data,masks,useTA=None,useMask=None,IntegrateOnly
         if G2frame.autoIntFrame: # ensure only one open at a time
             G2frame.autoIntFrame.Raise()
             return
+        else:
+            print('Auto-integration window already open')
         PollTime = GSASIIpath.GetConfigValue('Autoint_PollTime',30.)
         G2frame.autoIntFrame = AutoIntFrame(G2frame,PollTime=PollTime)
         # debug code to reload code for window on each use
@@ -1796,13 +1798,13 @@ def UpdateMasks(G2frame,data):
         finally:
             dlg.Destroy()
             
-    def OnFindSpotMask(event):
-        '''Do auto search for spot masks
-        Called from (Masks) Operations->"Spot mask search"
+    def OnFindPixelMask(event):
+        '''Do auto search for pixels to mask
+        Called from (Masks) Operations->"Pixel mask search"
         '''
         dlg = wx.MessageDialog(G2frame.dataWindow,
                 'NB: This can be slow (0.5 to 2 min)',
-                'Spot mask search', wx.OK|wx.CANCEL)
+                'Pixel mask search', wx.OK|wx.CANCEL)
         try:
             if dlg.ShowModal() == wx.ID_OK:
                 Controls = G2frame.GPXtree.GetItemPyData( 
@@ -1816,30 +1818,33 @@ def UpdateMasks(G2frame,data):
                 if not np.any(x0) or not np.any(x1):
                     raise Exception
                 nChans = int(1000*(x1-x0)/Controls['pixelSize'][0])//2
-                dlg = wx.ProgressDialog("Auto spot masking for %d bins"%nChans,"Processed 2-theta rings = ",nChans+3,
+                dlg = wx.ProgressDialog("Pixel masking search for %d rings"%nChans,"Processed 2-theta rings = ",nChans+3,
                     style = wx.PD_ELAPSED_TIME|wx.PD_CAN_ABORT)
                 time0 = time.time()
-                data['SpotMask']['spotMask'] = G2img.AutoSpotMask(G2frame.ImageZ,data,Controls,nChans,dlg)
-                print(' Spot masksearch time: %.2f m'%((time.time()-time0)/60.))
+                if data['SpotMask'].get('ClearPrev',True):
+                    data['SpotMask']['spotMask'] = G2img.AutoPixelMask(G2frame.ImageZ,data,Controls,nChans,dlg)
+                else:
+                    data['SpotMask']['spotMask'] |= G2img.AutoPixelMask(G2frame.ImageZ,data,Controls,nChans,dlg)
+                print(' Pixel mask search time: %.2f m'%((time.time()-time0)/60.))
                 wx.CallAfter(UpdateMasks,G2frame,data)
                 wx.CallAfter(G2plt.PlotExposedImage,G2frame,event=event)
             else:
-                print(' Spot mask search not done')
+                print(' Pixel mask search not completed')
         except:
-            print('Invalid limits - spot mask search not done')
+            print('Invalid limits - pixel mask search not done')
         finally:
             dlg.Destroy()
             
-    def OnAutoFindSpotMask(event):
+    def OnAutoFindPixelMask(event):
         Names = G2gd.GetGPXtreeDataNames(G2frame,['IMG ',])
-        dlg = G2G.G2MultiChoiceDialog(G2frame,'Automatic spot mask search','Select images to spot mask:',Names)
+        dlg = G2G.G2MultiChoiceDialog(G2frame,'Multiple image pixel mask search','Select images for pixel masking:',Names)
         try:
             if dlg.ShowModal() == wx.ID_OK:
                 items = dlg.GetSelections()
                 G2frame.EnablePlot = False
                 for item in items:
                     name = Names[item]
-                    print ('Spot search for'+name)
+                    print ('Pixel mask search for'+name)
                     G2frame.Image = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,name)
                     Controls = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,G2frame.Image,'Image Controls'))
                     Mask = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,G2frame.Image,'Masks'))
@@ -1853,13 +1858,13 @@ def UpdateMasks(G2frame,data):
                     if not np.any(x0) or not np.any(x1):
                         raise Exception
                     nChans = int(1000*(x1-x0)/Controls['pixelSize'][0])//2
-                    dlg = wx.ProgressDialog("Spot mask search for %d bins"%nChans,"Processed 2-theta rings = ",nChans+3,
+                    dlg = wx.ProgressDialog("Pixel mask search for %d bins"%nChans,"Processed 2-theta rings = ",nChans+3,
                         style = wx.PD_ELAPSED_TIME|wx.PD_CAN_ABORT)
                     time0 = time.time()
-                    Mask['SpotMask']['spotMask'] = G2img.AutoSpotMask(G2frame.ImageZ,Mask,Controls,nChans,dlg)
-                    print(' Spot mask search time: %.2f m'%((time.time()-time0)/60.))
+                    Mask['SpotMask']['spotMask'] = G2img.AutoPixelMask(G2frame.ImageZ,Mask,Controls,nChans,dlg)
+                    print(' Pixel mask search time: %.2f m'%((time.time()-time0)/60.))
         except:
-            print('Invalid limits - spot mask search not done')
+            print('Invalid limits - pixel mask search not done')
         finally:
             dlg.Destroy()
         G2plt.PlotExposedImage(G2frame,event=None)
@@ -2074,8 +2079,8 @@ def UpdateMasks(G2frame,data):
     G2frame.Bind(wx.EVT_MENU, OnLoadMask, id=G2G.wxID_MASKLOAD)
     G2frame.Bind(wx.EVT_MENU, OnLoadMask, id=G2G.wxID_MASKLOADNOT)
     G2frame.Bind(wx.EVT_MENU, OnSaveMask, id=G2G.wxID_MASKSAVE)
-    G2frame.Bind(wx.EVT_MENU, OnFindSpotMask, id=G2G.wxID_FINDSPOTS)
-    G2frame.Bind(wx.EVT_MENU, OnAutoFindSpotMask, id=G2G.wxID_AUTOFINDSPOTS)
+    G2frame.Bind(wx.EVT_MENU, OnFindPixelMask, id=G2G.wxID_FINDSPOTS)
+    G2frame.Bind(wx.EVT_MENU, OnAutoFindPixelMask, id=G2G.wxID_AUTOFINDSPOTS)
     G2frame.Bind(wx.EVT_MENU, OnDeleteSpotMask, id=G2G.wxID_DELETESPOTS)
     G2frame.Bind(wx.EVT_MENU, ToggleSpotMaskMode, id=G2G.wxID_NEWMASKSPOT)
     G2frame.Bind(wx.EVT_MENU, OnNewArcMask, id=G2G.wxID_NEWMASKARC)
@@ -2148,19 +2153,32 @@ def UpdateMasks(G2frame,data):
     mainSizer.Add(littleSizer,0,)
     spotSizer = wx.BoxSizer(wx.HORIZONTAL)
     data['SpotMask']['esdMul'] = float(data['SpotMask']['esdMul'])
-    spotSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Select n*sigma spot rejection (n=1-10): '),0,WACV)
+    spotSizer.Add(wx.StaticText(G2frame.dataWindow,label='Pixel masking: Select n*sigma rejection (n=1-10): '),0,WACV)
     spotSizer.Add(G2G.ValidatedTxtCtrl(G2frame.dataWindow,loc=data['SpotMask'],
         key='esdMul',xmin=1.,xmax=10.,size=(40,25)),0,WACV)
     numPix = 0
     if data['SpotMask']['spotMask'] is not None:
         numPix = np.count_nonzero(data['SpotMask']['spotMask'])
-    spotSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Number of pixels in spot mask: %d  '%numPix),0,WACV)
-    delbtn = wx.Button(G2frame.dataWindow,label='Clear spot mask')
+    spotSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Number of masked pixels: %d  '%numPix),0,WACV)
+    delbtn = wx.Button(G2frame.dataWindow,label='Clear pixel mask')
     delbtn.Bind(wx.EVT_BUTTON,OnDelBtn)
     spotSizer.Add(delbtn,0,WACV)
     mainSizer.Add(spotSizer,0)
+    spotSizer = wx.BoxSizer(wx.HORIZONTAL)
+    data['SpotMask']['ClearPrev'] = data['SpotMask'].get('ClearPrev',True)
+    data['SpotMask']['SearchMin'] = data['SpotMask'].get('SearchMin',0.0)
+    data['SpotMask']['SearchMax'] = data['SpotMask'].get('SearchMax',180.)
+    spotSizer.Add(G2G.G2CheckBoxFrontLbl(G2frame.dataWindow,'Clear previous pixel mask on search',
+                  data['SpotMask'],'ClearPrev'),0,WACV)
+    spotSizer.Add(wx.StaticText(G2frame.dataWindow,label='  Pixel mask search range, 2theta min: '),0,WACV)
+    spotSizer.Add(G2G.ValidatedTxtCtrl(G2frame.dataWindow,loc=data['SpotMask'],
+        key='SearchMin',xmin=0.,xmax=180.,size=(40,25)),0,WACV)
+    spotSizer.Add(wx.StaticText(G2frame.dataWindow,label='  2theta max: '),0,WACV)
+    spotSizer.Add(G2G.ValidatedTxtCtrl(G2frame.dataWindow,loc=data['SpotMask'],
+        key='SearchMax',xmin=0.,xmax=180.,size=(40,25)),0,WACV)
+    mainSizer.Add(spotSizer,0)
     if len(Spots):
-        lbl = wx.StaticText(parent=G2frame.dataWindow,label=' Spot masks(on plot LB drag to move, shift-LB drag to resize, RB to delete)')
+        lbl = wx.StaticText(parent=G2frame.dataWindow,label=' Spot masks (on plot, LB drag to move, shift-LB drag to resize, RB to delete)')
         lbl.SetBackgroundColour(wx.Colour(200,200,210))
         lbl.SetForegroundColour(wx.Colour(50,50,50))
         mainSizer.Add(lbl,0,wx.EXPAND,0)

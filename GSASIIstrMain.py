@@ -5,11 +5,11 @@
 
 '''
 ########### SVN repository information ###################
-# $Date: 2023-02-13 11:50:24 -0600 (Mon, 13 Feb 2023) $
+# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
 # $Author: vondreele $
-# $Revision: 5498 $
+# $Revision: 5520 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrMain.py $
-# $Id: GSASIIstrMain.py 5498 2023-02-13 17:50:24Z vondreele $
+# $Id: GSASIIstrMain.py 5520 2023-03-23 18:03:34Z vondreele $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import platform
@@ -27,7 +27,7 @@ import numpy.linalg as nl
 import scipy.optimize as so
 import GSASIIpath
 GSASIIpath.SetBinaryPath()
-GSASIIpath.SetVersionNumber("$Revision: 5498 $")
+GSASIIpath.SetVersionNumber("$Revision: 5520 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIImapvars as G2mv
@@ -422,7 +422,7 @@ def Refine(GPXfile,dlg=None,makeBack=True,refPlotUpdate=None,newLeBail=False):
                 G2stIO.SetPhaseData(parmDict,sigDict,Phases,rbIds,covData,restraintDict,printFile)
                 G2stIO.SetISOmodes(parmDict,sigDict,Phases,printFile)
                 G2stIO.SetHistogramPhaseData(parmDict,sigDict,Phases,Histograms,calcControls,
-                                             pFile=printFile,covMatrix=covMatrix,varyList=varyList)
+                    pFile=printFile,covMatrix=covMatrix,varyList=varyList)
                 G2stIO.SetHistogramData(parmDict,sigDict,Histograms,calcControls,pFile=printFile)
                 # check for variables outside their allowed range, reset and freeze them
                 frozen = dropOOBvars(varyList,parmDict,sigDict,Controls,parmFrozenList)

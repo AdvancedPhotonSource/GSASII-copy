@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII image calculations: ellipse fitting & image integration        
 ########### SVN repository information ###################
-# $Date: 2023-01-10 17:29:50 -0600 (Tue, 10 Jan 2023) $
+# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
 # $Author: toby $
-# $Revision: 5469 $
+# $Revision: 5529 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIimage.py $
-# $Id: GSASIIimage.py 5469 2023-01-10 23:29:50Z toby $
+# $Id: GSASIIimage.py 5529 2023-04-02 19:20:32Z toby $
 ########### SVN repository information ###################
 '''
 *GSASIIimage: Image calc module*
@@ -25,7 +25,7 @@ import scipy.interpolate as scint
 import scipy.special as sc
 import copy
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5469 $")
+GSASIIpath.SetVersionNumber("$Revision: 5529 $")
 try:
     import GSASIIplot as G2plt
 except ImportError: # expected in scriptable w/o matplotlib and/or wx
@@ -1709,47 +1709,47 @@ def FitImageSpots(Image,ImMax,ind,pixSize,nxy,spotSize=1.0):
             return None
 
 # Original version
-def AutoSpotMask(Image,Masks,Controls,numChans,dlg=None):
-    '''Find "bad" regions on an image and remove them with a spot mask.
-    This works by masking pixels that are well outside the range of the
-    radial average.
-    Original version from RBVD, takes 1-5 min per image. No longer in use.
-    '''
-    #if GSASIIpath.GetConfigValue('debug'): print('original AutoSpotMask starting')
-    frame = Masks['Frames']
-    tam = ma.make_mask_none(Image.shape)
-    if frame:
-        tam = ma.mask_or(tam,MakeFrameMask(Controls,frame))
-    LUtth = np.array(Controls['IOtth'])
-    dtth = (LUtth[1]-LUtth[0])/numChans
-    esdMul = Masks['SpotMask']['esdMul']
-    prob = 100.*sc.erf(esdMul/np.sqrt(2.))
-    print(' Spots greater than %.2f of band intensity are masked'%prob)
-    mask = ma.make_mask_none(Image.shape)
-    band = ma.array(Image,mask=ma.nomask)
-    TA = Make2ThetaAzimuthMap(Controls,(0,Image.shape[0]),(0,Image.shape[1]))[0]    #2-theta array
-    TThs = np.linspace(LUtth[0],LUtth[1],numChans,False)
-    for it,TTh in enumerate(TThs):
-        band.mask = ma.masked_outside(TA,TTh,TTh+dtth).mask+tam
-        pcmax = np.percentile(band.compressed(),[prob,50.])
-        mband = ma.masked_greater(band,pcmax[0])
-        std = ma.std(mband)
-        anom = ma.masked_greater((band-pcmax[1])/std,esdMul)
-        mask ^= (anom.mask^band.mask)
-        if not dlg is None:
-            GoOn = dlg.Update(it,newmsg='Processed 2-theta rings = %d'%(it))
-            if not GoOn[0]:
-                break
-    return mask
+# def AutoPixelMask(Image,Masks,Controls,numChans,dlg=None):
+#     '''Find "bad" regions on an image and remove them with a pixel mask.
+#     This works by masking pixels that are well outside the range of the
+#     radial average.
+#     Original version from RBVD, takes 1-5 min per image. No longer in use.
+#     '''
+#     #if GSASIIpath.GetConfigValue('debug'): print('original AutoPixelMask starting')
+#     frame = Masks['Frames']
+#     tam = ma.make_mask_none(Image.shape)
+#     if frame:
+#         tam = ma.mask_or(tam,MakeFrameMask(Controls,frame))
+#     LUtth = np.array(Controls['IOtth'])
+#     dtth = (LUtth[1]-LUtth[0])/numChans
+#     esdMul = Masks['SpotMask']['esdMul']
+#     prob = 100.*sc.erf(esdMul/np.sqrt(2.))
+#     print(' Spots greater than %.2f of band intensity are masked'%prob)
+#     mask = ma.make_mask_none(Image.shape)
+#     band = ma.array(Image,mask=ma.nomask)
+#     TA = Make2ThetaAzimuthMap(Controls,(0,Image.shape[0]),(0,Image.shape[1]))[0]    #2-theta array
+#     TThs = np.linspace(LUtth[0],LUtth[1],numChans,False)
+#     for it,TTh in enumerate(TThs):
+#         band.mask = ma.masked_outside(TA,TTh,TTh+dtth).mask+tam
+#         pcmax = np.percentile(band.compressed(),[prob,50.])
+#         mband = ma.masked_greater(band,pcmax[0])
+#         std = ma.std(mband)
+#         anom = ma.masked_greater((band-pcmax[1])/std,esdMul)
+#         mask ^= (anom.mask^band.mask)
+#         if not dlg is None:
+#             GoOn = dlg.Update(it,newmsg='Processed 2-theta rings = %d'%(it))
+#             if not GoOn[0]:
+#                 break
+#     return mask
 
-def AutoSpotMask(Image, Masks, Controls, numChans, dlg=None):
-    '''Find "bad" regions on an image and remove them with a spot mask.
+def AutoPixelMask(Image, Masks, Controls, numChans, dlg=None):
+    '''Find "bad" regions on an image and remove them with a pixel mask.
     This works by masking pixels that are well outside the range of the
     median at that radial distance.
     This is ~4x faster than the original version from RBVD.
     Developed by Howard Yanxon, Wenqian Xu and James Weng. 
 
-    Called from OnFindSpotMask (single image) and OnAutoFindSpotMask 
+    Called from OnFindPixelMask (single image) and OnAutoFindPixelMask 
     (multiple images) in :func:`GSASIIimgGUI.UpdateMasks`
 
     :param np.array Image: 2D data structure describing a diffaction image
@@ -1759,12 +1759,12 @@ def AutoSpotMask(Image, Masks, Controls, numChans, dlg=None):
     :param int numChans: number of channels in eventual 2theta pattern 
       after integration
     :param wx.Dialog dlg: a widget that can be used to show the status of
-      the spot mask scan and can optionally be used to cancel the scan. If 
+      the pixel mask scan and can optionally be used to cancel the scan. If 
       dlg=None then this is ignored (for non-GUI use).
     :returns: a mask array with the same shape as Image or None if the 
       the scan is cancelled from the dlg Dialog.
     '''
-    #if GSASIIpath.GetConfigValue('debug'): print('faster all-Python AutoSpotMask')
+    #if GSASIIpath.GetConfigValue('debug'): print('faster all-Python AutoPixelMask')
     try:
         from scipy.stats import median_absolute_deviation as MAD
     except ImportError:
@@ -1789,6 +1789,10 @@ def AutoSpotMask(Image, Masks, Controls, numChans, dlg=None):
  
     for it in range(len(TThs)):
         masker = (TA >= TThs[it]) & (TA < TThs[it]+dtth) & ~tam
+        if (TThs[it] < Masks['SpotMask'].get('SearchMin',0.0) or 
+            TThs[it] > Masks['SpotMask'].get('SearchMax',180.0)):
+            mask |= masker
+            continue
         bin = band[masker]
         if np.all(np.isnan(bin)):
             continue
@@ -1798,6 +1802,7 @@ def AutoSpotMask(Image, Masks, Controls, numChans, dlg=None):
         mad = MAD(bin, nan_policy='omit')       
         anom = np.abs(band-median)/mad <= esdMul
         mask |= (anom & masker)
+        #print(TThs[it],sum(sum(masker))- sum(sum(anom & masker)))
         if not dlg is None:
             GoOn = dlg.Update(it,newmsg='Processed 2-theta rings = %d'%(it))
             if not GoOn[0]:

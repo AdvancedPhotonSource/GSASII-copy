@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - phase data display routines
 #========== SVN repository information ###################
-# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5513 $
+# $Date: 2023-04-13 11:17:53 -0500 (Thu, 13 Apr 2023) $
+# $Author: toby $
+# $Revision: 5537 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIphsGUI.py $
-# $Id: GSASIIphsGUI.py 5513 2023-03-14 13:25:52Z vondreele $
+# $Id: GSASIIphsGUI.py 5537 2023-04-13 16:17:53Z toby $
 #========== SVN repository information ###################
 '''
 *GSASIIphsGUI: Phase GUI*
@@ -44,7 +44,7 @@ import subprocess as subp
 import distutils.file_util as disfile
 import scipy.optimize as so
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5513 $")
+GSASIIpath.SetVersionNumber("$Revision: 5537 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -3088,7 +3088,7 @@ def UpdatePhaseData(G2frame,Item,data):
             AtCods = []
             atMxyz = []
             for ia,atom in enumerate(Atoms):
-                if atom[1] == 'O':       #skip "magnetic" O atoms
+                if ifMag and atom[1] == 'O':       #skip "magnetic" O atoms
                     continue
                 if ifMag and not len(G2elem.GetMFtable([atom[1],],[2.0,])):
                     continue
@@ -3564,7 +3564,11 @@ def UpdatePhaseData(G2frame,Item,data):
                 Atoms.SetReadOnly(row,colSS,True)                         #site sym
                 Atoms.SetReadOnly(row,colSS+1,True)                       #Mult
             oldSizer = AtomList.GetSizer()
-            if oldSizer: oldSizer.Clear()  # get rid of the old sizer, if repeated call
+            if oldSizer:  # 2nd+ use, clear out old entries
+                for i in oldSizer.GetChildren(): # look for grids in sizer
+                    if type(i.GetWindow()) is G2G.GSGrid:
+                        oldSizer.Detach(i.GetWindow())  # don't delete them
+                oldSizer.Clear(True)
             Atoms.AutoSizeColumns(False)
             mainSizer = wx.BoxSizer(wx.VERTICAL)
             topSizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -6075,7 +6079,9 @@ D.A. Keen, M.T. Dove, A.L. Goodwin and Q. Hui, Jour. Phys.: Cond. Matter (2007),
             histNames = list(histograms.keys())
             mainSizer.Add(wx.StaticText(G2frame.FRMC,label=' Select one histogram for Bragg processing:'),0)
             histoSizer = wx.BoxSizer(wx.HORIZONTAL)
-            histo = wx.ComboBox(G2frame.FRMC,choices=histNames,style=wx.CB_DROPDOWN|wx.TE_READONLY) 
+            histo = wx.ComboBox(G2frame.FRMC,choices=histNames,style=wx.CB_DROPDOWN|wx.TE_READONLY)
+            if RMCPdict['histogram'][0] == '':
+                RMCPdict['histogram'][0] = histo.GetStringSelection()
             histo.SetStringSelection(RMCPdict['histogram'][0])
             histo.Bind(wx.EVT_COMBOBOX,OnHisto)
             histoSizer.Add(histo,0,WACV)
@@ -6421,6 +6427,8 @@ S.J.L. Billinge, J. Phys, Condens. Matter 19, 335219 (2007)., Jour. Phys.: Cond.
         generalData = data['General']
         if not G2frame.GSASprojectfile:     #force a project save
             G2frame.OnFileSaveas(event)
+        dName = G2frame.LastGPXdir            
+        os.chdir(dName)
         if G2frame.RMCchoice == 'fullrmc':
             RMCPdict = data['RMC']['fullrmc']
             pName = G2frame.GSASprojectfile.split('.')[0] + '-' + generalData['Name']
@@ -6444,6 +6452,7 @@ S.J.L. Billinge, J. Phys, Condens. Matter 19, 335219 (2007)., Jour. Phys.: Cond.
                 wx.MessageDialog(G2frame,'ERROR: Phase name has space; change phase name','Bad phase name',wx.ICON_ERROR).ShowModal()
                 G2frame.dataWindow.FRMCDataEdit.Enable(G2G.wxID_RUNRMC,False)
                 return
+            dName = G2frame.LastGPXdir            
             pName = generalData['Name']
             G2frame.dataWindow.FRMCDataEdit.Enable(G2G.wxID_RUNRMC,True)
             RMCPdict = data['RMC']['RMCProfile']
@@ -9160,8 +9169,11 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
 #### UpdateDrawAtoms executable code starts here
         G2frame.GetStatusBar().SetStatusText('',1)
         oldSizer = drawAtomsList.GetSizer()
-        if oldSizer: 
-            oldSizer.Clear()  # get rid of the old sizer, if repeated call
+        if oldSizer: # 2nd+ use, clear out old entries
+            for i in oldSizer.GetChildren(): # look for grids in sizer
+                if type(i.GetWindow()) is G2G.GSGrid:
+                    oldSizer.Detach(i.GetWindow())  # don't delete them
+            oldSizer.Clear(True)
         generalData = data['General']
         SetupDrawingData()
         drawingData = data['Drawing']
@@ -10410,16 +10422,18 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                 
             valSize = (50,20)
             mapSizer = wx.BoxSizer(wx.VERTICAL)
-            showMap = wx.CheckBox(drawOptions,-1,label=' Show density map?')
+            showMap = wx.CheckBox(drawOptions,label=' Show density map?')
             showMap.Bind(wx.EVT_CHECKBOX, OnShowMap)
             showMap.SetValue(drawingData['showMap'])
             mapSizer.Add(showMap,0)
-            mapSizer.Add(G2G.G2SliderWidget(drawOptions,drawingData,'contourLevel',
-                'Max relative to rho max ({:.2f}): '.format(generalData['Map']['rhoMax']),
-                0.01,1.0,100,size=valSize,onChange=G2plt.PlotStructure,onChangeArgs=(G2frame,data)))
-            mapSizer.Add(G2G.G2SliderWidget(drawOptions,drawingData,'mapSize',
-                'Range of map surrounding view point: ',0.1,10.,10.,size=valSize,
-                onChange=G2plt.PlotStructure,onChangeArgs=(G2frame,data)))
+            sliders = wx.FlexGridSizer(0,3,5,5)
+            G2G.G2SliderWidget(drawOptions,drawingData,'contourLevel',
+                'Fraction of rho max ({:.2f}): '.format(generalData['Map']['rhoMax']),0.01,1.0,100.,
+                sizer=sliders,size=valSize,onChange=G2plt.PlotStructure,onChangeArgs=(G2frame,data))
+            G2G.G2SliderWidget(drawOptions,drawingData,'mapSize',
+                'Visible map radius: ',0.1,10.,10.,sizer=sliders,size=valSize,
+                onChange=G2plt.PlotStructure,onChangeArgs=(G2frame,data))
+            mapSizer.Add(sliders)
             lineSizer = wx.BoxSizer(wx.HORIZONTAL)
             lineSizer.Add(wx.StaticText(drawOptions,wx.ID_ANY,'On map peak selection:  '),0,WACV)
             lineSizer.Add(G2G.G2CheckBox(drawOptions,'Move view point',drawingData,'peakMoveView'))
@@ -11428,7 +11442,7 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                 or azimuth)
                 '''
                 newXYZ = G2mth.UpdateRBXYZ(Bmat,RBObj,RBData,rbType)[0]
-                Sytsym,Mult = G2spc.SytSym(rbObj['Orig'][0],SGData)[:2]
+                Sytsym,Mult = G2spc.SytSym(RBObj['Orig'][0],SGData)[:2]
                 sytsymtxt.SetLabel('Origin site symmetry: %s, multiplicity: %d '%(Sytsym,Mult))
                 maxFrac = 0.0
                 for Id in RBObj['Ids']:
@@ -11578,7 +11592,7 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                 rbData = RBData['Spin'][rbIds[selection]]
                 RBObj['RBId'].append(rbIds[selection])
                 RBObj['SHC'].append({})
-                for name in ['atColor','atType','Natoms','nSH','radius','RBname','RBsym']:
+                for name in ['atColor','atType','Natoms','nSH','RBname','RBsym','Radius']:
                     RBObj[name].append(rbData[name])
                 RBObj['hide'].append(False)
                 RBData['Spin'][rbIds[selection]]['useCount'] += 1
@@ -11609,17 +11623,22 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     Obj = event.GetEventObject()
                     iSh,name = Indx[Obj.GetId()]
                     RBObj['SHC'][iSh][name][2] = not RBObj['SHC'][iSh][name][2]
+                    
+                def OnRadRef(event):
+                    Obj = event.GetEventObject()
+                    iSh = Indx[Obj.GetId()]
+                    RBObj['Radius'][iSh][1] = not RBObj['Radius'][iSh][1]
                 
                 def NewSHC(invalid,value,tc):
                     G2plt.PlotStructure(G2frame,data)
-                    
+                                       
                 def OnDelShell(event):
                     Obj = event.GetEventObject()
                     iSh = Indx[Obj.GetId()]
                     rbId = RBObj['RBId'][iSh]
                     RBData['Spin'][rbId]['useCount'] -= 1
                     RBData['Spin'][rbId]['useCount'] = max(0,RBData['Spin'][rbId]['useCount'])
-                    for name in ['atColor','atType','Natoms','nSH','radius','RBId','RBname','RBsym','SHC']:
+                    for name in ['atColor','atType','Natoms','nSH','RBId','RBname','RBsym','SHC','Radius']:
                         del RBObj[name][iSh]
                     G2plt.PlotStructure(G2frame,data)
                     wx.CallAfter(FillRigidBodyGrid,True,spnId=rbId)
@@ -11627,8 +11646,13 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     
                 shSizer = wx.BoxSizer(wx.VERTICAL)
                 for iSh,nSh in enumerate(RBObj['nSH']):
+                    #patch
+                    if 'Radius' not in RBObj:
+                        RBObj['Radius'] = [[1.0,False] for i in range(len(RBObj['nSH']))]
+                    #end patch
                     rbId = RBObj['RBId'][iSh]
-                    RBObj['atType'][iSh] = RBData['Spin'][rbId]['atType']
+                    RBObj['atType'][iSh] = RBData['Spin'][rbId]['atType']                   
+                    RBObj['atColor'][iSh] = G2elem.GetAtomInfo(RBObj['atType'][iSh])['Color']  #correct atom color for shell
                     if iSh:
                         subLine = wx.BoxSizer(wx.HORIZONTAL)
                         subLine.Add(wx.StaticText(RigidBodies,label='Shell %d: Name: %s   Atom type: %s RB sym: %s '  \
@@ -11651,7 +11675,15 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     shOrder.Bind(wx.EVT_COMBOBOX,OnSHOrder)
                     shoSizer.Add(shOrder,0,WACV)
                     if RBObj['nSH'][iSh]>0:
-                        shoSizer.Add(wx.StaticText(RigidBodies,label=" 'c' for cubic harmonic term"),0,WACV)
+                        shoSizer.Add(wx.StaticText(RigidBodies,label=" 'c' for cubic harmonic term. "),0,WACV)
+                    shoSizer.Add(wx.StaticText(RigidBodies,label=' Radius: '),0,WACV)
+                    shoSizer.Add(G2G.ValidatedTxtCtrl(RigidBodies,RBObj['Radius'][iSh],0,nDig=(8,5),xmin=0.0,xmax=5.0,
+                        typeHint=float,size=(70,-1),OnLeave=NewSHC),0,WACV)
+                    radref = wx.CheckBox(RigidBodies,label=' refine? ')
+                    radref.SetValue(RBObj['Radius'][iSh][1])
+                    radref.Bind(wx.EVT_CHECKBOX,OnRadRef)
+                    Indx[radref.GetId()] = iSh
+                    shoSizer.Add(radref,0,WACV)
                     shSizer.Add(shoSizer)
                     if not RBObj['nSH'][iSh]:
                         shSizer.Add(wx.StaticText(RigidBodies,
@@ -11794,7 +11826,9 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                 torSizer.Add(torCheck,0,WACV)
             resrbSizer.Add(torSizer)
             members = 'Rigid body members: '
-            for Id in RBObj['Ids']:
+            for nId,Id in enumerate(RBObj['Ids']):
+                if nId and not nId%10:
+                    members += ('\n'+30*' ')
                 members += data['Atoms'][AtLookUp[Id]][ct-1].strip()+', '
             resrbSizer.Add(wx.StaticText(RigidBodies,label=members[:-2]),0)
             fracSizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -12055,6 +12089,7 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     rbName = RBnames[spnId]
             rbObj = data['RBModels']['Spin'][spnId]
             data['Drawing']['viewPoint'][0] = data['Atoms'][AtLookUp[RBObj['Ids'][0]]][cx:cx+3]
+            data['Drawing']['Quaternion'] = rbObj['Orient'][0]
             spnSelect = wx.ListBox(RigidBodies,choices=RBnames,style=wx.LB_SINGLE,size=(-1,120))
             if spnId != -1:
                 spnSelect.SetSelection(spnId)
@@ -12252,6 +12287,7 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     AtLookUp = G2mth.FillAtomLookUp(atomData,cia+8)
                     G2lat.RBsymCheck(atomData,ct,cx,cs,AtLookUp,Amat,Ids,SGData)
                 if updateNeeded:
+                    SetupGeneral()
                     UpdateDrawAtoms()
                     G2plt.PlotStructure(G2frame,data)
                 
@@ -12278,14 +12314,15 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     else:
                         break
                 rbObj['RBname'] = rbName
-                # if type(rbObj['Orig'][0]) is tuple:      # patch because somehow adding RB origin is becoming a tuple                
-                #     if GSASIIpath.GetConfigValue('debug'): print('patching origin!')
-                #     rbObj['Orig'][0] = list(rbObj['Orig'][0])    # patch: somehow this was getting set as a tuple
                 if not rbType in data['RBModels']:
                     data['RBModels'][rbType] = []
                 if rbType == 'Spin':    #convert items to lists of shells
-                    for name in ['atColor','atType','Natoms','nSH','radius','RBId','RBname','RBsym']:
-                        item = rbObj[name]                        
+                    for name in ['atColor','atType','Natoms','nSH','Radius','RBId','RBname','RBsym']:
+                        #patch
+                        if name == 'Radius' and name not in rbObj:
+                            item = rbObj['radius']
+                        else:
+                            item = rbObj[name]                        
                         rbObj[name] = [item,] 
                 data['RBModels'][rbType].append(copy.deepcopy(rbObj))
                 RBData[rbType][rbId]['useCount'] += 1
@@ -12939,7 +12976,7 @@ of the crystal structure.
         rbType,rbId = rbNames[selection]
         if rbType == 'Spin':
             data['testRBObj']['rbAtTypes'] = [RBData[rbType][rbId]['rbType'],] 
-            data['testRBObj']['AtInfo'] = {RBData[rbType][rbId]['rbType']:[RBData[rbType][rbId]['radius'],(128, 128, 255)],}
+            data['testRBObj']['AtInfo'] = {RBData[rbType][rbId]['rbType']:[1.0,(128, 128, 255)],}
             data['testRBObj']['rbType'] = rbType
             data['testRBObj']['rbData'] = RBData
             data['testRBObj']['Sizers'] = {}
@@ -12972,6 +13009,8 @@ of the crystal structure.
         data['testRBObj']['rbObj'] = {'Orig':[[0,0,0],False],
                     'Orient':[[0.,0.,0.,1.],' '],'Ids':[],'RBId':rbId,'Torsions':[],
                     'numChain':'','RBname':RBData[rbType][rbId]['RBname']}
+        # if rbType == 'Spin':
+        #     data['testRBObj']['rbObj']['Radius'] = [1.0,False]
         data['testRBObj']['torAtms'] = []                
         for item in RBData[rbType][rbId].get('rbSeq',[]):
             data['testRBObj']['rbObj']['Torsions'].append([item[2],False])
@@ -13185,7 +13224,7 @@ of the crystal structure.
                 wx.EndBusyCursor()
             FillRigidBodyGrid()
             
-##### MC/SA routines ################################################################################
+#### MC/SA routines ################################################################################
     def UpdateMCSA(Scroll=0):
         Indx = {}
         
@@ -13358,7 +13397,7 @@ of the crystal structure.
                     for it,tor in enumerate(model['Tor'][0]):
                         iBeg,iFin = RBData['Residue'][model['RBId']]['rbSeq'][it][:2]
                         name = atNames[iBeg]+'-'+atNames[iFin]
-                        torRef = wx.CheckBox(G2frame.MCSA,-1,label=' %s: '%(name))
+                        torRef = wx.CheckBox(G2frame.MCSA,label=' %s: '%(name))
                         torRef.SetValue(model['Tor'][1][it])
                         torRef.Bind(wx.EVT_CHECKBOX,OnPosRef)
                         Indx[torRef.GetId()] = [model,'Tor',it]
@@ -13503,9 +13542,16 @@ of the crystal structure.
             G2frame.dataWindow.Refresh()
             G2frame.dataWindow.SendSizeEvent()
             wx.CallAfter(oldFocus.SetFocus)
+            
+        def OnShoLabels(event):
+            data['MCSA']['showLabels'] = not data['MCSA']['showLabels']
+            G2plt.PlotStructure(G2frame,data)
         
         # UpdateMCSA executable code starts here
         if G2frame.MCSA.GetSizer(): G2frame.MCSA.GetSizer().Clear(True)
+        #patch
+        data['MCSA']['showLabels'] = data['MCSA'].get('showLabels',False)
+        #end patch
         if not data['Drawing']:                 #if new drawing - no drawing data!
             SetupDrawingData()
         general = data['General']
@@ -13556,14 +13602,19 @@ of the crystal structure.
                 G2frame.bottomSizer.Add(rbSizer(data['MCSA']['Models'][rbids[0]]))
                 mainSizer.Add(G2frame.bottomSizer)
                 
+        mainSizer.Add((5,5),0)
+        bottomSizer = wx.BoxSizer(wx.HORIZONTAL)
+        resStr = 'MC/SA results:  '
         if not data['MCSA']['Results']:
-            mainSizer.Add((5,5),0)
-            mainSizer.Add(wx.StaticText(G2frame.MCSA,-1,'No MC/SA results:'),0)
-            mainSizer.Add((5,5),0)
-        else:
-            mainSizer.Add((5,5),0)
-            mainSizer.Add(wx.StaticText(G2frame.MCSA,-1,'MC/SA results:'),0)
-            mainSizer.Add((5,5),0)
+            resStr = 'No'+resStr
+        bottomSizer.Add(wx.StaticText(G2frame.MCSA,-1,resStr),0,WACV)
+        shoLabels = wx.CheckBox(G2frame.MCSA,label=' Show atom labels? ')
+        shoLabels.SetValue(data['MCSA']['showLabels'])
+        shoLabels.Bind(wx.EVT_CHECKBOX,OnShoLabels)
+        bottomSizer.Add(shoLabels,0,WACV)
+        mainSizer.Add(bottomSizer)
+        mainSizer.Add((5,5),0)
+        if data['MCSA']['Results']:
             Results = data['MCSA']['Results']
             mainSizer.Add(ResultsSizer(Results),0,wx.EXPAND)
             
@@ -14185,7 +14236,11 @@ of the crystal structure.
         # beginning of FillMapPeaksGrid()
         G2frame.GetStatusBar().SetStatusText('',1)
         oldSizer = MapPeakList.GetSizer()
-        if oldSizer: oldSizer.Clear()
+        if oldSizer: # 2nd+ use, clear out old entries
+            for i in oldSizer.GetChildren(): # look for grids in sizer
+                if type(i.GetWindow()) is G2G.GSGrid:
+                    oldSizer.Detach(i.GetWindow())  # don't delete them
+            oldSizer.Clear(True)
         mainSizer = wx.BoxSizer(wx.VERTICAL)
         topSizer = wx.BoxSizer(wx.HORIZONTAL)
         topSizer.Add(wx.StaticText(MapPeakList,label='Fourier map peak positions for %s:'%data['General']['Name']),0,WACV)
@@ -14691,8 +14746,16 @@ of the crystal structure.
         ChangePage(page)
         
     def ChangePage(page):
-        for p in G2frame.phaseDisplay.gridList: # clear out all grids, forcing edits in progress to complete
-            p.ClearGrid()
+        newlist = []
+        # force edits in open grids to complete
+        for p in G2frame.phaseDisplay.gridList:
+            if not p: continue   # skip deleted grids
+            try:
+                p.ClearGrid()
+                newlist.append(p)
+            except:
+                pass
+        G2frame.phaseDisplay.gridList = newlist  # remove deleted grids from list
         text = G2frame.phaseDisplay.GetPageText(page)
         G2frame.lastSelectedPhaseTab = text
         G2frame.dataWindow.helpKey = 'Phase-'+text # use name of Phase tab for help lookup
@@ -15036,9 +15099,10 @@ of the crystal structure.
         Pages.append('RB Models')
         
     MapPeakList = wx.ScrolledWindow(G2frame.phaseDisplay)   
+    G2frame.phaseDisplay.AddPage(MapPeakList,'Map peaks')
+    # create the grid once; N.B. need to reference at this scope
     MapPeaks = G2G.GSGrid(MapPeakList)
     G2frame.phaseDisplay.gridList.append(MapPeaks)    
-    G2frame.phaseDisplay.AddPage(MapPeakList,'Map peaks')
     
     if data['General']['doDysnomia']:
         G2frame.MEMData = wx.ScrolledWindow(G2frame.phaseDisplay)
