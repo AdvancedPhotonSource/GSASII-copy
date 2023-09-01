@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-08-31 08:06:14 -0500 (Tue, 31 Aug 2021) $
-# $Author: vondreele $
-# $Revision: 5019 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pwd_xye.py $
-# $Id: G2pwd_xye.py 5019 2021-08-31 13:06:14Z vondreele $
+# $Id: G2pwd_xye.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2pwd_xye: Topas .xye data*
-------------------------------------
-
-Routine to read in powder data from a Topas-compatible .xye file
-
 '''
 
 from __future__ import division, print_function
@@ -22,7 +17,7 @@ import GSASIIpath
 
 asind = lambda x: 180.*np.arcsin(x)/np.pi
 
-GSASIIpath.SetVersionNumber("$Revision: 5019 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 class xye_ReaderClass(G2obj.ImportPowderData):
     'Routines to import powder data from a .xye/.chi file'
     def __init__(self):

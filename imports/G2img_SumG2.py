@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2017-10-23 11:39:16 -0500 (Mon, 23 Oct 2017) $
-# $Author: vondreele $
-# $Revision: 3136 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2img_SumG2.py $
-# $Id: G2img_SumG2.py 3136 2017-10-23 16:39:16Z vondreele $
+# $Id: G2img_SumG2.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2img_SumG2: Python pickled image*
-------------------------------------------
-
 '''
 
 from __future__ import division, print_function
@@ -20,7 +17,7 @@ else:
     import pickle as cPickle
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 3136 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 class G2_ReaderClass(G2obj.ImportImage):
     '''Routine to read an image that has been pickled in Python. Images
     in this format are created by the "Sum image data" command. At least for

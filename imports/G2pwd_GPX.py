@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2019-02-22 09:35:29 -0600 (Fri, 22 Feb 2019) $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 3828 $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pwd_GPX.py $
-# $Id: G2pwd_GPX.py 3828 2019-02-22 15:35:29Z toby $
+# $Id: G2pwd_GPX.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2pwd_GPX: GSAS-II projects*
-------------------------------------
-Routine to import powder data from GSAS-II .gpx files
-
 '''
 from __future__ import division, print_function
 import platform
@@ -21,7 +17,7 @@ else:
 import numpy as np
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 3828 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 def cPickleLoad(fp):
     if '2' in platform.python_version_tuple()[0]:

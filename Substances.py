@@ -1,7 +1,13 @@
+#/usr/bin/env python
+# -*- coding: utf-8 -*-
+########### SVN repository information ###################
+# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
+# $Author: toby $
+# $Revision: 5572 $
+# $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/Substances.py $
+# $Id: Substances.py 5572 2023-05-10 02:43:48Z toby $
+########### SVN repository information ###################
 """
-*Substances: Define Materials*
----------------------------------------------------------------------------------
-
 Defines materials commonly found in small angle & reflectometry experiments.
 GSASII substances as a dictionary ''Substances.Substances'' with these materials.
 
@@ -10,7 +16,7 @@ Each entry in ''Substances'' consists of::
      'key':{'Elements':{element:{'Num':float number in formula},...},'Density':value, 'Volume':,value}
 
 Density & Volume are optional, if one missing it is calculated from the other; if both
-are missing then Volume is estimated from composition & assuming 10A^3 for each atom,
+are missing then Volume is estimated from composition & assuming 10 \\AA^3 for each atom. 
 Density is calculated from that Volume.
 See examples below for what is needed.
 """

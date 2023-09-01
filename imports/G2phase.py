@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-03-24 13:06:49 -0500 (Wed, 24 Mar 2021) $
-# $Author: vondreele $
-# $Revision: 4865 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2phase.py $
-# $Id: G2phase.py 4865 2021-03-24 18:06:49Z vondreele $
+# $Id: G2phase.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 #
 '''
-*Module G2phase: PDB, .EXP & JANA m40,m50*
--------------------------------------------
-
-A set of short routines to read in phases using routines that were
-previously implemented in GSAS-II: PDB, GSAS .EXP and JANA m40-m50 file formats
-
 '''
 
 from __future__ import division, print_function
@@ -30,7 +24,7 @@ import GSASIIobj as G2obj
 import GSASIIspc as G2spc
 import GSASIIlattice as G2lat
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4865 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 try:  # fails on doc build
     R2pisq = 1./(2.*np.pi**2)
 except TypeError:

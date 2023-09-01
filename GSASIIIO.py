@@ -1,21 +1,13 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2022-11-21 11:16:11 -0600 (Mon, 21 Nov 2022) $
-# $Author: toby $
-# $Revision: 5394 $
+# $Date: 2023-07-25 11:56:58 -0500 (Tue, 25 Jul 2023) $
+# $Author: vondreele $
+# $Revision: 5634 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIIO.py $
-# $Id: GSASIIIO.py 5394 2022-11-21 17:16:11Z toby $
+# $Id: GSASIIIO.py 5634 2023-07-25 16:56:58Z vondreele $
 ########### SVN repository information ###################
 '''
-*GSASIIIO: Misc I/O routines*
-=============================
-
-Module with miscellaneous routines for input and output. Many
-are GUI routines to interact with user.
-
-Includes support for image reading.
-
-Also includes base class for data export routines (TODO: should move)
+Misc routines for input and output, including image reading follow. 
 
 TODO: This module needs some work to separate wx from non-wx routines. GUI 
 routines should probably move to GSASIIctrlGUI.
@@ -47,7 +39,7 @@ import sys
 import re
 import random as ran
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5394 $")
+GSASIIpath.SetVersionNumber("$Revision: 5634 $")
 try:
     import GSASIIdataGUI as G2gd
 except ImportError:
@@ -811,7 +803,11 @@ def ProjFileOpen(G2frame,showProvenance=True):
 def ProjFileSave(G2frame):
     'Save a GSAS-II project file'
     if not G2frame.GPXtree.IsEmpty():
-        file = open(G2frame.GSASprojectfile,'wb')
+        try:
+            file = open(G2frame.GSASprojectfile,'wb')
+        except PermissionError:
+            G2G.G2MessageBox(G2frame,'Read only file','Project cannot be saved; change permission & try again')
+            return
         print ('save to file: '+G2frame.GSASprojectfile)
         # stick the file name into the tree and version info into tree so they are saved.
         # (Controls should always be created at this point)

@@ -1,17 +1,15 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
-'''
-*GSASII small angle calculation module*
-=======================================
-
-'''
 ########### SVN repository information ###################
-# $Date: 2021-12-21 08:53:00 -0600 (Tue, 21 Dec 2021) $
-# $Author: vondreele $
-# $Revision: 5114 $
+# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
+# $Author: toby $
+# $Revision: 5572 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIsasd.py $
-# $Id: GSASIIsasd.py 5114 2021-12-21 14:53:00Z vondreele $
+# $Id: GSASIIsasd.py 5572 2023-05-10 02:43:48Z toby $
 ########### SVN repository information ###################
+'''
+Classes and routines defined in :mod:`GSASIIsasd` follow. 
+'''
 from __future__ import division, print_function
 import os
 import math
@@ -22,7 +20,7 @@ import scipy.optimize as so
 #import pdb
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5114 $")
+GSASIIpath.SetVersionNumber("$Revision: 5572 $")
 import GSASIIpwd as G2pwd
 
 # trig functions in degrees

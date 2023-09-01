@@ -1,23 +1,20 @@
 # -*- coding: utf-8 -*-
 #GSASII reference data sets
 ########### SVN repository information ###################
-# $Date: 2020-03-12 15:07:32 -0500 (Thu, 12 Mar 2020) $
+# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
 # $Author: toby $
-# $Revision: 4364 $
+# $Revision: 5572 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIdata.py $
-# $Id: GSASIIdata.py 4364 2020-03-12 20:07:32Z toby $
+# $Id: GSASIIdata.py 5572 2023-05-10 02:43:48Z toby $
 ########### SVN repository information ###################
 '''
-*GSASIIdata: Data for computations*
------------------------------------
-
 At present this module defines one dict, ``ramachandranDist``,
 which contains arrays for All and specific amino acids.
 
 '''
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4364 $")
+GSASIIpath.SetVersionNumber("$Revision: 5572 $")
 import numpy as np
 
 ramachandranDist = {'All':np.array([

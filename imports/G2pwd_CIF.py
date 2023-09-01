@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2020-04-24 11:06:35 -0500 (Fri, 24 Apr 2020) $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 4410 $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pwd_CIF.py $
-# $Id: G2pwd_CIF.py 4410 2020-04-24 16:06:35Z toby $
+# $Id: G2pwd_CIF.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2pwd_CIF: CIF powder data*
-------------------------------------
-
-Routine to read in powder data from a CIF. 
-
 '''
 from __future__ import division, print_function
 import numpy as np
@@ -24,7 +19,7 @@ try:
 except ImportError:
     pass
 asind = lambda x: 180.*np.arcsin(x)/np.pi
-GSASIIpath.SetVersionNumber("$Revision: 4410 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 class CIFpwdReader(G2obj.ImportPowderData):
     'Routines to import powder data from a CIF file'

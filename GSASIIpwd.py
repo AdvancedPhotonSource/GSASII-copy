@@ -1,19 +1,16 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
-'''
-*GSASIIpwd: Powder calculations module*
-==============================================
-
-This version hacked to provide Laue Fringe fitting.
-
-'''
 ########### SVN repository information ###################
-# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
+# $Date: 2023-08-17 11:34:57 -0500 (Thu, 17 Aug 2023) $
 # $Author: toby $
-# $Revision: 5529 $
+# $Revision: 5650 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpwd.py $
-# $Id: GSASIIpwd.py 5529 2023-04-02 19:20:32Z toby $
+# $Id: GSASIIpwd.py 5650 2023-08-17 16:34:57Z toby $
 ########### SVN repository information ###################
+'''
+Classes and routines defined in :mod:`GSASIIpwd` follow. 
+'''
+
 from __future__ import division, print_function
 import sys
 import math
@@ -36,8 +33,8 @@ import scipy.special as sp
 import scipy.signal as signal
 
 import GSASIIpath
-filversion = "$Revision: 5529 $"
-GSASIIpath.SetVersionNumber("$Revision: 5529 $")
+filversion = "$Revision: 5650 $"
+GSASIIpath.SetVersionNumber("$Revision: 5650 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -315,12 +312,28 @@ def CalcPDF(data,inst,limits,xydata):
     IofQ = copy.deepcopy(xydata['Sample'])
     IofQ[1] = np.array([I[Ibeg:Ifin] for I in IofQ[1]])
     if data['Sample Bkg.']['Name']:
-        IofQ[1][1] += xydata['Sample Bkg.'][1][1][Ibeg:Ifin]*data['Sample Bkg.']['Mult']
+        try:   # fails if background differs in number of points
+            IofQ[1][1] += xydata['Sample Bkg.'][1][1][Ibeg:Ifin]*data['Sample Bkg.']['Mult']
+        except ValueError:
+            print("Interpolating Sample background since points don't match")
+            interpF = si.interp1d(xydata['Sample Bkg.'][1][0],xydata['Sample Bkg.'][1][1],
+                                  fill_value='extrapolate')
+            IofQ[1][1] += interpF(IofQ[1][0]) * data['Sample Bkg.']['Mult']
     if data['Container']['Name']:
         xycontainer = xydata['Container'][1][1]*data['Container']['Mult']
         if data['Container Bkg.']['Name']:
-            xycontainer += xydata['Container Bkg.'][1][1][Ibeg:Ifin]*data['Container Bkg.']['Mult']
-        IofQ[1][1] += xycontainer[Ibeg:Ifin]
+            try:
+                xycontainer += xydata['Container Bkg.'][1][1][Ibeg:Ifin]*data['Container Bkg.']['Mult']
+            except ValueError:
+                print('Number of points do not agree between Container and Container Bkg.')
+                return
+        try:   # fails if background differs in number of points
+            IofQ[1][1] += xycontainer[Ibeg:Ifin]
+        except ValueError:
+            print("Interpolating Container background since points don't match")
+            interpF = si.interp1d(xydata['Container'][1][0],xycontainer,fill_value='extrapolate')
+            IofQ[1][1] += interpF(IofQ[1][0])
+        
     data['IofQmin'] = IofQ[1][1][-1]
     IofQ[1][1] -= data.get('Flat Bkg',0.)
     #get element data & absorption coeff.
@@ -533,6 +546,9 @@ def MakeRDF(RDFcontrols,background,inst,pwddata):
         Qdata = si.griddata(powQ,pwddata[1]-pwddata[4],Qpoints,method=RDFcontrols['Smooth'],fill_value=pwddata[1][0])
     elif RDFcontrols['UseObsCalc'] == 'calc-back':
         Qdata = si.griddata(powQ,pwddata[3]-pwddata[4],Qpoints,method=RDFcontrols['Smooth'],fill_value=pwddata[1][0])
+    elif RDFcontrols['UseObsCalc'] == 'auto-back':
+        auto = autoBkgCalc(background[1],pwddata[1])
+        Qdata = si.griddata(powQ,auto-pwddata[4],Qpoints,method=RDFcontrols['Smooth'],fill_value=0.)
     Qdata *= np.sin((Qpoints-minQ)*piDQ)/piDQ
     Qdata *= 0.5*np.sqrt(Qpoints)       #Qbin normalization
     dq = Qpoints[1]-Qpoints[0]
@@ -683,44 +699,44 @@ np.seterr(divide='ignore')
 
 # loc = mu, scale = std
 _norm_pdf_C = 1./math.sqrt(2*math.pi)
+
 class norm_gen(st.rv_continuous):
-    'needs a doc string'
+    '''
+    Normal distribution
+
+The location (loc) keyword specifies the mean.
+The scale (scale) keyword specifies the standard deviation.
+
+normal.pdf(x) = exp(-x**2/2)/sqrt(2*pi)
+
+    '''
       
     def pdf(self,x,*args,**kwds):
         loc,scale=kwds['loc'],kwds['scale']
         x = (x-loc)/scale
         return np.exp(-x**2/2.0) * _norm_pdf_C / scale
         
-norm = norm_gen(name='norm',longname='A normal',extradoc="""
-
-Normal distribution
-
-The location (loc) keyword specifies the mean.
-The scale (scale) keyword specifies the standard deviation.
-
-normal.pdf(x) = exp(-x**2/2)/sqrt(2*pi)
-""")
+norm = norm_gen(name='norm')
 
 ## Cauchy
 
 # median = loc
 
 class cauchy_gen(st.rv_continuous):
-    'needs a doc string'
+    '''
+Cauchy distribution
+
+cauchy.pdf(x) = 1/(pi*(1+x**2))
+
+This is the t distribution with one degree of freedom.
+    '''
 
     def pdf(self,x,*args,**kwds):
         loc,scale=kwds['loc'],kwds['scale']
         x = (x-loc)/scale
         return 1.0/np.pi/(1.0+x*x) / scale
         
-cauchy = cauchy_gen(name='cauchy',longname='Cauchy',extradoc="""
-
-Cauchy distribution
-
-cauchy.pdf(x) = 1/(pi*(1+x**2))
-
-This is the t distribution with one degree of freedom.
-""")
+cauchy = cauchy_gen(name='cauchy')
     
 
 class fcjde_gen(st.rv_continuous):
@@ -810,19 +826,20 @@ def getWidthsCW(pos,sig,gam,shl):
         fmin,fmax = [fmax,fmin]          
     return widths,fmin,fmax
     
-def getWidthsED(pos,sig):
+def getWidthsED(pos,sig,gam):
     '''Compute the peak widths used for computing the range of a peak
     for energy dispersive data. On low-energy side, 20 FWHM are used, 
     on high-energy side 20 are used
     
     :param pos: peak position; energy in keV (not used)
     :param sig: Gaussian peak variance in keV^2
+    :param gam: Lorentzian peak width in keV
     
-    :returns: widths; [Gaussian sigma] in keV, and 
-        low angle, high angle ends of peak; 20 FWHM & 50 FWHM from position
+    :returns: widths; [Gaussian sigma, Lorentzian gamma] in keV, and 
+        low angle, high angle ends of peak; 5 FWHM & 5 FWHM from position
     '''
-    widths = [np.sqrt(sig),.001]
-    fwhm = 2.355*widths[0]
+    widths = [np.sqrt(sig),gam]
+    fwhm = 2.355*widths[0]+widths[1]
     fmin = 5.*fwhm
     fmax = 5.*fwhm
     return widths,fmin,fmax
@@ -861,11 +878,14 @@ def getFWHM(pos,Inst,N=1):
     sigED = lambda E,A,B,C: np.sqrt(max(0.001,A*E**2+B*E+C))
     sigTOF = lambda dsp,S0,S1,S2,Sq: np.sqrt(S0+S1*dsp**2+S2*dsp**4+Sq*dsp)
     gam = lambda Th,X,Y,Z: Z+X/cosd(Th)+Y*tand(Th)
+    gamED = lambda E,X,Y,Z: max(0.001,X*E**2+Y*E+Z)
     gamTOF = lambda dsp,X,Y,Z: Z+X*dsp+Y*dsp**2
     alpTOF = lambda dsp,alp: alp/dsp
     betTOF = lambda dsp,bet0,bet1,betq: bet0+bet1/dsp**4+betq/dsp**2
-    alpPink = lambda pos,alp0,alp1: alp0+alp1*tand(pos/2.)
-    betPink = lambda pos,bet0,bet1: bet0+bet1*tand(pos/2.)
+    alpPinkX = lambda pos,alp0,alp1: alp0+alp1*nptand(pos/2.)
+    betPinkX = lambda pos,bet0,bet1: bet0+bet1*nptand(pos/2.)
+    alpPinkN = lambda pos,alp0,alp1: alp0+alp1*npsind(pos/2.)
+    betPinkN = lambda pos,bet0,bet1: bet0+bet1*npsind(pos/2.)
     if 'LF' in Inst['Type'][0]:
         return 3
     elif 'T' in Inst['Type'][0]:
@@ -881,10 +901,15 @@ def getFWHM(pos,Inst,N=1):
         return getgamFW(g,s)/100.  #returns FWHM in deg
     elif 'E' in Inst['Type'][0]:
         s = sigED(pos,Inst['A'][N],Inst['B'][N],Inst['C'][N])
-        return 2.35482*s
+        g = gamED(pos,Inst['X'][N],Inst['Y'][N],Inst['Z'][N])
+        return getgamFW(g,s)
     else:   #'B'
-        alp = alpPink(pos,Inst['alpha-0'][N],Inst['alpha-1'][N])
-        bet = betPink(pos,Inst['beta-0'][N],Inst['beta-1'][N])
+        if 'X' in Inst['Type'][0]:
+            alp = alpPinkX(pos,Inst['alpha-0'][N],Inst['alpha-1'][N])
+            bet = betPinkX(pos,Inst['beta-0'][N],Inst['beta-1'][N])
+        else:
+            alp = alpPinkN(pos,Inst['alpha-0'][N],Inst['alpha-1'][N])
+            bet = betPinkN(pos,Inst['beta-0'][N],Inst['beta-1'][N])
         s = sig(pos/2.,Inst['U'][N],Inst['V'][N],Inst['W'][N])
         g = gam(pos/2.,Inst['X'][N],Inst['Y'][N],Inst['Z'][N])
         return getgamFW(g,s)/100.+np.log(2.0)*(alp+bet)/(alp*bet)  #returns FWHM in deg
@@ -1437,7 +1462,6 @@ def getPeakProfile(dataType,parmDict,xdata,fixback,varyList,bakType):
     for powder patterns. 
     NB: not used for Rietveld refinement
     '''
-    
     yb = getBackground('',parmDict,bakType,dataType,xdata,fixback)[0]
     yc = np.zeros_like(yb)
     if 'LF' in dataType:
@@ -1468,27 +1492,27 @@ def getPeakProfile(dataType,parmDict,xdata,fixback,varyList,bakType):
                 parmDict['pos'+str(iPeak)] = pos
                 #tth = (pos-parmDict['Zero'])
                 intens = parmDict['int'+str(iPeak)]
-                damp =  parmDict['damp'+str(iPeak)]
-                asym =  parmDict['asym'+str(iPeak)]
+                dampM =  parmDict['dampM'+str(iPeak)]
+                dampP =  parmDict['dampP'+str(iPeak)]
                 sig =  parmDict['sig'+str(iPeak)]
                 gam =  parmDict['gam'+str(iPeak)]
-                fmin = 8 # for now make peaks 8 degrees wide
+                fmin = parmDict.get('fitRange',8.0) # width for peak computation: defaults to 8 deg.
                 fmin = min(0.9*abs(xdata[-1] - xdata[0]),fmin) # unless the data range is smaller
+                fitPowerM = parmDict.get('fitPowerM',2.0)
+                fitPowerP = parmDict.get('fitPowerP',2.0)
                 iBeg = np.searchsorted(xdata,pos-fmin/2)
                 iFin = np.searchsorted(xdata,pos+fmin/2)
                 if not iBeg+iFin:       # skip peak below low limit
                     continue
                 elif not iBeg-iFin:     # got peak above high limit (peaks sorted, so we can stop)
                     break
-                #LF.plotme(fmin,lam,pos,intens,sig,gam,shol,ncells,clat,damp,asym)
-                #LaueFringePeakCalc(xdata,yc,lam,pos,intens,sig,gam,shol,ncells,clat,damp,asym,fmin,plot=(iPeak==0))
-                LaueFringePeakCalc(xdata,yc,lam,pos,intens,sig,gam,shol,ncells,clat,damp,asym,fmin,plot=False)
+                LaueFringePeakCalc(xdata,yc,lam,pos,intens,sig,gam,shol,ncells,clat,dampM,dampP,fmin,fitPowerM,fitPowerP,plot=False)
                 if Ka2:
                     pos2 = pos+lamRatio*tand(pos/2.0)       # + 360/pi * Dlam/lam * tan(th)
                     iBeg = np.searchsorted(xdata,pos2-fmin)
                     iFin = np.searchsorted(xdata,pos2+fmin)
                     if iBeg-iFin:
-                        LaueFringePeakCalc(xdata,yc,lam2,pos2,intens*kRatio,sig,gam,shol,ncells,clat,damp,asym,fmin)
+                        LaueFringePeakCalc(xdata,yc,lam2,pos2,intens*kRatio,sig,gam,shol,ncells,clat,dampM,dampP,fmin,fitPowerM,fitPowerP)
             except KeyError:        #no more peaks to process
                 return yb+yc
     elif 'C' in dataType:
@@ -1549,7 +1573,13 @@ def getPeakProfile(dataType,parmDict,xdata,fixback,varyList,bakType):
                 else:
                     sig = G2mth.getEDsig(parmDict,pos)
                 sig = max(sig,0.001)          #avoid neg sigma^2
-                Wd,fmin,fmax = getWidthsED(pos,sig)
+                gamName = 'gam'+str(iPeak)
+                if gamName in varyList or not peakInstPrmMode:
+                    gam = parmDict[gamName]
+                else:
+                    gam = G2mth.getEDgam(parmDict,pos)
+                gam = max(gam,0.001)             #avoid neg gamma
+                Wd,fmin,fmax = getWidthsED(pos,sig,gam)
                 iBeg = np.searchsorted(xdata,pos-fmin)
                 iFin = max(iBeg+3,np.searchsorted(xdata,pos+fmin))
                 if not iBeg+iFin:       #peak below low limit
@@ -1557,7 +1587,7 @@ def getPeakProfile(dataType,parmDict,xdata,fixback,varyList,bakType):
                     continue
                 elif not iBeg-iFin:     #peak above high limit
                     return yb+yc
-                yc[iBeg:iFin] += intens*getPsVoigt(pos,sig*10.**4,0.001,xdata[iBeg:iFin])[0]
+                yc[iBeg:iFin] += intens*getPsVoigt(pos,sig*10.**4,gam*100.,xdata[iBeg:iFin])[0]
                 iPeak += 1
             except KeyError:        #no more peaks to process
                 return yb+yc        
@@ -1573,13 +1603,19 @@ def getPeakProfile(dataType,parmDict,xdata,fixback,varyList,bakType):
                 if alpName in varyList or not peakInstPrmMode:
                     alp = parmDict[alpName]
                 else:
-                    alp = G2mth.getPinkalpha(parmDict,tth)
+                    if 'X' in dataType:                        
+                        alp = G2mth.getPinkXalpha(parmDict,tth)
+                    else:
+                        alp = G2mth.getPinkNalpha(parmDict,tth)
                 alp = max(0.1,alp)
                 betName = 'bet'+str(iPeak)
                 if betName in varyList or not peakInstPrmMode:
                     bet = parmDict[betName]
                 else:
-                    bet = G2mth.getPinkbeta(parmDict,tth)
+                    if 'X' in dataType:
+                        bet = G2mth.getPinkXbeta(parmDict,tth)
+                    else:
+                        bet = G2mth.getPinkNbeta(parmDict,tth)
                 bet = max(0.1,bet)
                 sigName = 'sig'+str(iPeak)
                 if sigName in varyList or not peakInstPrmMode:
@@ -1792,7 +1828,15 @@ def getPeakProfileDerv(dataType,parmDict,xdata,fixback,varyList,bakType):
                     sig = G2mth.getEDsig(parmDict,pos)
                     dsdA,dsdB,dsdC = G2mth.getEDsigDeriv(parmDict,pos)
                 sig = max(sig,0.001)          #avoid neg sigma
-                Wd,fmin,fmax = getWidthsED(pos,sig)
+                gamName = 'gam'+str(iPeak)
+                if gamName in varyList or not peakInstPrmMode:
+                    gam = parmDict[gamName]
+                    dgdX = dgdY = dgdZ = 0
+                else:
+                    gam = G2mth.getEDgam(parmDict,pos)
+                    dgdX,dgdY,dgdZ = G2mth.getEDgamDeriv(parmDict,pos)
+                gam = max(gam,0.001)             #avoid neg gamma
+                Wd,fmin,fmax = getWidthsED(pos,sig,gam)
                 iBeg = np.searchsorted(xdata,pos-fmin)
                 iFin = np.searchsorted(xdata,pos+fmin)
                 if not iBeg+iFin:       #peak below low limit
@@ -1801,12 +1845,12 @@ def getPeakProfileDerv(dataType,parmDict,xdata,fixback,varyList,bakType):
                 elif not iBeg-iFin:     #peak above high limit
                     break
                 dMdpk = np.zeros(shape=(4,len(xdata)))
-                dMdipk = getdPsVoigt(pos,sig*10.**4,0.001,xdata[iBeg:iFin])
+                dMdipk = getdPsVoigt(pos,sig*10.**4,gam*100.,xdata[iBeg:iFin])
                 dMdpk[0][iBeg:iFin] += dMdipk[0]
                 for i in range(1,4):
                     dMdpk[i][iBeg:iFin] += intens*dMdipk[i]
-                dervDict = {'int':dMdpk[0],'pos':-dMdpk[1],'sig':dMdpk[2]*10**4}
-                for parmName in ['pos','int','sig']:
+                dervDict = {'int':dMdpk[0],'pos':-dMdpk[1],'sig':dMdpk[2]*10**4,'gam':dMdpk[3]*100.}
+                for parmName in ['pos','int','sig','gam']:
                     try:
                         idx = varyList.index(parmName+str(iPeak))
                         dMdv[idx] = dervDict[parmName]
@@ -1818,6 +1862,12 @@ def getPeakProfileDerv(dataType,parmDict,xdata,fixback,varyList,bakType):
                     dMdv[varyList.index('B')] += dsdB*dervDict['sig']
                 if 'C' in varyList:
                     dMdv[varyList.index('C')] += dsdC*dervDict['sig']
+                if 'X' in varyList:
+                    dMdv[varyList.index('X')] += dgdX*dervDict['gam']
+                if 'Y' in varyList:
+                    dMdv[varyList.index('Y')] += dgdY*dervDict['gam']
+                if 'Z' in varyList:
+                    dMdv[varyList.index('Z')] += dgdZ*dervDict['gam']
                 iPeak += 1
             except KeyError:        #no more peaks to process
                 break        
@@ -1834,16 +1884,24 @@ def getPeakProfileDerv(dataType,parmDict,xdata,fixback,varyList,bakType):
                     alp = parmDict[alpName]
                     dada0 = dada1 = 0.0
                 else:
-                    alp = G2mth.getPinkalpha(parmDict,tth)
-                    dada0,dada1 = G2mth.getPinkalphaDeriv(tth)
+                    if 'X' in dataType:
+                        alp = G2mth.getPinkXalpha(parmDict,tth)
+                        dada0,dada1 = G2mth.getPinkXalphaDeriv(tth)
+                    else:
+                        alp = G2mth.getPinkNalpha(parmDict,tth)
+                        dada0,dada1 = G2mth.getPinkNalphaDeriv(tth)
                 alp = max(0.0001,alp)
                 betName = 'bet'+str(iPeak)
                 if betName in varyList or not peakInstPrmMode:
                     bet = parmDict[betName]
                     dbdb0 = dbdb1 = 0.0
                 else:
-                    bet = G2mth.getPinkbeta(parmDict,tth)
-                    dbdb0,dbdb1 = G2mth.getPinkbetaDeriv(tth)
+                    if 'X' in dataType:
+                        bet = G2mth.getPinkXbeta(parmDict,tth)
+                        dbdb0,dbdb1 = G2mth.getPinkXbetaDeriv(tth)
+                    else:
+                        bet = G2mth.getPinkNbeta(parmDict,tth)
+                        dbdb0,dbdb1 = G2mth.getPinkNbetaDeriv(tth)
                 bet = max(0.0001,bet)
                 sigName = 'sig'+str(iPeak)
                 if sigName in varyList or not peakInstPrmMode:
@@ -2062,6 +2120,21 @@ def SetBackgroundParms(Background):
             if Background[1]['background PWDR'][2]:
                 backVary += ['BF mult',]
     return bakType,backDict,backVary
+
+def autoBkgCalc(bkgdict,ydata):
+    '''Compute the autobackground using the selected pybaselines function
+    
+    :param dict bkgdict: background parameters
+    :param np.array ydata: array of Y values
+    :returns: points for background intensity at each Y position
+    '''
+    import pybaselines.whittaker
+    lamb = int(10**bkgdict['autoPrms']['logLam'])
+    if bkgdict['autoPrms']['opt'] == 0:
+        func = pybaselines.whittaker.arpls
+    else:
+        func = pybaselines.whittaker.iarpls
+    return func(ydata, lam=lamb, max_iter=10)[0]
     
 def DoCalibInst(IndexPeaks,Inst):
     
@@ -2160,9 +2233,9 @@ def getHeaderInfo(dataType):
     names = ['pos','int']
     lnames = ['position','intensity']
     if 'LF' in dataType:
-        names = ['int','sig','gam','damp','asym','l','ttheta']
-        lnames = ['intensity','sigma','gamma','satellite\ndamping',
-                      'satellite\nasym','00l',
+        names = ['int','sig','gam','dampM','dampP','l','ttheta']
+        lnames = ['intensity','sigma','gamma','damping\nminus',
+                      'damping\nplus','00l',
                       #'2theta    '
                       '2\u03B8'
                       ]
@@ -2176,9 +2249,9 @@ def getHeaderInfo(dataType):
         lnames += ['alpha','beta','sigma','gamma']
         fmt = ["%10.2f","%10.4f","%8.3f","%8.5f","%10.3f","%10.3f"]
     elif 'E' in dataType:
-        names += ['sig']
-        lnames += ['sigma']
-        fmt = ["%10.5f","%10.1f","%8.3f"]
+        names += ['sig','gam']
+        lnames += ['sigma','gamma']
+        fmt = ["%10.5f","%10.1f","%8.3f","%10.3f"]
     else: # 'B'
         names += ['alp','bet','sig','gam']
         lnames += ['alpha','beta','sigma','gamma']
@@ -2347,6 +2420,8 @@ def DoPeakFit(FitPgm,Peaks,Background,Limits,Inst,Inst2,data,fixback=None,prevVa
                     if 'T' in Inst['Type'][0]:
                         dsp = G2lat.Pos2dsp(Inst,pos)
                         parmDict[gamName] = G2mth.getTOFgamma(parmDict,dsp)
+                    if 'E' in Inst['Type'][0]:
+                        parmDict[gamName] = G2mth.getEDgam(parmDict,pos)
                     else:
                         parmDict[gamName] = G2mth.getCWgam(parmDict,pos)
                 iPeak += 1
@@ -2430,12 +2505,18 @@ def DoPeakFit(FitPgm,Peaks,Background,Limits,Inst,Inst2,data,fixback=None,prevVa
                     if 'T' in Inst['Type'][0]:
                         peak[2*j+off] = G2mth.getTOFalpha(parmDict,dsp)
                     else: #'B'
-                        peak[2*j+off] = G2mth.getPinkalpha(parmDict,pos)
+                        if 'X' in Inst['Type'][0]:
+                            peak[2*j+off] = G2mth.getPinkXalpha(parmDict,pos)
+                        else:
+                            peak[2*j+off] = G2mth.getPinkNalpha(parmDict,pos)
                 elif 'bet' in parName:
                     if 'T' in Inst['Type'][0]:
                         peak[2*j+off] = G2mth.getTOFbeta(parmDict,dsp)
                     else:   #'B'
-                        peak[2*j+off] = G2mth.getPinkbeta(parmDict,pos)
+                        if 'X' in Inst['Type'][0]:
+                            peak[2*j+off] = G2mth.getPinkXbeta(parmDict,pos)
+                        else:
+                            peak[2*j+off] = G2mth.getPinkNbeta(parmDict,pos)
                 elif 'sig' in parName:
                     if 'T' in Inst['Type'][0]:
                         peak[2*j+off] = G2mth.getTOFsig(parmDict,dsp)
@@ -2446,6 +2527,8 @@ def DoPeakFit(FitPgm,Peaks,Background,Limits,Inst,Inst2,data,fixback=None,prevVa
                 elif 'gam' in parName:
                     if 'T' in Inst['Type'][0]:
                         peak[2*j+off] = G2mth.getTOFgamma(parmDict,dsp)
+                    elif 'E' in Inst['Type'][0]:
+                        peak[2*j+off] = G2mth.getEDgam(parmDict,pos)
                     else:   #'C' & 'B'
                         peak[2*j+off] = G2mth.getCWgam(parmDict,pos)
                         
@@ -4057,12 +4140,12 @@ ENGINE.set_log_file(os.path.join(dirName,prefix))
     rundata += '''for c in ENGINE.constraints:
     if hasattr(c, '_ExperimentalConstraint__adjustScaleFactor'):
         def _constraint_copy_needs_lut(self, *args, **kwargs):
-            result =  super(self.__class__, self)._constraint_copy_needs_lut(*args, **kwargs)
+            result =  fPDF.PairDistributionConstraint._constraint_copy_needs_lut(self, *args, **kwargs)
             result['_ExperimentalConstraint__adjustScaleFactor'] = '_ExperimentalConstraint__adjustScaleFactor'
             return result
         c._constraint_copy_needs_lut = types.MethodType(_constraint_copy_needs_lut, c)
 '''
-#    rundata += '\n# set weights -- do this now so values can be changed without a restart\n'
+    # rundata += '\n# set weights -- do this now so values can be changed without a restart\n'
     # rundata += 'wtDict = {}\n'
     # for File in Files:
     #     filDat = RMCPdict['files'][File]
@@ -5365,12 +5448,14 @@ class profileObj(FP.FP_profile):
         ttwid = self.twotheta_window_fullwidth_deg
         ncell = self.param_dicts[me]['Ncells']
         co2 = self.param_dicts[me]['clat'] / 2.
-        damp =  self.param_dicts[me]['damp']
-        asym =  self.param_dicts[me]['asym']
+        dampM =  self.param_dicts[me]['dampM']
+        dampP =  self.param_dicts[me]['dampP']
+        fpowM =  self.param_dicts[me]['fitPowerM']        
+        fpowP =  self.param_dicts[me]['fitPowerP']        
         ttlist = np.linspace(pos-ttwid/2,pos+ttwid/2,len(self._epsb2))
         Qs = np.pi * 4 * np.sin(np.deg2rad(ttlist/2)) / wave
-        w =  np.exp(-1*10**((damp-asym) * (Qs - posQ)**2))
-        w2 = np.exp(-1*10**((damp+asym) * (Qs - posQ)**2))
+        w =  np.exp(-1*10**((dampM) * np.abs(Qs - posQ)**fpowM))
+        w2 = np.exp(-1*10**((dampP) * np.abs(Qs - posQ)**fpowP))
         w[len(w)//2:] = w2[len(w)//2:]
         weqdiv = w * np.sin(Qs * ncell * co2)**2 / (np.sin(Qs * co2)**2)
         weqdiv[:np.searchsorted(Qs,posQ - np.pi/self.param_dicts[me]['clat'])] = 0  # isolate central peak, if needed
@@ -5403,7 +5488,7 @@ class profileObj(FP.FP_profile):
         conv[1::2] *= -1 #flip center
         return conv
     
-def LaueFringePeakCalc(ttArr,intArr,lam,peakpos,intens,sigma2,gamma,shol,ncells,clat,damp,asym,calcwid,plot=False):
+def LaueFringePeakCalc(ttArr,intArr,lam,peakpos,intens,sigma2,gamma,shol,ncells,clat,dampM,dampP,calcwid,fitPowerM=2,fitPowerP=2,plot=False):
     '''Compute the peakshape for a Laue Fringe peak convoluted with a Gaussian, Lorentzian & 
     an axial divergence asymmetry correction.
 
@@ -5417,42 +5502,44 @@ def LaueFringePeakCalc(ttArr,intArr,lam,peakpos,intens,sigma2,gamma,shol,ncells,
     :param float shol: FCJ (S + H)/L where S=sample-half height, H=slit half-height, L=radius **
     :param float ncells: number of unit cells in specular direction **
     :param float clat: c lattice parameter **
-    :param float damp:
-    :param float asym:
+    :param float dampM:
+    :param float dampP:
     :param float calcwid: two-theta (deg.) width for cutoff of peak computation. 
        Defaults to 5
+    :param float fitPowerM: exponent used for damping fall-off on minus side of peak
+    :param float fitPowerP: exponent used for damping fall-off on plus side of peak
     :param bool plot: for debugging, shows contributions to peak
 
     **  If term is <= zero, item is removed from convolution
     '''
-    def LaueFringePeakPlot(ttArr,intArr):
-        import matplotlib.pyplot as plt
-        refColors = ['xkcd:blue','xkcd:red','xkcd:green','xkcd:cyan','xkcd:magenta','xkcd:black',
-                         'xkcd:pink','xkcd:brown','xkcd:teal','xkcd:orange','xkcd:grey','xkcd:violet',]
-        fig, ax = plt.subplots()
-        ax.set(title='Peak convolution functions @ 2theta={:.3f}'.format(peakpos),
-                   xlabel=r'$\Delta 2\theta, deg$',
-                   ylabel=r'Intensity (arbitrary)')
-        ax.set_yscale("log",nonpositive='mask')
-        ttmin = ttmax = 0
-        for i,conv in enumerate(convList):
-            f = NISTpk.convolver_funcs[conv]()
-            if f is None: continue
-            FFT = FP.best_irfft(f)
-            if f[1].real > 0: FFT = np.roll(FFT,int(len(FFT)/2.))
-            FFT /= FFT.max()
-            if i == 0:
-                tt = np.linspace(-NISTpk.twotheta_window_fullwidth_deg/2,
-                                    NISTpk.twotheta_window_fullwidth_deg/2,len(FFT))
-            ttmin = min(ttmin,tt[np.argmax(FFT>.005)])
-            ttmax = max(ttmax,tt[::-1][np.argmax(FFT[::-1]>.005)])
-            color = refColors[i%len(refColors)]
-            ax.plot(tt,FFT,color,label=conv[5:])
-        color = refColors[(i+1)%len(refColors)]
-        ax.plot(ttArr-peakpos,intArr/max(intArr),color,label='Convolution')
-        ax.set_xlim((ttmin,ttmax))
-        ax.legend(loc='best')
-        plt.show()
+    # def LaueFringePeakPlot(ttArr,intArr):
+    #     import matplotlib.pyplot as plt
+    #     refColors = ['xkcd:blue','xkcd:red','xkcd:green','xkcd:cyan','xkcd:magenta','xkcd:black',
+    #                      'xkcd:pink','xkcd:brown','xkcd:teal','xkcd:orange','xkcd:grey','xkcd:violet',]
+    #     fig, ax = plt.subplots()
+    #     ax.set(title='Peak convolution functions @ 2theta={:.3f}'.format(peakpos),
+    #                xlabel=r'$\Delta 2\theta, deg$',
+    #                ylabel=r'Intensity (arbitrary)')
+    #     ax.set_yscale("log",nonpositive='mask')
+    #     ttmin = ttmax = 0
+    #     for i,conv in enumerate(convList):
+    #         f = NISTpk.convolver_funcs[conv]()
+    #         if f is None: continue
+    #         FFT = FP.best_irfft(f)
+    #         if f[1].real > 0: FFT = np.roll(FFT,int(len(FFT)/2.))
+    #         FFT /= FFT.max()
+    #         if i == 0:
+    #             tt = np.linspace(-NISTpk.twotheta_window_fullwidth_deg/2,
+    #                                 NISTpk.twotheta_window_fullwidth_deg/2,len(FFT))
+    #         ttmin = min(ttmin,tt[np.argmax(FFT>.005)])
+    #         ttmax = max(ttmax,tt[::-1][np.argmax(FFT[::-1]>.005)])
+    #         color = refColors[i%len(refColors)]
+    #         ax.plot(tt,FFT,color,label=conv[5:])
+    #     color = refColors[(i+1)%len(refColors)]
+    #     ax.plot(ttArr-peakpos,intArr/max(intArr),color,label='Convolution')
+    #     ax.set_xlim((ttmin,ttmax))
+    #     ax.legend(loc='best')
+    #     plt.show()
     # hardcoded constants
     diffRadius = 220 # diffractometer radius in mm; needed for axial divergence, etc, but should not matter
     axial_factor = 1.5  # fudge factor to bring sh/l broadening to ~ agree with FPA
@@ -5483,7 +5570,8 @@ def LaueFringePeakCalc(ttArr,intArr,lam,peakpos,intens,sigma2,gamma,shol,ncells,
             },
         'Gaussian': {'g2sig2': sigma2},
         'Lorentzian': {'g2gam': gamma},
-        'Lauefringe': {'Ncells': ncells, 'clat':clat, 'damp': damp, 'asym': asym},
+        'Lauefringe': {'Ncells': ncells, 'clat':clat, 'dampM': dampM,
+                        'dampP': dampP, 'fitPowerM':fitPowerM, 'fitPowerP':fitPowerP},
         }
     NISTpk=profileObj(anglemode="twotheta",
                     output_gaussian_smoother_bins_sigma=1.0,
@@ -5529,7 +5617,8 @@ def LaueFringePeakCalc(ttArr,intArr,lam,peakpos,intens,sigma2,gamma,shol,ncells,
         pstart = -startInd
     elif startInd > len(intArr):
         return
-    elif startInd+pkPts >= len(intArr):
+#    elif startInd+pkPts >= len(intArr):
+    elif startInd+pkPts > len(intArr):
         offset = pkPts - len( intArr[startInd:] )
         istart = startInd
         iend = startInd+pkPts-offset
@@ -5538,8 +5627,8 @@ def LaueFringePeakCalc(ttArr,intArr,lam,peakpos,intens,sigma2,gamma,shol,ncells,
         istart = startInd
         iend = startInd+pkPts
     intArr[istart:iend] += intens * peakObj.peak[pstart:pend]/pkMax
-    if plot:
-        LaueFringePeakPlot(ttArr[istart:iend], (intens * peakObj.peak[pstart:pend]/pkMax))
+#    if plot:
+#        LaueFringePeakPlot(ttArr[istart:iend], (intens * peakObj.peak[pstart:pend]/pkMax))
         
 def LaueSatellite(peakpos,wave,c,ncell,j=[-4,-3,-2,-1,0,1,2,3,4]):
     '''Returns the locations of the Laue satellite positions relative

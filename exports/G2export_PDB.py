@@ -1,25 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-11-18 16:39:00 -0600 (Thu, 18 Nov 2021) $
-# $Author: vondreele $
-# $Revision: 5090 $
+# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5576 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_PDB.py $
-# $Id: G2export_PDB.py 5090 2021-11-18 22:39:00Z vondreele $
+# $Id: G2export_PDB.py 5576 2023-05-11 19:22:54Z toby $
 ########### SVN repository information ###################
-'''
-*Module G2export_PDB: Macromolecular export*
---------------------------------------------
-Code to export a phase into the venerated/obsolete (pick one)
-ASCII PDB format. Also defines exporter :class:`ExportPhaseCartXYZ`
-which writes atom positions in orthogonal coordinates for a phase.
-
+'''Classes in :mod:`G2export_PDB` follow:
 '''
 from __future__ import division, print_function
 import numpy as np
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5090 $")
+GSASIIpath.SetVersionNumber("$Revision: 5576 $")
 import GSASIIIO as G2IO
 import GSASIIlattice as G2lat
 

@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-05-18 08:19:22 -0500 (Tue, 18 May 2021) $
-# $Author: vondreele $
-# $Revision: 4906 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2phase_xyz.py $
-# $Id: G2phase_xyz.py 4906 2021-05-18 13:19:22Z vondreele $
+# $Id: G2phase_xyz.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 #
 '''
-*Module G2phase_xyz: read coordinates from an xyz file*
--------------------------------------------------------
-
-A short routine to read in a phase from an xyz Cartesian coordinate file
-
 '''
 
 from __future__ import division, print_function
@@ -25,7 +20,7 @@ import GSASIIobj as G2obj
 import GSASIIspc as G2spc
 import GSASIIlattice as G2lat
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4906 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 class XYZ_ReaderClass(G2obj.ImportPhase):
     'Routine to import Phase information from a XYZ file'

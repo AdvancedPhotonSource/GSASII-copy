@@ -1,7 +1,4 @@
 '''
-*makeBat: Create GSAS-II Batch File*
-====================================
-
 This script creates a file named ``RunGSASII.bat`` and a desktop shortcut to that file.
 It registers the filetype .gpx so that the GSAS-II project files exhibit the
 GSAS-II icon and so that double-clicking on them opens them in GSAS-II. 
@@ -13,7 +10,7 @@ used to run this script.
 
 '''
 from __future__ import division, print_function
-version = "$Id: makeBat.py 4298 2020-02-12 23:39:55Z toby $"
+version = "$Id: makeBat.py 5577 2023-05-11 23:08:12Z toby $"
 # creates Windows files to aid in running GSAS-II
 #   creates RunGSASII.bat and a desktop shortcut to that file
 #   registers the filetype .gpx so that the GSAS-II project files exhibit the

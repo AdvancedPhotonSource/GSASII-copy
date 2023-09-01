@@ -1,31 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2022-01-21 13:37:39 -0600 (Fri, 21 Jan 2022) $
+# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 5150 $
+# $Revision: 5576 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_csv.py $
-# $Id: G2export_csv.py 5150 2022-01-21 19:37:39Z toby $
+# $Id: G2export_csv.py 5576 2023-05-11 19:22:54Z toby $
 ########### SVN repository information ###################
+'''Classes in :mod:`G2export_csv` follow:
 '''
-*Module G2export_csv: Spreadsheet export*
--------------------------------------------
-
-Code to create .csv (comma-separated variable) files for
-GSAS-II data export to a spreadsheet program, etc.
-
-'''
+# note documentation in docs/source/exports.rst
+#
 from __future__ import division, print_function
 import os.path
 import numpy as np
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5150 $")
+GSASIIpath.SetVersionNumber("$Revision: 5576 $")
 import GSASIIIO as G2IO
-import GSASIIpy3 as G2py3
 import GSASIIobj as G2obj
 import GSASIImath as G2mth
 import GSASIIpwd as G2pwd
 import GSASIIlattice as G2lat
+import GSASIIfiles as G2fil
 
 def WriteList(obj,headerItems):
     '''Write a CSV header
@@ -213,7 +209,7 @@ class ExportPowderCSV(G2IO.ExportBaseclass):
             for val,digits in zip(vallist,digitList):
                 if line: line += ','
                 line += '%.6g'%val
-#                line += G2py3.FormatValue(val,digits)
+#                line += G2fil.FormatValue(val,digits)
             self.Write(line)
         if mode == 'w':
             print('Powder data written to CSV file '+self.fullpath)
@@ -288,7 +284,7 @@ class ExportMultiPowderCSV(G2IO.ExportBaseclass):
             for val,digits in zip(vallist,digitList):
                 if line: line += ','
                 line += '%.6g'%val
-#                line += G2py3.FormatValue(val,digits)
+#                line += G2fil.FormatValue(val,digits)
             self.Write(line)
         self.CloseFile()
         print('...file '+self.fullpath+' written')
@@ -418,7 +414,7 @@ class ExportSASDCSV(G2IO.ExportBaseclass):
                 line = ""
                 for val,digits in zip(bindata,digitList):
                     if line: line += ','
-                    line += G2py3.FormatValue(val,digits)
+                    line += G2fil.FormatValue(val,digits)
                 self.Write(line)            
         self.Write('"Small angle data"')
         Parms = self.Histograms[TreeName]['Instrument Parameters'][0]
@@ -442,7 +438,7 @@ class ExportSASDCSV(G2IO.ExportBaseclass):
             for val,digits in zip(vallist,digitList):
                 if line: line += ','
                 line += '%.6g'%val
-#                line += G2py3.FormatValue(val,digits)
+#                line += G2fil.FormatValue(val,digits)
             self.Write(line)
         self.CloseFile()
         
@@ -509,7 +505,7 @@ class ExportREFDCSV(G2IO.ExportBaseclass):
             for val,digits in zip(vallist,digitList):
                 if line: line += ','
                 line += '%.6g'%val
-#                line += G2py3.FormatValue(val,digits)
+#                line += G2fil.FormatValue(val,digits)
             self.Write(line)
         self.CloseFile()
         

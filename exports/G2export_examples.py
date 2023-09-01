@@ -1,34 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2020-07-16 09:30:05 -0500 (Thu, 16 Jul 2020) $
-# $Author: vondreele $
-# $Revision: 4522 $
+# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5576 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_examples.py $
-# $Id: G2export_examples.py 4522 2020-07-16 14:30:05Z vondreele $
+# $Id: G2export_examples.py 5576 2023-05-11 19:22:54Z toby $
 ########### SVN repository information ###################
+'''Classes in :mod:`G2export_examples` follow:
 '''
-*Module G2export_examples: Examples*
--------------------------------------------
-
-Code to demonstrate how GSAS-II data export routines are created. The
-classes defined here, :class:`ExportPhaseText`, 
-:class:`ExportSingleText`, :class:`ExportPowderReflText`, 
-and :class:`ExportPowderText` each demonstrate a different type
-of export. Also see :class:`G2export_map.ExportMapASCII` for an
-example of a map export.
-
-'''
+# note documentation in docs/source/exports.rst
+#
 from __future__ import division, print_function
 import os
 import numpy as np
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4522 $")
+GSASIIpath.SetVersionNumber("$Revision: 5576 $")
 import GSASIIIO as G2IO
-import GSASIIpy3 as G2py3
 import GSASIIobj as G2obj
 import GSASIImath as G2mth
 import GSASIIpwd as G2pwd
+import GSASIIfiles as G2fil
 
 class ExportPhaseText(G2IO.ExportBaseclass):
     '''Used to create a text file for a phase
@@ -143,7 +135,7 @@ class ExportPowderText(G2IO.ExportBaseclass):
                            ):
             strg = ''
             for val,digits in zip(vallist,digitList):
-                strg += G2py3.FormatPadValue(val,digits)
+                strg += G2fil.FormatPadValue(val,digits)
             self.Write(strg)
         self.CloseFile()
         

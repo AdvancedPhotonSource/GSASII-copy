@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2022-12-04 16:52:41 -0600 (Sun, 04 Dec 2022) $
-# $Author: vondreele $
-# $Revision: 5419 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pwd_BrukerRAW.py $
-# $Id: G2pwd_BrukerRAW.py 5419 2022-12-04 22:52:41Z vondreele $
+# $Id: G2pwd_BrukerRAW.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2pwd_BrukerRAW: Bruker v.1-v.3 .raw data*
----------------------------------------------------
-
-Routine to read in powder data from a Bruker versions 1-3 .raw file
-
 '''
 
 from __future__ import division, print_function
@@ -22,7 +17,7 @@ import numpy as np
 import GSASIIobj as G2obj
 import GSASIIctrlGUI as G2G
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5419 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 class raw_ReaderClass(G2obj.ImportPowderData):
     'Routines to import powder data from a binary Bruker .RAW file'
     def __init__(self):

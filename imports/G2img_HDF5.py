@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-08-05 08:52:37 -0500 (Thu, 05 Aug 2021) $
-# $Author: vondreele $
-# $Revision: 5009 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2img_HDF5.py $
-# $Id: G2img_HDF5.py 5009 2021-08-05 13:52:37Z vondreele $
+# $Id: G2img_HDF5.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2img_HDF5: summed HDF5 image file*
--------------------------------------------
-
-Reads all images found in a HDF5 file.
-
 '''
 
 from __future__ import division, print_function
@@ -21,7 +16,7 @@ except ImportError:
     h5py = None
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5009 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 class HDF5_Reader(G2obj.ImportImage):
     '''Routine to read a HD5 image, typically from APS Sector 6.

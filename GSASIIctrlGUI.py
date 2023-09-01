@@ -1,146 +1,17 @@
 # -*- coding: utf-8 -*-
 #GSASIIctrlGUI - Custom GSAS-II GUI controls
 ########### SVN repository information ###################
-# $Date: 2023-04-10 08:39:20 -0500 (Mon, 10 Apr 2023) $
-# $Author: vondreele $
-# $Revision: 5536 $
+# $Date: 2023-08-14 20:10:19 -0500 (Mon, 14 Aug 2023) $
+# $Author: toby $
+# $Revision: 5649 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIctrlGUI.py $
-# $Id: GSASIIctrlGUI.py 5536 2023-04-10 13:39:20Z vondreele $
+# $Id: GSASIIctrlGUI.py 5649 2023-08-15 01:10:19Z toby $
 ########### SVN repository information ###################
+'''Documentation for all the routines in module :mod:`GSASIIctrlGUI`
+follows.
 '''
-*GSASIIctrlGUI: Custom GUI controls*
----------------------------------------------
-
-A library of GUI controls for reuse throughout GSAS-II, as indexed below
-
-.. tabularcolumns:: |l|p{4in}|
-
-================================  =================================================================
-Class or function name             Description
-================================  =================================================================
-:class:`EnumSelector`              A combo box with a built-in call back routine that
-                                   automatically sets a dict or list entry.
-:class:`DisAglDialog`              Distance/Angle Controls input dialog. 
-:class:`FlagSetDialog`             Dialog that provides a table of items along with a
-                                   checkbox for each. 
-:class:`G2ChoiceButton`            A customized wx.Choice that automatically initializes to
-                                   the initial value and saves the choice directly into a dict
-                                   or list value. Optionally calls function when a
-                                   choice is selected
-:class:`G2CheckBox`                A customized wx.CheckBox that automatically initializes to
-                                   the initial value and saves the choice directly into a dict
-                                   or list value. Optionally calls function when a
-                                   choice is selected
-:func:`G2CheckBoxFrontLbl`         A version of :class:`G2CheckBox` that places the label
-                                   for the check box in front. Otherwise works the same. 
-:func:`G2RadioButtons`             Creates a series of grouped radio buttons.
-:class:`G2SliderWidget`            A customized combination of a wx.Slider and a validated 
-                                   wx.TextCtrl (see :class:`ValidatedTxtCtrl`).
-:class:`G2Slider`                  A wrapped version of wx.Slider that implements scaling
-:class:`G2SpinWidget`              A customized combination of a wx.SpinButton and a validated 
-                                   wx.TextCtrl (see :class:`ValidatedTxtCtrl`).
-:class:`G2ColumnIDDialog`          A dialog for matching column data to desired items; some
-                                   columns may be ignored.
-:class:`G2HistoDataDialog`         A dialog for global edits to histogram data globally
-:class:`G2MultiChoiceDialog`       Dialog similar to wx.MultiChoiceDialog, but provides
-                                   a filter to select choices and buttons to make selection
-                                   of multiple items more simple.
-:class:`G2MultiChoiceWindow`       Similar to :class:`G2MultiChoiceDialog` but provides
-                                   a sizer that can be placed in a frame or panel.
-:class:`G2SingleChoiceDialog`      Dialog similar to wx.SingleChoiceDialog, but provides
-                                   a filter to help search through choices.
-:class:`HelpButton`                Creates a button labeled with a "?" that when pressed
-                                   displays help text in a modal message window
-                                   or web browser. 
-:class:`MultiColumnSelection`      A dialog that builds a multicolumn table, word wrapping
-                                   is used for the 2nd, 3rd,... columns. 
-:class:`MultiDataDialog`           Dialog to obtain multiple data values from user, 
-                                   with optional range validation; items can be float, str or bool
-:class:`MultiIntegerDialog`        Dialog to obtain multiple integer values from user, 
-                                   with a description for each value and optional
-                                   defaults.
-:class:`MultiStringDialog`         Dialog to obtain multiple string values from user, 
-                                   with a description for each value and optional
-                                   defaults.
-:class:`OrderBox`                  Creates a wx.Panel with scrollbars where items can be
-                                   ordered into columns.
-:class:`SortableLstCtrl`           Creates a wx.Panel for a table of data that  
-                                   can be sorted by clicking on a column label.
-:class:`ScrolledMultiEditor`       wx.Dialog for editing many dict- or list-contained items.
-                                   with validation. Results are placed in dict or list.
-:class:`SGMagSpinBox`              Special version of MessageBox that displays magnetic spin text
-:class:`SGMessageBox`              Special version of MessageBox that displays space group & 
-                                   super space group text in two blocks
-:class:`SingleFloatDialog`         Dialog to obtain a single float value from user, with
-                                   optional range validation.
-:class:`SingleIntDialog`           Dialog to obtain a single integer value from user,
-                                   with optional range validation.
-:class:`SingleStringDialog`        Dialog to obtain a single string value from user, 
-                                   with optional an optional default value.
-:class:`ValidatedTxtCtrl`          A text control with a built-in call back routine to set dict
-                                   or list elements. Optionally validates input as float, int or
-                                   for strings non-blank. Value is set when focus changes
-:func:`CallScrolledMultiEditor`    Routine for editing many dict- or list-contained items.
-                                   using the :class:`ScrolledMultiEditor` dialog
-:func:`Define_wxId`                Create a unique wx.Id symbol in _initMenus in :mod:`GSASIIdataGUI`.
-                                   Such symbols are needed when the menu item is defined in a 
-                                   different location from the wx.Bind that links the menu item 
-                                   to a function. This function allows all the menu Ids to be
-                                   defined as the menus are created in one place and then can be 
-                                   used in Bind elsewhere in the code.
-:func:`G2MessageBox`               Displays text typically used for errors or warnings. 
-:func:`ShowScrolledInfo`           Displays longer text where scrolling is possibly needed
-:func:`ShowScrolledColText`        Displays tabular text with scrolling where needed
-:func:`GetItemOrder`               Creates a dialog for ordering items into columns
-:func:`GetImportFile`              Gets one ore more file from the appropriate import
-                                   directory, which can be overridden. Arguments follow those
-                                   of :func:`wx.FileDialog`
-:func:`HorizontalLine`             Places a line in a Frame or Dialog to separate sections.
-:func:`ItemSelector`               Select a single item or multiple items from list of choices.
-                                   Creates and then destroys a wx.Dialog and returns the
-                                   selections(s).
-:func:`SelectEdit1Var`             Select a variable from a list, then edit it and select
-                                   histograms to copy it to.
-:func:`askSaveFile`                Get a file name from user
-:func:`askSaveDirectory`           Get a directory name from user
-:func:`BlockSelector`              Select a single block for instrument parameters
-:func:`MultipleBlockSelector`      Select one or more blocks of data, used for 
-                                   CIF powder histogram imports only
-:func:`MultipleChoicesSelector`    Dialog for displaying fairly complex choices, used for 
-                                   CIF powder histogram imports only
-:func:`PhaseSelector`              Select a phase from a list (used for phase importers)
-:class:`gpxFileSelector`           File browser dialog for opening existing .gpx files
-:class:`ScrolledStaticText`        A wx.StaticText widget that fits a large string into a 
-                                   small space by scrolling it
-:func:`ReadOnlyTextCtrl`           A wx.TextCtrl widget to be used wx.StaticText 
-                                   (no edits allowed) text appears in a box.
-:func:`setColorButton`             A button for color selection as a replacement 
-                                   for wx.ColourSelect 
-================================  =================================================================
-
-Other miscellaneous non-GUI routines that may be of use for GUI-related actions:
-
-.. tabularcolumns:: |l|p{4in}|
-
-================================  =================================================================
-Function name                      Description
-================================  =================================================================
-:func:`StripIndents`               Regularizes the intentation from a string with multiple
-                                   newline characters by removing spaces at the beginning
-                                   of each line.
-:func:`StripUnicode`               Removes unicode characters from strings 
-:func:`GetImportPath`              Determines the default location to use for importing files.
-                                   Tries sequentially :attr:`G2frame.TutorialImportDir`,
-                                   config var ``Import_directory`` and
-                                   :attr:`G2frame.LastImportDir`.
-:func:`GetExportPath`              Determines the default location to use for writing files.
-                                   Tries sequentially :attr:`G2frame.LastExportDir` and
-                                   :attr:`G2frame.LastGPXdir`
-================================  =================================================================
-
-Documentation for all the routines in module :mod:`GSASIIctrlGUI`.
-
-'''
+# Documentation moved to doc/source/GSASIIGUIr.rst
+#
 from __future__ import division, print_function
 import os
 import sys
@@ -176,11 +47,10 @@ except ImportError:
     from matplotlib.backends.backend_wx import FigureCanvas as Canvas
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5536 $")
+GSASIIpath.SetVersionNumber("$Revision: 5649 $")
 import GSASIIdataGUI as G2gd
 import GSASIIpwdGUI as G2pdG
 import GSASIIspc as G2spc
-import GSASIIpy3 as G2py3
 import GSASIIlog as log
 import GSASIIobj as G2obj
 import GSASIIfiles as G2fil
@@ -698,10 +568,10 @@ class ValidatedTxtCtrl(wx.TextCtrl):
                 else:
                     self.invalid = True
             if self.nDig and show and not self.invalid:
-                wx.TextCtrl.SetValue(self,str(G2py3.FormatValue(val,self.nDig)))
+                wx.TextCtrl.SetValue(self,str(G2fil.FormatValue(val,self.nDig)))
                 self.evaluated = False # expression has been recast as value, reset flag
             elif show and not self.invalid:
-                wx.TextCtrl.SetValue(self,str(G2py3.FormatSigFigs(val)).rstrip('0'))
+                wx.TextCtrl.SetValue(self,str(G2fil.FormatSigFigs(val)).rstrip('0'))
                 self.evaluated = False # expression has been recast as value, reset flag
         else:
             if self.ASCIIonly:
@@ -970,7 +840,7 @@ class NumberValidator(wxValidator):
             val = self.typ(tc.GetValue())
         except (ValueError, SyntaxError):
             if self.typ is float: # for float values, see if an expression can be evaluated
-                val = G2py3.FormulaEval(tc.GetValue().replace(',','.'))
+                val = G2fil.FormulaEval(tc.GetValue().replace(',','.'))
                 if val is None:
                     tc.invalid = True
                     return
@@ -1301,11 +1171,15 @@ def HorizontalLine(sizer,parent):
     '''Draws a horizontal line as wide as the window.
     '''
     if sys.platform == "darwin": 
-        line = wx.StaticLine(parent, size=(-1,1), style=wx.LI_HORIZONTAL)
+        #sizer.Add((-1,2))
+        line = wx.Panel(parent, size=(-1, 2))
+        #line.SetBackgroundColour('red')
         line.SetBackgroundColour((128,128,128))
+        sizer.Add(line, 0, wx.EXPAND|wx.ALL, 0)
+        sizer.Add((-1,5))
     else:
         line = wx.StaticLine(parent, size=(-1,3), style=wx.LI_HORIZONTAL)
-    sizer.Add(line, 0, wx.EXPAND|wx.ALL, 5)
+        sizer.Add(line, 0, wx.EXPAND|wx.ALL, 5)
 
 ################################################################################
 class G2LoggedButton(wx.Button):
@@ -2780,6 +2654,69 @@ def ShowScrolledColText(parent,txt,width=600,height=400,header='Warning info',co
     dlg.ShowModal()
     dlg.Destroy()
     
+def G2ScrolledGrid(G2frame,lbl,title,tbl,colLbls,colTypes,maxSize=(600,300)):
+    '''Display a scrolled table of information in a dialog window
+
+    :param wx.Frame G2frame: parent for dialog
+    :param str lbl: label for window 
+    :param str title: window title
+    :param list tbl: list of lists where inner list is each row
+    :param list colLbls: list of str with labels for each column
+    :param list colTypes: Data types for each column (such as 
+      wg.GRID_VALUE_STRING,wg.GRID_VALUE_FLOAT)
+    :param list maxSize: Maximum size for the table in points. Defaults to 
+      (600,300)
+
+    Example::
+
+       row = ['item1',1.234,'description of item']
+       colTypes = [wg.GRID_VALUE_STRING,wg.GRID_VALUE_FLOAT+':8,4',wg.GRID_VALUE_STRING]
+       colLbls = ['item name','value','Description']
+       G2ScrolledGrid(frm,'window label','title',20*[row],colLbls,colTypes)
+
+    '''
+    dlg = wx.Dialog(G2frame,title=title,style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(wx.StaticText(dlg,label=lbl),
+                      0,wx.ALIGN_CENTER_HORIZONTAL,0)
+    sizer.Add((-1,15))
+    rowlbl = [str(i+1) for i in range(len(tbl))]
+    wxtbl = Table(tbl,rowLabels=rowlbl,colLabels=colLbls,types=colTypes)
+        
+    scrGrid = wx.ScrolledWindow(dlg)
+    wxGrid = GSGrid(scrGrid)
+    wxGrid.SetTable(wxtbl, True)
+    wxGrid.AutoSizeColumns(False)
+    wxGrid.EnableEditing(False)
+    gridSizer = wx.BoxSizer(wx.VERTICAL)
+    gridSizer.Add(wxGrid,1,wx.EXPAND,1)
+    gridSizer.Layout()
+    Size = gridSizer.GetMinSize()
+    
+    Size[0] = min(Size[0]+25,maxSize[0])
+    Size[1] = min(Size[1]+25,maxSize[1])
+    scrGrid.SetSizer(gridSizer)
+    scrGrid.SetMinSize(Size)
+    scrGrid.SetScrollbars(10,10,int(Size[0]/10-4),int(Size[1]/10-1))
+    scrGrid.Scroll(0,0)
+    sizer.Add(scrGrid,1,wx.EXPAND,1)
+        
+    btnsizer = wx.BoxSizer(wx.HORIZONTAL)
+    btnsizer.Add((-1,-1),1,wx.EXPAND,1)
+    btn = wx.Button(dlg, wx.ID_OK)
+    btn.SetDefault()
+    btn.Bind(wx.EVT_BUTTON, lambda x: dlg.EndModal(wx.ID_OK))
+    btnsizer.Add(btn)
+    btnsizer.Add((-1,-1),1,wx.EXPAND,1)
+    sizer.Add(btnsizer, 0, wx.EXPAND|wx.ALL, 5)
+       
+    sizer.Layout()    
+    dlg.SetSizer(sizer)
+    sizer.Fit(dlg)
+    dlg.CenterOnParent()
+    dlg.ShowModal()
+    dlg.Destroy()
+
 ################################################################################
 class PickTwoDialog(wx.Dialog):
     '''This does not seem to be in use
@@ -3339,18 +3276,18 @@ class G2ColumnIDDialog(wx.Dialog):
         Indx = {}
         for icol,col in enumerate(self.ColumnData):
             colSizer = wx.BoxSizer(wx.VERTICAL)
-            colSizer.Add(wx.StaticText(panel,label=' Column #%d Select:'%(icol)),0,WACV)
+            colSizer.Add(wx.StaticText(panel,label=' Column #%d Select:'%(icol)))
             self.sel.append(wx.ComboBox(panel,value=' ',choices=self.ChoiceList,style=wx.CB_READONLY|wx.CB_DROPDOWN))
             colSizer.Add(self.sel[-1])
             colData = wx.TextCtrl(panel,value='\n'.join(self.ColumnData[icol]),size=(120,-1),
                 style=wx.TE_MULTILINE|wx.TE_READONLY|wx.TE_DONTWRAP)
             colSizer.Add(colData,1,wx.ALL|wx.EXPAND,1)
-            colSizer.Add(wx.StaticText(panel,label=' Modify by:'),0,WACV)
+            colSizer.Add(wx.StaticText(panel,label=' Modify by:'))
             mod = wx.TextCtrl(panel,size=(120,-1),value='',style=wx.TE_PROCESS_ENTER)
             mod.Bind(wx.EVT_TEXT_ENTER,OnModify)
             mod.Bind(wx.EVT_KILL_FOCUS,OnModify)
             Indx[mod.GetId()] = [icol,colData]
-            colSizer.Add(mod,0,WACV)
+            colSizer.Add(mod)
             columnsSizer.Add(colSizer,0,wx.ALL|wx.EXPAND,10)
         Sizer.Add(columnsSizer,1,wx.ALL|wx.EXPAND,1)
         Sizer.Add(wx.StaticText(panel,label=' For modify by, enter arithmetic string eg. "-12345.67". "+", "-", "*", "/", "**" all allowed'),0) 
@@ -3800,7 +3737,7 @@ class OrderBox(wxscroll.ScrolledPanel):
                 wid = wx.StaticText(pnl,wx.ID_ANY,lbl)
                 insize.Add(wid,0,flag=wx.EXPAND)
                 try:
-                    val = G2py3.FormatSigFigs(self.vallookup[nam][lbl],maxdigits=8)
+                    val = G2fil.FormatSigFigs(self.vallookup[nam][lbl],maxdigits=8)
                 except KeyError:
                     val = '?'
                 wid = wx.StaticText(pnl,wx.ID_ANY,'('+val+')')
@@ -4672,7 +4609,7 @@ class VirtualVarBox(wx.ListCtrl):
         subSizer = wx.BoxSizer(wx.HORIZONTAL)
         subSizer.Add((-1,-1),1,wx.EXPAND)
         try:
-            value = G2py3.FormatSigFigs(self.parmWin.parmDict[name])
+            value = G2fil.FormatSigFigs(self.parmWin.parmDict[name])
         except TypeError:
             value = str(self.parmWin.parmDict[name])+' -?' # unexpected
         subSizer.Add(wx.StaticText(dlg,wx.ID_ANY,
@@ -4823,7 +4760,7 @@ class VirtualVarBox(wx.ListCtrl):
             return ""
         elif col == 3:
             try:
-                value = G2py3.FormatSigFigs(self.parmWin.parmDict[name])
+                value = G2fil.FormatSigFigs(self.parmWin.parmDict[name])
             except TypeError:
                 value = str(self.parmWin.parmDict[name])+' -?' # unexpected
             return value
@@ -4835,7 +4772,7 @@ class VirtualVarBox(wx.ListCtrl):
             n,val = G2obj.prmLookup(name,d)
             if val is None: return ""
             try:
-                return G2py3.FormatSigFigs(val,8)
+                return G2fil.FormatSigFigs(val,8)
             except TypeError:
                 return "?"
         elif col == 6:
@@ -5146,6 +5083,7 @@ class Table(wg.PyGridTableBase):        #TODO: this works in python 3/phoenix bu
                 return
             except IndexError: # has this been tested? 
                 #print row,col,value
+                if self.GetNumberRows() == 0: return
                 # add a new row
                 if row > self.GetNumberRows():
                     self.data.append([''] * self.GetNumberCols())
@@ -5226,7 +5164,7 @@ class GridFractionEditor(wg.PyGridCellEditor):
                 val = 'cosd('+val.strip('c')+')'
             if neg:
                 val = '-' + val
-            val = G2py3.FormulaEval(val)
+            val = G2fil.FormulaEval(val)
             if val is not None:
                 if mult:
                     self.nextval *= val
@@ -7412,6 +7350,11 @@ tutorialIndex = (
      '''This shows how to get an initial estimate of background parameters from a suite of fixed points 
      before beginning Rietveld refinement.'''],
      
+    ['AutoBkg', 'AutoBkg.html',  'Using the "Auto Background" feature',
+     '''This shows how to use the "Auto Background" feature in GSAS-II to get an estimate of background parameters for a 
+     series of histograms with quite significant background levels. This estimate can be used to define a set of fixed points 
+     or to define a "Fixed background histogram."'''],
+     
     ['LeBail', 'LeBailSucrose.htm', 'Le Bail Intensity Extraction in GSAS-II - Sucrose',
      '''Shows the process of setting up a Le Bail fit, where reflection 
      intensities are treated as arbitrary, and how to converge the Le Bail
@@ -8405,23 +8348,23 @@ def ChooseOrigin(G2frame,rd):
         DisAglData['OrigAtoms'] = DisAglData['TargAtoms'] = [
                         [i,]+atom[ct-1:ct+1]+atom[cx:cx+3] for
                         i,atom in enumerate(phObj['Atoms'])]
-        lbl,dis,angle = G2stMn.RetDistAngle(DisAglCtls,DisAglData)
-        # get unique distances
-        minDis = {} 
-        for i in dis: 
-            for j,o,s,d,e in dis[i]: 
-                key = '-'.join(sorted([lbl[i],lbl[j]])) 
-                if key not in minDis: 
-                    minDis[key] = d 
-                elif d < minDis[key]: 
-                    minDis[key] = d
-        thirdShortest = sorted([minDis[k] for k in minDis])[:3][-1]
-        shortTxt = ''
-        for k in minDis:
-            if minDis[k] <= thirdShortest:
-                if shortTxt: shortTxt += ', '
-                shortTxt += "{}: {:.2f}".format(k,minDis[k])
-        txt += "   Shortest distances are "+shortTxt
+        # lbl,dis,angle = G2stMn.RetDistAngle(DisAglCtls,DisAglData)
+        # # get unique distances
+        # minDis = {} 
+        # for i in dis: 
+        #     for j,o,s,d,e in dis[i]: 
+        #         key = '-'.join(sorted([lbl[i],lbl[j]])) 
+        #         if key not in minDis: 
+        #             minDis[key] = d 
+        #         elif d < minDis[key]: 
+        #             minDis[key] = d
+        # thirdShortest = sorted([minDis[k] for k in minDis])[:3][-1]
+        # shortTxt = ''
+        # for k in minDis:
+        #     if minDis[k] <= thirdShortest:
+        #         if shortTxt: shortTxt += ', '
+        #         shortTxt += "{}: {:.2f}".format(k,minDis[k])
+        # txt += "   Shortest distances are "+shortTxt
 
     # do we know if there is a center of symmetry at origin?
     centro = None
@@ -9017,10 +8960,8 @@ def Load2Cells(G2frame,phase):
     tableSizer = wx.FlexGridSizer(0,9,0,0)
     tableSizer.Add((-1,-1))
     for l in u'abc\u03B1\u03B2\u03B3':
-        tableSizer.Add(wx.StaticText(dlg,label=l),
-                       0,WACV|wx.ALIGN_CENTER)
-    tableSizer.Add(wx.StaticText(dlg,label='Centering'),
-                       0,WACV|wx.ALIGN_LEFT)
+        tableSizer.Add(wx.StaticText(dlg,label=l),0,WACV|wx.ALIGN_CENTER)
+    tableSizer.Add(wx.StaticText(dlg,label='Centering'),0,WACV|wx.ALIGN_LEFT)
     tableSizer.Add((-1,-1))
     for cell in range(2):
         tableSizer.Add(wx.StaticText(dlg,label='Cell '+str(cell+1)),0,wx.ALIGN_CENTER|wx.RIGHT,5)
@@ -9059,11 +9000,9 @@ def Load2Cells(G2frame,phase):
     tableSizer.Add(volMaxLbl)
     sizer.Add(tableSizer,0,wx.EXPAND)
     tableSizer = wx.FlexGridSizer(0,2,0,0)
-    tableSizer.Add(wx.StaticText(dlg,label='Search mode: '),
-                       0,WACV|wx.ALIGN_LEFT)
-    tableSizer.Add(EnumSelector(dlg,nistInput,2,
-                    ['Integral matrices', 'Fractional matrices'],
-                    ['I','F'],OnChange=setRatioMax))
+    tableSizer.Add(wx.StaticText(dlg,label='Search mode: '),0,WACV|wx.ALIGN_LEFT)
+    tableSizer.Add(EnumSelector(dlg,nistInput,2,['Integral matrices', 'Fractional matrices'],
+        ['I','F'],OnChange=setRatioMax))
     sizer.Add(tableSizer,0,wx.EXPAND)
     btnSizer = wx.BoxSizer(wx.HORIZONTAL)
     btn = wx.Button(dlg, wx.ID_ANY,'Compute')
@@ -9145,7 +9084,6 @@ class ScrolledStaticText(wx.StaticText):
             self.timer.Stop()
         self.msgpos += 1
         if self.msgpos >= len(self.fullmsg): self.msgpos = 0
-
         
 if __name__ == '__main__':
     app = wx.App()

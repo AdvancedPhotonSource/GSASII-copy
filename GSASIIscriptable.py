@@ -1,1232 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-03-08 12:14:27 -0600 (Wed, 08 Mar 2023) $
+# $Date: 2023-08-14 17:41:31 -0500 (Mon, 14 Aug 2023) $
 # $Author: toby $
-# $Revision: 5511 $
+# $Revision: 5647 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIscriptable.py $
-# $Id: GSASIIscriptable.py 5511 2023-03-08 18:14:27Z toby $
+# $Id: GSASIIscriptable.py 5647 2023-08-14 22:41:31Z toby $
 ########### SVN repository information ###################
 #
 """
-*GSASIIscriptable: Scripting Interface*
-=======================================
-
-Routines to use an increasing amount of GSAS-II's capabilities from scripts, 
-without use of the graphical user interface (GUI). GSASIIscriptable can create and access
-GSAS-II project (.gpx) files and can directly perform image handling and refinements.  
-The module defines wrapper classes (inheriting from :class:`G2ObjectWrapper`) for a growing number 
-of data tree items.
-
-GSASIIscriptable can be used in two ways. It offers a command-line mode 
-(see :ref:`CommandlineInterface`) that 
-provides access a number of features without writing Python scripts 
-via shell/batch commands. The more widely used and more powerful mode of GSASIIscriptable is 
-use is through Python scripts that 
-call the module's application interface (API), see API summary that follows or the :ref:`API` 
-section.
-
-==================================================
-Application Interface (API) Summary
-==================================================
-This section of the documentation provides an overview to API, with full documentation 
-in the :ref:`API` section. The typical API use will be with a Python script, such as 
-what is found in :ref:`CodeExamples`. Most functionality is provided via the objects and methods
-summarized below.
-
----------------------
-Overview of Classes 
----------------------
-
-.. tabularcolumns:: |l|p{4in}|
-
-===============================    ===============================================================================================================
-class                              Encapsulates 
-===============================    ===============================================================================================================
-:class:`G2Project`                  A GSAS-II project file, provides references to objects below,
-                                    each corresponding to a tree item 
-                                    (exception is :class:`G2AtomRecord`)
-:class:`G2Phase`                    Provides phase information access 
-                                    (also provides access to atom info via :class:`G2AtomRecord`)
-:class:`G2AtomRecord`               Access to an atom within a phase
-:class:`G2PwdrData`                 Access to powder histogram info
-:class:`G2Image`                    Access to image info
-:class:`G2PDF`                      PDF histogram info
-:class:`G2SeqRefRes`                The sequential results table
-===============================    ===============================================================================================================
-
----------------------
-Functions
----------------------
-
-A small amount of the Scriptable code does not require use of objects. 
-
-.. tabularcolumns:: |l|p{4in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:func:`GenerateReflections`                            Generates a list of unique powder reflections 
-:func:`SetPrintLevel`                                  Sets the amout of output generated when running a script
-==================================================    ===============================================================================================================
-
----------------------------------
-Class :class:`G2Project`
----------------------------------
-
-  All GSASIIscriptable scripts will need to create a :class:`G2Project` object 
-  either for a new GSAS-II project or to read in an existing project (.gpx) file. 
-  The most commonly used routines in this object are:
-
-.. tabularcolumns:: |l|p{3.in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:meth:`G2Project.save`                                Writes the current project to disk.
-
-:meth:`G2Project.add_powder_histogram`                Used to read in powder diffraction data into a project file.
-
-:meth:`G2Project.add_simulated_powder_histogram`      Defines a "dummy" powder diffraction data that will be simulated after a refinement step.
-
-:meth:`G2Project.add_image`                           Reads in an image into a project.
-
-:meth:`G2Project.add_phase`                           Adds a phase to a project
-
-:meth:`G2Project.add_PDF`                             Adds a PDF entry to a project (does not compute it)
-
-:meth:`G2Project.histograms`                          Provides a list of histograms in the current project, as :class:`G2PwdrData` objects
-
-:meth:`G2Project.phases`                              Provides a list of phases defined in the current project, as :class:`G2Phase` objects
-
-:meth:`G2Project.images`                              Provides a list of images in the current project, as :class:`G2Image` objects
-
-:meth:`G2Project.pdfs`                                Provides a list of PDFs in the current project, as :class:`G2PDF` objects
-
-:meth:`G2Project.seqref`                              Returns a :class:`G2SeqRefRes` object if there are Sequential Refinement results
-
-:meth:`G2Project.do_refinements`                      This is passed a list of dictionaries, where each dict defines a refinement step. 
-                                                      Passing a list with a single empty dict initiates a refinement with the current
-                                                      parameters and flags. A refinement dict sets up a single refinement step 
-                                                      (as described in :ref:`Project_dicts`). Also see :ref:`Refinement_recipe`.
-
-:meth:`G2Project.set_refinement`                      This is passed a single dict which is used to set parameters and flags.
-                                                      These actions can be performed also in :meth:`G2Project.do_refinements`. 
-:meth:`G2Project.get_Variable`                        Retrieves the value and esd for a parameter
-:meth:`G2Project.get_Covariance`                      Retrieves values and covariance for a set of refined parameters
-:meth:`G2Project.set_Controls`                        Set overall GSAS-II control settings such as number of cycles and to set up a sequential
-                                                      fit. (Also see :meth:`G2Project.get_Controls` to read values.)
-:meth:`G2Project.imageMultiDistCalib`                 Performs a global calibration fit with images at multiple distance settings.
-:meth:`G2Project.get_Constraints`                     Retrieves :ref:`constraint definition <Constraint_definitions_table>` entries.
-:meth:`G2Project.add_HoldConstr`                      Adds a hold constraint on one or more variables
-:meth:`G2Project.add_EquivConstr`                     Adds an equivalence constraint on two or more variables
-:meth:`G2Project.add_EqnConstr`                       Adds an equation-type constraint on two or more variables
-:meth:`G2Project.add_NewVarConstr`                    Adds an new variable as a constraint on two or more variables
-==================================================    ===============================================================================================================
-
----------------------------------
-Class :class:`G2Phase`
----------------------------------
-
-
-  Another common object in GSASIIscriptable scripts is :class:`G2Phase`, used to encapsulate each phase in a project, with commonly used methods:
-
-.. tabularcolumns:: |l|p{3.5in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:meth:`G2Phase.set_refinements`                       Provides a mechanism to set values and refinement flags for the phase. See :ref:`Phase_parameters_table` 
-                                                      for more details. This information also can be supplied within a call to :meth:`G2Project.do_refinements` 
-                                                      or :meth:`G2Project.set_refinement`.
-:meth:`G2Phase.clear_refinements`                     Unsets refinement flags for the phase. 
-:meth:`G2Phase.set_HAP_refinements`                   Provides a mechanism to set values and refinement flags for parameters specific to both this phase and 
-                                                      one of its histograms. See :ref:`HAP_parameters_table`. This information also can be supplied within 
-                                                      a call to :meth:`G2Project.do_refinements` or :meth:`G2Project.set_refinement`.
-:meth:`G2Phase.clear_HAP_refinements`                 Clears refinement flags specific to both this phase and one of its histograms.
-:meth:`G2Phase.getHAPvalues`                          Returns values of parameters specific to both this phase and one of its histograms.
-:meth:`G2Phase.copyHAPvalues`                         Copies HAP settings between from one phase/histogram and to other histograms in same phase.
-:meth:`G2Phase.atoms`                                 Returns a list of atoms in the phase
-:meth:`G2Phase.atom`                                  Returns an atom from its label 
-:meth:`G2Phase.histograms`                            Returns a list of histograms linked to the phase
-:meth:`G2Phase.get_cell`                              Returns unit cell parameters (also see :meth:`G2Phase.get_cell_and_esd`)
-:meth:`G2Phase.export_CIF`                            Writes a CIF for the phase
-:meth:`G2Phase.setSampleProfile`                      Sets sample broadening parameters
-==================================================    ===============================================================================================================
-
----------------------------------
-Class :class:`G2PwdrData`
----------------------------------
-
-  Another common object in GSASIIscriptable scripts is :class:`G2PwdrData`, which encapsulate each powder diffraction histogram in a project, with commonly used methods:
-
-.. tabularcolumns:: |l|p{3.5in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:meth:`G2PwdrData.set_refinements`                    Provides a mechanism to set values and refinement flags for the powder histogram. See 
-                                                      :ref:`Histogram_parameters_table` for details.  
-:meth:`G2PwdrData.clear_refinements`                  Unsets refinement flags for the the powder histogram.
-:meth:`G2PwdrData.residuals`                          Reports R-factors etc. for the the powder histogram (also see :meth:`G2PwdrData.get_wR`) 
-:meth:`G2PwdrData.add_back_peak`                      Adds a background peak to the histogram. Also see :meth:`G2PwdrData.del_back_peak` and 
-                                                      :meth:`G2PwdrData.ref_back_peak`.
-:meth:`G2PwdrData.fit_fixed_points`                   Fits background to the specified fixed points.
-:meth:`G2PwdrData.getdata`                            Provides access to the diffraction data associated with the histogram.
-:meth:`G2PwdrData.reflections`                        Provides access to the reflection lists for the histogram.
-:meth:`G2PwdrData.Export`                             Writes the diffraction data or reflection list into a file
-:meth:`G2PwdrData.add_peak`                           Adds a peak to the peak list. Also see :ref:`PeakRefine`.
-:meth:`G2PwdrData.set_peakFlags`                      Sets refinement flags for peaks
-:meth:`G2PwdrData.refine_peaks`                       Starts a peak/background fitting cycle, returns refinement results
-:attr:`G2PwdrData.Peaks`                              Provides access to the peak list data structure
-:attr:`G2PwdrData.PeakList`                           Provides the peak list parameter values 
-:meth:`G2PwdrData.Export_peaks`                       Writes the peak parameters to a text file 
-:meth:`G2PwdrData.set_background`                     Sets a background histogram that will be subtracted (point by point) from the current histogram.
-==================================================    ===============================================================================================================
-
----------------------------------
-Class :class:`G2Image`
----------------------------------
-
-  When working with images, there will be a :class:`G2Image` object for each image (also see :meth:`G2Project.add_image`  and :meth:`G2Project.images`).
-
-.. tabularcolumns:: |l|p{3.5in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:meth:`G2Image.Recalibrate`                           Invokes a recalibration fit starting from the current Image Controls calibration coefficients.
-:meth:`G2Image.Integrate`                             Invokes an image integration All parameters Image Controls will have previously been set.
-:meth:`G2Image.setControl`                            Set an Image Controls parameter in the current image.
-:meth:`G2Image.getControl`                            Return an Image Controls parameter in the current image.
-:meth:`G2Image.findControl`                           Get the names of Image Controls parameters.
-:meth:`G2Image.loadControls`                          Load controls from a .imctrl file (also see :meth:`G2Image.saveControls`).
-:meth:`G2Image.loadMasks`                             Load masks from a .immask file.
-:meth:`G2Image.setVary`                               Set a refinement flag for Image Controls parameter in the current image. (Also see :meth:`G2Image.getVary`)
-:meth:`G2Image.setCalibrant`                          Set a calibrant type (or show choices) for the current image.
-:meth:`G2Image.setControlFile`                        Set a image to be used as a background/dark/gain map image.
-==================================================    ===============================================================================================================
-
-
----------------------------------
-Class :class:`G2PDF`
----------------------------------
-
-  To work with PDF entries, object :class:`G2PDF`, encapsulates a PDF entry with methods:
-
-.. tabularcolumns:: |l|p{3.5in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:meth:`G2PDF.export`                                   Used to write G(r), etc. as a file
-:meth:`G2PDF.calculate`                                Computes the PDF using parameters in the object
-:meth:`G2PDF.optimize`                                 Optimizes selected PDF parameters
-:meth:`G2PDF.set_background`                           Sets the histograms used for sample background, container, etc. 
-:meth:`G2PDF.set_formula`                              Sets the chemical formula for the sample
-==================================================    ===============================================================================================================
-
----------------------------------
-Class :class:`G2SeqRefRes`
----------------------------------
-
-  To work with Sequential Refinement results, object :class:`G2SeqRefRes`, encapsulates the sequential refinement table with methods:
-
-.. tabularcolumns:: |l|p{3.5in}|
-
-==================================================    ===============================================================================================================
-method                                                Use
-==================================================    ===============================================================================================================
-:meth:`G2SeqRefRes.histograms`                         Provides a list of histograms used in the Sequential Refinement 
-:meth:`G2SeqRefRes.get_cell_and_esd`                   Returns cell dimensions and standard uncertainies for a phase and histogram from the Sequential Refinement 
-:meth:`G2SeqRefRes.get_Variable`                       Retrieves the value and esd for a parameter from a particular histogram in the Sequential Refinement 
-:meth:`G2SeqRefRes.get_Covariance`                     Retrieves values and covariance for a set of refined parameters for a particular histogram 
-==================================================    ===============================================================================================================
-
----------------------------------
-Class :class:`G2AtomRecord`
----------------------------------
-
-  When working with phases, :class:`G2AtomRecord` objects provide access to the contents of each atom in a phase. This provides access to "properties" that can be 
-  used to get values of much of the atoms associated settings: label, type, refinement_flags, coordinates, occupancy, ranId, adp_flag, and uiso. In addition, 
-  refinement_flags, occupancy and uiso can be used to set values. See the :class:`G2AtomRecord` docs and source code.
-
-.. _Refinement_dicts:
-
-=====================
-Refinement parameters
-=====================
-While scripts can be written that setup refinements by changing individual parameters 
-through calls to the methods associated with objects that wrap each data tree item, 
-many of these actions can be combined into fairly complex dict structures to conduct refinement
-steps. Use of these dicts is required with the :ref:`CommandlineInterface`. This section of the 
-documentation describes these dicts. 
-
-.. _Project_dicts:
-
------------------------------
-Project-level Parameter Dict
------------------------------
-
-As noted below (:ref:`Refinement_parameters_kinds`), there are three types of refinement parameters,
-which can be accessed individually by the objects that encapsulate individual phases and histograms
-but it will often be simplest to create a composite dictionary
-that is used at the project-level. A dict is created with keys
-"set" and "clear" that can be supplied to :meth:`G2Project.set_refinement`
-(or :meth:`G2Project.do_refinements`, see :ref:`Refinement_recipe` below) that will
-determine parameter values and will determine which parameters will be refined. 
-
-The specific keys and subkeys that can be used are defined in tables 
-:ref:`Histogram_parameters_table`, :ref:`Phase_parameters_table` and :ref:`HAP_parameters_table`.
-
-Note that optionally a list of histograms and/or phases can be supplied in the call to 
-:meth:`G2Project.set_refinement`, but if not specified, the default is to use all defined
-phases and histograms. 
-
-As an example: 
-
-.. code-block::  python
-
-    pardict = {'set': { 'Limits': [0.8, 12.0],
-                       'Sample Parameters': ['Absorption', 'Contrast', 'DisplaceX'],
-                       'Background': {'type': 'chebyschev-1', 'refine': True,
-                                      'peaks':[[0,True],[1,1,1]] }},
-              'clear': {'Instrument Parameters': ['U', 'V', 'W']}}
-    my_project.set_refinement(pardict)
-
-.. _Refinement_recipe:
-
-------------------------
-Refinement recipe
-------------------------
-
-Building on the :ref:`Project_dicts`,
-it is possible to specify a sequence of refinement actions as a list of
-these dicts and supplying this list 
-as an argument to :meth:`G2Project.do_refinements`.
-
-As an example, this code performs the same actions as in the example in the section above: 
-
-.. code-block::  python
-
-    pardict = {'set': { 'Limits': [0.8, 12.0],
-                       'Sample Parameters': ['Absorption', 'Contrast', 'DisplaceX'],
-                       'Background': {'type': 'chebyschev-1', 'refine': True}},
-              'clear': {'Instrument Parameters': ['U', 'V', 'W']}}
-    my_project.do_refinements([pardict])
-
-However, in addition to setting a number of parameters, this example will perform a refinement as well,
-after setting the parameters. More than one refinement can be performed by including more 
-than one dict in the list. 
-
-In this example, two refinement steps will be performed:
-
-.. code-block::  python
-
-    my_project.do_refinements([pardict,pardict1])
-
-
-The keys defined in the following table
-may be used in a dict supplied to :meth:`G2Project.do_refinements`. Note that keys ``histograms``
-and ``phases`` are used to limit actions to specific sets of parameters within the project. 
-
-.. tabularcolumns:: |l|p{4in}|
-
-========== ============================================================================
-key         explanation
-========== ============================================================================
-set                    Specifies a dict with keys and subkeys as described in the
-                       :ref:`Refinement_parameters_fmt` section. Items listed here
-                       will be set to be refined.
-clear                  Specifies a dict, as above for set, except that parameters are
-                       cleared and thus will not be refined.
-once                   Specifies a dict as above for set, except that parameters are
-                       set for the next cycle of refinement and are cleared once the
-                       refinement step is completed.
-skip                   Normally, once parameters are processed with a set/clear/once
-                       action(s), a refinement is started. If skip is defined as True
-                       (or any other value) the refinement step is not performed.
-output                 If a file name is specified for output is will be used to save
-                       the current refinement. 
-histograms             Should contain a list of histogram(s) to be used for the
-                       set/clear/once action(s) on :ref:`Histogram_parameters_table` or
-                       :ref:`HAP_parameters_table`. Note that this will be
-                       ignored for :ref:`Phase_parameters_table`. Histograms may be
-                       specified as a list of strings [('PWDR ...'),...], indices
-                       [0,1,2] or as list of objects [hist1, hist2]. 
-phases                 Should contain a list of phase(s) to be used for the
-                       set/clear/once action(s) on :ref:`Phase_parameters_table` or 
-                       :ref:`HAP_parameters_table`. Note that this will be
-                       ignored for :ref:`Histogram_parameters_table`.
-                       Phases may be specified as a list of strings
-                       [('Phase name'),...], indices [0,1,2] or as list of objects
-                       [phase0, phase2]. 
-call                   Specifies a function to call after a refinement is completed.
-                       The value supplied can be the object (typically a function)
-                       that will be called or a string that will evaluate (in the
-                       namespace inside :meth:`G2Project.iter_refinements` where
-                       ``self`` references the project.)
-                       Nothing is called if this is not specified.
-callargs               Provides a list of arguments that will be passed to the function
-                       in call (if any). If call is defined and callargs is not, the
-                       current <tt>G2Project</tt> is passed as a single argument. 
-========== ============================================================================
-
-An example that performs a series of refinement steps follows:
-
-.. code-block::  python
-
-    reflist = [
-            {"set": { "Limits": { "low": 0.7 },
-                      "Background": { "no. coeffs": 3,
-                                      "refine": True }}},
-            {"set": { "LeBail": True,
-                      "Cell": True }},
-            {"set": { "Sample Parameters": ["DisplaceX"]}},
-            {"set": { "Instrument Parameters": ["U", "V", "W", "X", "Y"]}},
-            {"set": { "Mustrain": { "type": "uniaxial",
-                                    "refine": "equatorial",
-                                    "direction": [0, 0, 1]}}},
-            {"set": { "Mustrain": { "type": "uniaxial",
-                                    "refine": "axial"}}},
-            {"clear": { "LeBail": True},
-             "set": { "Atoms": { "Mn": "X" }}},
-            {"set": { "Atoms": { "O1": "X", "O2": "X" }}},]
-    my_project.do_refinements(reflist)
-
-
-In this example, a separate refinement step will be performed for each dict in the list. The keyword 
-"skip" can be used to specify a dict that should not include a refinement. 
-Note that in the second from last refinement step, parameters are both set and cleared. 
-
-.. _Refinement_parameters_kinds:
-
-----------------------------
-Refinement parameter types
-----------------------------
-
-Note that parameters and refinement flags used in GSAS-II fall into three classes:
-
-    * **Histogram**: There will be a set of these for each dataset loaded into a
-      project file. The parameters available depend on the type of histogram
-      (Bragg-Brentano, Single-Crystal, TOF,...). Typical Histogram parameters
-      include the overall scale factor, background, instrument and sample parameters;
-      see the :ref:`Histogram_parameters_table` table for a list of the histogram
-      parameters where access has been provided.
-
-    * **Phase**: There will be a set of these for each phase loaded into a
-      project file. While some parameters are found in all types of phases,
-      others are only found in certain types (modulated, magnetic, protein...).
-      Typical phase parameters include unit cell lengths and atomic positions; see the
-      :ref:`Phase_parameters_table` table for a list of the phase      
-      parameters where access has been provided.
-
-    * **Histogram-and-phase** (HAP): There is a set of these for every histogram
-      that is associated with each phase, so that if there are ``N`` phases and ``M``
-      histograms, there can be ``N*M`` total sets of "HAP" parameters sets (fewer if all
-      histograms are not linked to all phases.) Typical HAP parameters include the
-      phase fractions, sample microstrain and crystallite size broadening terms,
-      hydrostatic strain perturbations of the unit cell and preferred orientation
-      values.
-      See the :ref:`HAP_parameters_table` table for the HAP parameters where access has
-      been provided. 
-
-.. _Refinement_parameters_fmt:
-
-=================================
-Specifying Refinement Parameters
-=================================
-
-Refinement parameter values and flags to turn refinement on and off are specified within dictionaries,
-where the details of these dicts are organized depends on the
-type of parameter (see :ref:`Refinement_parameters_kinds`), with a different set
-of keys (as described below) for each of the three types of parameters.
-
-.. _Histogram_parameters_table:
-
---------------------
-Histogram parameters
---------------------
-
-This table describes the dictionaries supplied to :func:`G2PwdrData.set_refinements`
-and :func:`G2PwdrData.clear_refinements`. As an example, 
-
-.. code-block::  python
-
-   hist.set_refinements({"Background": {"no.coeffs": 3, "refine": True},
-                         "Sample Parameters": ["Scale"],
-                         "Limits": [10000, 40000]})
-
-With :meth:`G2Project.do_refinements`, these parameters should be placed inside a dict with a key
-``set``, ``clear``, or ``once``. Values will be set for all histograms, unless the ``histograms``
-key is used to define specific histograms. As an example: 
-
-.. code-block::  python
-
-  gsas_proj.do_refinements([
-      {'set': {
-          'Background': {'no.coeffs': 3, 'refine': True},
-          'Sample Parameters': ['Scale'],
-          'Limits': [10000, 40000]},
-      'histograms': [1,2]}
-                            ])
-
-Note that below in the Instrument Parameters section, 
-related profile parameters (such as U and V) are grouped together but
-separated by commas to save space in the table.
-
-.. tabularcolumns:: |l|l|p{3.5in}|
-
-===================== ====================  =================================================
-key                   subkey                explanation
-===================== ====================  =================================================
-Limits                                      The range of 2-theta (degrees) or TOF (in 
-                                            microsec) range of values to use. Can
-                                            be either a dictionary of 'low' and/or 'high',
-                                            or a list of 2 items [low, high]
-\\                     low                   Sets the low limit
-\\                     high                  Sets the high limit
-
-Sample Parameters                           Should be provided as a **list** of subkeys
-                                            to set or clear,\\e.g. ['DisplaceX', 'Scale']
-\\                     Absorption
-\\                     Contrast
-\\                     DisplaceX             Sample displacement along the X direction
-\\                     DisplaceY             Sample displacement along the Y direction
-\\                     Scale                 Histogram Scale factor
-
-Background                                  Sample background. Value will be a dict or 
-                                            a boolean. If True or False, the refine 
-                                            parameter for background is set to that.
-                                            Note that background peaks are not handled
-                                            via this; see 
-                                            :meth:`G2PwdrData.ref_back_peak` instead.
-                                            When value is a dict,
-                                            supply any of the following keys:
-\\                     type                  The background model, e.g. 'chebyschev-1'
-\\                     refine                The value of the refine flag, boolean
-\\                     'no. coeffs'          Number of coefficients to use, integer
-\\                     coeffs                List of floats, literal values for background
-\\                     FixedPoints           List of (2-theta, intensity) values for fixed points
-\\                     'fit fixed points'    If True, triggers a fit to the fixed points to
-                                            be calculated. It is calculated when this key is
-                                            detected, regardless of calls to refine.
-\\                     peaks                 Specifies a set of flags for refining 
-                                            background peaks as a nested list. There may
-                                            be an item for each defined background peak
-                                            (or fewer) and each item is a list with the flag 
-                                            values for pos,int,sig & gam (fewer than 4 values 
-                                            are allowed). 
-
-Instrument Parameters                       As in Sample Paramters, provide as a **list** of
-                                            subkeys to
-                                            set or clear, e.g. ['X', 'Y', 'Zero', 'SH/L']
-\\                     U, V, W               Gaussian peak profile terms
-\\                     X, Y, Z               Lorentzian peak profile terms
-\\                     alpha, beta-0,        TOF profile terms 
-                      beta-1, beta-q,
-\\                     sig-0, sig-1,         TOF profile terms
-                      sig-2, sig-q
-\\                     difA, difB, difC      TOF Calibration constants
-\\                     Zero                  Zero shift
-\\                     SH/L                  Finger-Cox-Jephcoat low-angle peak asymmetry
-\\                     Polariz.              Polarization parameter
-\\                     Lam                   Lambda, the incident wavelength
-===================== ====================  =================================================
-
-.. _Phase_parameters_table:
-
-----------------
-Phase parameters
-----------------
-
-This table describes the dictionaries supplied to :func:`G2Phase.set_refinements`
-and :func:`G2Phase.clear_refinements`. With :meth:`G2Project.do_refinements`,
-these parameters should be placed inside a dict with a key
-``set``, ``clear``, or ``once``. Values will be set for all phases, unless the ``phases``
-key is used to define specific phase(s). 
-
-
-.. tabularcolumns:: |l|p{4.5in}|
-
-======= ==========================================================
-key                   explanation
-======= ==========================================================
-Cell                  Whether or not to refine the unit cell.
-Atoms                 Dictionary of atoms and refinement flags.
-                      Each key should be an atom label, e.g.
-                      'O3', 'Mn5', and each value should be
-                      a string defining what values to refine.
-                      Values can be any combination of 'F'
-                      for site fraction, 'X' for position,
-                      and 'U' for Debye-Waller factor
-LeBail                Enables LeBail intensity extraction.
-======= ==========================================================
-
-
-.. _HAP_parameters_table:
-
-
-Histogram-and-phase parameters
-------------------------------
-
-This table describes the dictionaries supplied to :func:`G2Phase.set_HAP_refinements`
-and :func:`G2Phase.clear_HAP_refinements`. When supplied to
-:meth:`G2Project.do_refinements`, these parameters should be placed inside a dict with a key
-``set``, ``clear``, or ``once``. Values will be set for all histograms used in each phase,
-unless the ``histograms`` and ``phases`` keys are used to define specific phases and histograms.
-
-.. tabularcolumns:: |l|l|p{3.5in}|
-
-=============  ==========  ============================================================
-key             subkey                 explanation
-=============  ==========  ============================================================
-Babinet                                Should be a **list** of the following
-                                       subkeys. If not, assumes both
-                                       BabA and BabU
-\\              BabA
-\\              BabU
-Extinction                             Boolean, True to refine.
-HStrain                                Boolean or list/tuple, True to refine all 
-                                       appropriate D\\ :sub:`ij` terms or False
-                                       to not refine any. If a list/tuple, will
-                                       be a set of True & False values for each 
-                                       D\\ :sub:`ij` term; number of items must 
-                                       match number of terms.
-Mustrain
-\\              type                   Mustrain model. One of 'isotropic',
-                                       'uniaxial', or 'generalized'. **Should always
-                                       be included when Mustrain is used.**
-\\              direction              For uniaxial only. A list of three
-                                       integers,
-                                       the [hkl] direction of the axis.
-\\              refine                 Usually boolean, set to True to refine.
-                                       or False to clear. 
-                                       For uniaxial model, can specify a value
-                                       of 'axial' or 'equatorial' to set that flag
-                                       to True or a single
-                                       boolean sets both axial and equatorial.
-Size                                   
-\\              type                   Size broadening model. One of 'isotropic',
-                                       'uniaxial', or 'ellipsoid'. **Should always
-                                       be specified when Size is used.**
-\\              direction              For uniaxial only. A list of three
-                                       integers,
-                                       the [hkl] direction of the axis.
-\\              refine                 Boolean, True to refine.
-\\              value                  float, size value in microns 
-Pref.Ori.                              Boolean, True to refine
-Show                                   Boolean, True to refine
-Use                                    Boolean, True to refine
-Scale                                  Phase fraction; Boolean, True to refine
-=============  ==========  ============================================================
-
-------------------------
-Histogram/Phase objects
-------------------------
-Each phase and powder histogram in a :class:`G2Project` object has an associated
-object. Parameters within each individual object can be turned on and off by calling
-:meth:`G2PwdrData.set_refinements` or :meth:`G2PwdrData.clear_refinements`
-for histogram parameters;
-:meth:`G2Phase.set_refinements` or :meth:`G2Phase.clear_refinements`
-for phase parameters; and :meth:`G2Phase.set_HAP_refinements` or
-:meth:`G2Phase.clear_HAP_refinements`. As an example, if some_histogram is a histogram object (of type :class:`G2PwdrData`), use this to set parameters in that histogram:
-
-.. code-block::  python
-
-    params = { 'Limits': [0.8, 12.0],
-               'Sample Parameters': ['Absorption', 'Contrast', 'DisplaceX'],
-               'Background': {'type': 'chebyschev-1', 'refine': True}}
-    some_histogram.set_refinements(params)
-
-Likewise to turn refinement flags on, use code such as this:
-
-.. code-block::  python
-
-    params = { 'Instrument Parameters': ['U', 'V', 'W']} 
-    some_histogram.set_refinements(params)
-
-and to turn these refinement flags, off use this (Note that the
-``.clear_refinements()`` methods will usually will turn off refinement even
-if a refinement parameter is set in the dict to True.):
-
-.. code-block::  python
-
-    params = { 'Instrument Parameters': ['U', 'V', 'W']} 
-    some_histogram.clear_refinements(params)
-
-For phase parameters, use code such as this:
-
-.. code-block::  python
-
-    params = { 'LeBail': True, 'Cell': True,
-               'Atoms': { 'Mn1': 'X',
-                          'O3': 'XU',
-                          'V4': 'FXU'}}
-    some_histogram.set_refinements(params)
-
-and here is an example for HAP parameters:
-
-.. code-block::  python
-
-    params = { 'Babinet': 'BabA',
-               'Extinction': True,
-               'Mustrain': { 'type': 'uniaxial',
-                             'direction': [0, 0, 1],
-                             'refine': True}}
-    some_phase.set_HAP_refinements(params)
-
-Note that the parameters must match the object type and method (phase vs. histogram vs. HAP).
-
-.. _AccessingOtherItems:
-
-===================================
-Access to other parameter settings
-===================================
-
-There are several hundred different types of values that can be stored in a 
-GSAS-II project (.gpx) file. All can be changed from the GUI but only a 
-subset have direct mechanism implemented for change from the GSASIIscriptable 
-API. In practice all parameters in a .gpx file can be edited via scripting, 
-but sometimes determining what should be set to implement a parameter 
-change can be complex. 
-Several routines, :meth:`G2Phase.getHAPentryList`, 
-:meth:`G2Phase.getPhaseEntryList` and :meth:`G2PwdrData.getHistEntryList` 
-(and their related get...Value and set.Value entries), 
-provide a mechanism to discover what the GUI is changing inside a .gpx file. 
-
-As an example, a user in changing the data type for a histogram from Debye-Scherrer 
-mode to Bragg-Brentano. This capability is not directly exposed in the API. To 
-find out what changes when the histogram type is changed we can create a short script 
-that displays the contents of all the histogram settings:
-
-.. code-block::  python
-
-    from __future__ import division, print_function
-    import os,sys
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    gpx = G2sc.G2Project('/tmp/test.gpx')
-    h = gpx.histograms()[0]
-    for h in h.getHistEntryList():
-        print(h)
-
-This can be run with a command like this::
-
-       python test.py > before.txt
-
-(This will create file ``before.txt``, which will contain hundreds of lines.) 
-
-At this point open the project file, ``test.gpx`` in the GSAS-II GUI and 
-change in Histogram/Sample Parameters the diffractometer type from Debye-Scherrer 
-mode to Bragg-Brentano and then save the file. 
-
-Rerun the previous script creating a new file::
-
-       python test.py > after.txt
-
-Finally look for the differences between files ``before.txt`` and ``after.txt`` using a tool 
-such as diff (on Linux/OS X) or fc (in Windows).
-
-in Windows:: 
-
-    Z:\\>fc before.txt after.txt
-    Comparing files before.txt and after.txt
-    ***** before.txt
-           fill_value = 1e+20)
-    , 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1', 'PWDR Co_PCP_Act_d900-00030.fxye Ban
-    k 1'])
-    (['Comments'], <class 'list'>, ['Co_PCP_Act_d900-00030.tif #0001 Azm= 180.00'])
-    ***** AFTER.TXT
-           fill_value = 1e+20)
-    , 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1', 'PWDR Co_PCP_Act_d900-00030.fxye Ban
-    k 1', 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1']
-
-    (['Comments'], <class 'list'>, ['Co_PCP_Act_d900-00030.tif #0001 Azm= 180.00'])
-    *****
-
-    ***** before.txt
-    (['Sample Parameters', 'Scale'], <class 'list'>, [1.276313196832068, True])
-    (['Sample Parameters', 'Type'], <class 'str'>, 'Debye-Scherrer')
-    (['Sample Parameters', 'Absorption'], <class 'list'>, [0.0, False])
-    ***** AFTER.TXT
-    (['Sample Parameters', 'Scale'], <class 'list'>, [1.276313196832068, True])
-    (['Sample Parameters', 'Type'], <class 'str'>, 'Bragg-Brentano')
-    (['Sample Parameters', 'Absorption'], <class 'list'>, [0.0, False])
-    *****
-
-in Linux/Mac:: 
-
-    bht14: toby$ diff before.txt after.txt 
-    103c103
-    < , 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1', 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1'])
-    ---
-    > , 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1', 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1', 'PWDR Co_PCP_Act_d900-00030.fxye Bank 1'])
-    111c111
-    < (['Sample Parameters', 'Type'], <class 'str'>, 'Debye-Scherrer')
-    ---
-    > (['Sample Parameters', 'Type'], <class 'str'>, 'Bragg-Brentano')
-
-From this we can see there are two changes that took place. One is fairly obscure, 
-where the histogram name is added to a list, which can be ignored, but the second change 
-occurs in a straight-forward way and we discover that a simple call::
-
-    h.setHistEntryValue(['Sample Parameters', 'Type'], 'Bragg-Brentano')
-
-can be used to change the histogram type. 
-
-.. _CodeExamples:
-
-=================================
-Code Examples
-=================================
-
-.. _PeakRefine:
-
---------------------
-Peak Fitting
---------------------
-
-Peak refinement is performed with routines 
-:meth:`G2PwdrData.add_peak`, :meth:`G2PwdrData.set_peakFlags` and
-:meth:`G2PwdrData.refine_peaks`. Method :meth:`G2PwdrData.Export_peaks` and
-properties :attr:`G2PwdrData.Peaks` and :attr:`G2PwdrData.PeakList` 
-provide ways to access the results. Note that when peak parameters are 
-refined with :meth:`~G2PwdrData.refine_peaks`, the background may also
-be refined. Use :meth:`G2PwdrData.set_refinements` to change background 
-settings and the range of data used in the fit. See below for an example
-peak refinement script, where the data files are taken from the 
-"Rietveld refinement with CuKa lab Bragg-Brentano powder data" tutorial 
-(in https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/LabData/data/).
-
-.. code-block::  python
-
-    from __future__ import division, print_function
-    import os,sys
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII') # needed to "find" GSAS-II modules
-    import GSASIIscriptable as G2sc
-    datadir = os.path.expanduser("~/Scratch/peakfit")
-    PathWrap = lambda fil: os.path.join(datadir,fil)
-    gpx = G2sc.G2Project(newgpx=PathWrap('pkfit.gpx'))
-    hist = gpx.add_powder_histogram(PathWrap('FAP.XRA'), PathWrap('INST_XRY.PRM'),
-                                    fmthint='GSAS powder')
-    hist.set_refinements({'Limits': [16.,24.],
-          'Background': {"no. coeffs": 2,'type': 'chebyschev-1', 'refine': True}
-                         })
-    peak1 = hist.add_peak(1, ttheta=16.8)
-    peak2 = hist.add_peak(1, ttheta=18.9)
-    peak3 = hist.add_peak(1, ttheta=21.8)
-    peak4 = hist.add_peak(1, ttheta=22.9)
-    hist.set_peakFlags(area=True)
-    hist.refine_peaks()
-    hist.set_peakFlags(area=True,pos=True)
-    hist.refine_peaks()
-    hist.set_peakFlags(area=True, pos=True, sig=True, gam=True)
-    res = hist.refine_peaks()
-    print('peak positions: ',[i[0] for i in hist.PeakList])
-    for i in range(len(hist.Peaks['peaks'])):
-        print('peak',i,'pos=',hist.Peaks['peaks'][i][0],'sig=',hist.Peaks['sigDict']['pos'+str(i)])
-    hist.Export_peaks('pkfit.txt')
-    #gpx.save()  # gpx file is not written without this
-
------------------------
-Pattern Simulation
------------------------
-
-This shows two examples where a structure is read from a CIF, a 
-pattern is computed using a instrument parameter file to specify the 
-probe type (neutrons here) and wavelength. 
-
-The first example uses a CW neutron instrument parameter file. 
-The pattern is computed over a 2θ range of 5 to 120 degrees 
-with 1000 points. 
-The pattern and reflection list are written into files. 
-Data files are found in the 
-`Scripting Tutorial <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/PythonScript/data/>`_.
-
-.. code-block::  python
-
-    import os,sys
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    datadir = "/Users/toby/software/G2/Tutorials/PythonScript/data"
-    PathWrap = lambda fil: os.path.join(datadir,fil)
-    gpx = G2sc.G2Project(newgpx='PbSO4sim.gpx') # create a project    
-    phase0 = gpx.add_phase(PathWrap("PbSO4-Wyckoff.cif"),
-             phasename="PbSO4",fmthint='CIF') # add a phase to the project
-    # add a simulated histogram and link it to the previous phase(s)
-    hist1 = gpx.add_simulated_powder_histogram("PbSO4 simulation",
-                PathWrap("inst_d1a.prm"),5.,120.,Npoints=1000,
-                phases=gpx.phases(),scale=500000.)
-    gpx.do_refinements()   # calculate pattern
-    gpx.save()
-    # save results
-    gpx.histogram(0).Export('PbSO4data','.csv','hist') # data
-    gpx.histogram(0).Export('PbSO4refl','.csv','refl') # reflections
-
-This example uses bank#2 from a TOF neutron instrument parameter file. 
-The pattern is computed over a TOF range of 14 to 35 milliseconds with 
-the default of 2500 points. 
-This uses the same CIF as in the example before, but the instrument is found in the  
-`TOF-CW Joint Refinement Tutorial <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/TOF-CW Joint Refinement/data>`_
-tutorial. 
-
-.. code-block::  python
-
-    import os,sys
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    cifdir = "/Users/toby/software/G2/Tutorials/PythonScript/data"
-    datadir = "/Users/toby/software/G2/Tutorials/TOF-CW Joint Refinement/data"
-    gpx = G2sc.G2Project(newgpx='/tmp/PbSO4simT.gpx') # create a project
-    phase0 = gpx.add_phase(os.path.join(cifdir,"PbSO4-Wyckoff.cif"),
-             phasename="PbSO4",fmthint='CIF') # add a phase to the project
-    hist1 = gpx.add_simulated_powder_histogram("PbSO4 simulation",
-                os.path.join(datadir,"POWGEN_1066.instprm"),14.,35.,
-                phases=gpx.phases(),ibank=2)
-    gpx.do_refinements([{}])
-    gpx.save()
-
-----------------------
-Simple Refinement
-----------------------
-
-GSASIIscriptable can be used to setup and perform simple refinements. 
-This example reads in an existing project (.gpx) file, adds a background
-peak, changes some refinement flags and performs a refinement.
-
-.. code-block::  python
-
-    from __future__ import division, print_function
-    import os,sys
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII') # needed to "find" GSAS-II modules
-    import GSASIIscriptable as G2sc
-    datadir = "/Users/Scratch/"
-    gpx = G2sc.G2Project(os.path.join(datadir,'test2.gpx'))
-    gpx.histogram(0).add_back_peak(4.5,30000,5000,0)
-    pardict = {'set': {'Sample Parameters': ['Absorption', 'Contrast', 'DisplaceX'],
-                       'Background': {'type': 'chebyschev-1', 'refine': True,
-                                      'peaks':[[0,True]]}}}
-    gpx.set_refinement(pardict)
-
-----------------------
-Sequential Refinement
-----------------------
-
-GSASIIscriptable can be used to setup and perform sequential refinements. This example script 
-is used to take the single-dataset fit at the end of Step 1 of the 
-`Sequential Refinement tutorial <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/SeqRefine/SequentialTutorial.htm>`_
-and turn on and off refinement flags, add histograms and setup the sequential fit, which is then run:
-
-.. code-block::  python
-
-    import os,sys,glob
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    datadir = os.path.expanduser("~/Scratch/SeqTut2019Mar")
-    PathWrap = lambda fil: os.path.join(datadir,fil)
-    # load and rename project
-    gpx = G2sc.G2Project(PathWrap('7Konly.gpx'))
-    gpx.save(PathWrap('SeqRef.gpx'))
-    # turn off some variables; turn on Dijs
-    for p in gpx.phases():
-        p.set_refinements({"Cell": False})
-    gpx.phase(0).set_HAP_refinements(
-        {'Scale': False,
-         "Size": {'type':'isotropic', 'refine': False},
-         "Mustrain": {'type':'uniaxial', 'refine': False},
-         "HStrain":True,})
-    gpx.phase(1).set_HAP_refinements({'Scale': False})
-    gpx.histogram(0).clear_refinements({'Background':False,
-                     'Sample Parameters':['DisplaceX'],})
-    gpx.histogram(0).ref_back_peak(0,[])
-    gpx.phase(1).set_HAP_refinements({"HStrain":(1,1,1,0)})
-    for fil in sorted(glob.glob(PathWrap('*.fxye'))): # load in remaining fxye files
-        if '00' in fil: continue
-        gpx.add_powder_histogram(fil, PathWrap('OH_00.prm'), fmthint="GSAS powder",phases='all')
-    # copy HAP values, background, instrument params. & limits, not sample params. 
-    gpx.copyHistParms(0,'all',['b','i','l']) 
-    for p in gpx.phases(): p.copyHAPvalues(0,'all')
-    # setup and launch sequential fit
-    gpx.set_Controls('sequential',gpx.histograms())
-    gpx.set_Controls('cycles',10)
-    gpx.set_Controls('seqCopy',True)
-    gpx.refine()  
-
-.. _ImageProc:
-
-----------------------
-Image Processing
-----------------------
-
-A sample script where an image is read, assigned calibration values from a file 
-and then integrated follows. 
-The data files are found in the 
-`Scripting Tutorial <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/PythonScript/data/>`_.
-
-.. code-block::  python
-
-    import os,sys
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    datadir = "/tmp"
-    PathWrap = lambda fil: os.path.join(datadir,fil)
-
-    gpx = G2sc.G2Project(newgpx=PathWrap('inttest.gpx'))
-    imlst = gpx.add_image(PathWrap('Si_free_dc800_1-00000.tif'),fmthint="TIF")
-    imlst[0].loadControls(PathWrap('Si_free_dc800_1-00000.imctrl'))
-    pwdrList = imlst[0].Integrate()
-    gpx.save()
-
-This example shows a computation similar to what is done in tutorial 
-`Area Detector Calibration with Multiple Distances <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/DeterminingWavelength/DeterminingWavelength.html>`_
-
-.. code-block::  python
-
-    import os,sys,glob
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    PathWrap = lambda fil: os.path.join(
-        "/Users/toby/wp/Active/MultidistanceCalibration/multimg",
-        fil)
-
-    gpx = G2sc.G2Project(newgpx='/tmp/img.gpx')
-    for f in glob.glob(PathWrap('*.tif')): 
-        im = gpx.add_image(f,fmthint="TIF")
-    # image parameter settings
-    defImgVals = {'wavelength': 0.24152, 'center': [206., 205.],
-      'pixLimit': 2,  'cutoff': 5.0, 'DetDepth': 0.055,'calibdmin': 1.,}
-    # set controls and vary options, then fit
-    for img in gpx.images():
-        img.setCalibrant('Si    SRM640c')
-        img.setVary('*',False)
-        img.setVary(['det-X', 'det-Y', 'phi', 'tilt', 'wave'], True)
-        img.setControls(defImgVals)
-        img.Recalibrate()
-        img.Recalibrate() # 2nd run better insures convergence
-    gpx.save()
-    # make dict of images for sorting
-    images = {img.getControl('setdist'):img for img in gpx.images()}
-    # show values
-    for key in sorted(images.keys()):
-        img = images[key]
-        c = img.getControls()
-        print(c['distance'],c['wavelength'])
-
-.. _MultiDist_Example:
-
-----------------------
-Image Calibration
-----------------------
-
-This example performs a number of cycles of constrained fitting. 
-A project is created with the images found in a directory, setting initial
-parameters as the images are read. The initial values 
-for the calibration are not very good, so a :meth:`G2Image.Recalibrate` is done
-to quickly improve the fit. Once that is done, a fit of all images is performed
-where the wavelength, an offset and detector orientation are constrained to 
-be the same for all images. The detector penetration correction is then added. 
-Note that as the calibration values improve, the algorithm is able to find more 
-points on diffraction rings to use for calibration and the number of "ring picks" 
-increase. The calibration is repeated until that stops increasing significantly (<10%). 
-Detector control files are then created. 
-The files used for this exercise are found in the
-`Area Detector Calibration Tutorial <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/DeterminingWavelength/data/>`_
-(see 
-`Area Detector Calibration with Multiple Distances <https://subversion.xray.aps.anl.gov/pyGSAS/Tutorials/DeterminingWavelength/DeterminingWavelength.html>`_ ). 
-
-.. code-block::  python
-
-    import os,sys,glob
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')
-    import GSASIIscriptable as G2sc
-    PathWrap = lambda fil: os.path.join(
-        "/Users/toby/wp/Active/MultidistanceCalibration/multimg",
-        fil)
-
-    gpx = G2sc.G2Project(newgpx='/tmp/calib.gpx')
-    for f in glob.glob(PathWrap('*.tif')): 
-        im = gpx.add_image(f,fmthint="TIF")
-    # starting image parameter settings
-    defImgVals = {'wavelength': 0.240, 'center': [206., 205.],
-      'pixLimit': 2,  'cutoff': 5.0, 'DetDepth': 0.03,'calibdmin': 0.5,}
-    # set controls and vary options, then initial fit
-    for img in gpx.images():
-        img.setCalibrant('Si    SRM640c')
-        img.setVary('*',False)
-        img.setVary(['det-X', 'det-Y', 'phi', 'tilt', 'wave'], True)
-        img.setControls(defImgVals)
-        if img.getControl('setdist') > 900:
-            img.setControls({'calibdmin': 1.,})
-        img.Recalibrate()
-    G2sc.SetPrintLevel('warn') # cut down on output
-    result,covData = gpx.imageMultiDistCalib()
-    print('1st global fit: initial ring picks',covData['obs'])
-    print({i:result[i] for i in result if '-' not in i})
-    # add parameter to all images & refit multiple times
-    for img in gpx.images(): img.setVary('dep',True)
-    ringpicks = covData['obs']
-    delta = ringpicks
-    while delta > ringpicks/10:
-        result,covData = gpx.imageMultiDistCalib(verbose=False)
-        delta = covData['obs'] - ringpicks
-        print('ring picks went from',ringpicks,'to',covData['obs'])
-        print({i:result[i] for i in result if '-' not in i})
-        ringpicks = covData['obs']
-    # once more for good measure & printout
-    result,covData = gpx.imageMultiDistCalib(verbose=True)
-    # create image control files
-    for img in gpx.images():
-        img.saveControls(os.path.splitext(img.name)[0]+'.imctrl')
-    gpx.save()
-
-.. _HistExport:
-
---------------------
-Histogram Export
---------------------
-
-This example shows how to export a series of histograms from a collection of 
-.gpx (project) files. The Python ``glob()`` function is used to find all files 
-matching a wildcard in the specified directory (``dataloc``). For each file 
-there is a loop over histograms in that project and for each histogram 
-:meth:`G2PwdrData.Export` is called to write out the contents of that histogram
-as CSV (comma-separated variable) file that contains data positions, 
-observed, computed and backgroun intensities as well as weighting for each 
-point and Q. Note that for the Export call, there is more than one choice of
-exporter that can write ``.csv`` extension files, so the export hint must 
-be specified. 
-
-.. code-block::  python
-
-    import os,sys,glob
-    sys.path.insert(0,'/Users/toby/software/G2/GSASII')  # change this
-    import GSASIIscriptable as G2sc
-
-    dataloc = "/Users/toby/Scratch/"                 # where to find data 
-    PathWrap = lambda fil: os.path.join(dataloc,fil) # EZ way 2 add dir to filename
-
-    for f in glob.glob(PathWrap('bkg*.gpx')):  # put filename prefix here
-        print(f)
-        gpx = G2sc.G2Project(f)
-        for i,h in enumerate(gpx.histograms()):
-            hfil = os.path.splitext(f)[0]+'_'+str(i) # file to write
-            print('\t',h.name,hfil+'.csv')
-            h.Export(hfil,'.csv','histogram CSV')
-
-.. _CommandlineInterface:
-
-=======================================
-Installation of GSASIIscriptable
-=======================================
-
-It is assumed that most people using GSASIIscriptable will also want to use the GUI, for this the standard 
-`installation instructions <https://subversion.xray.aps.anl.gov/trac/pyGSAS#Installationinstructions>`_ should be followed. The GUI includes all files needed to run scriptable. 
-Noting that not all GSAS-II capabilities are not available 
-by scripting -- yet. Even if the scripting API were to be fully completed, 
-there will still be some things that GSAS-II does
-with the GUI would be almost impossible to implement without a 
-interactive graphical view of the data.
-
-Nonetheless, there may be times where it does make sense to install GSAS-II without all of the GUI components, for example on a compute server. As `described here
-<https://gsas-ii.readthedocs.io/en/latest/packages.html#scripting-requirements>`_ the minimal python requirements are only numpy and scipy. It is assumed that 
-anyone able to use scripting is well posed to install from the command line. 
-Below are example commands to install GSAS-II for use for scripting only.
-
-**Installing a minimal Python configuration**: Note I have chosen below 
-to use the free 
-miniconda installer from Anaconda, Inc., but there are also plenty of 
-other ways to install Python, Numpy and Scipy on Linux, Windows and MacOS. 
-For Linux a reasonable alternative is to install these packages 
-(and perhaps others as below) using the Linux dist (``apt-get`` etc.).
-
-.. code-block::  bash
-
-    bash ~/Downloads/Miniconda3-latest-<platform>-x86_64.sh -b -p /loc/pyg2script
-    source /loc/pyg2script/bin/activate
-    conda install numpy scipy matplotlib pillow h5py hdf5 svn
-
-Some discussion on these commands follows:
-
-* the 1st command (bash) assumes that the appropriate version of Miniconda has been downloaded from https://docs.conda.io/en/latest/miniconda.html and ``/loc/pyg2script`` is where I have selected for python to be installed. You might want to use something like ``~/pyg2script``.
-* the 2nd command (source) is needed to access Python with miniconda. 
-* the 3rd command (conda) installs all possible packages that might be used by scripting, but matplotlib, pillow, and hdf5 are not commonly needed and could be omitted. The svn package is not needed (for example on Linux) where this has been installed in another way.
-
-Once svn and Python has been installed and is in the path, use these commands to install GSAS-II:
-
-.. code-block::  bash
-
-    svn co https://subversion.xray.aps.anl.gov/pyGSAS/trunk /loc/GSASII
-    python /loc/GSASII/GSASIIscriptable.py
-
-Notes on these commands:
-
-* the 1st command (svn) is used to download the GSAS-II software. ``/loc/GSASII`` is the location where I decided to install the software. You can select something different. 
-* the 2nd command (python) is used to invoke GSAS-II scriptable for the first time, which is needed to load the binary files from the server.
-
-=======================================
-GSASIIscriptable Command-line Interface
-=======================================
-
-The routines described above are intended to be called from a Python script, but an
-alternate way to access some of the same functionality is to 
-invoke the ``GSASIIscriptable.py`` script from 
-the command line usually from within a shell script or batch file. 
-This mode of accessing GSAS-II scripting does not appear to get much use and 
-is no longer being developed. Please do communicate to the developers if 
-keeping this mode of access would be of value in your work.
-
-To use the command-line mode is done with a command like this::
-
-       python <path/>GSASIIscriptable.py <subcommand> <file.gpx> <options>
-
-The following subcommands are defined:
-
-        * create, see :func:`create`
-        * add, see :func:`add`
-        * dump, see :func:`dump`
-        * refine, see :func:`refine`
-        * export, :func:`export`
-        * browse, see :func:`IPyBrowse`
-
-Run::
-
-   python GSASIIscriptable.py --help
-
-to show the available subcommands, and inspect each subcommand with
-`python GSASIIscriptable.py <subcommand> --help` or see the documentation for each of the above routines.
-
-.. _JsonFormat:
-
--------------------------
-Parameters in JSON files
--------------------------
-
-The refine command requires two inputs: an existing GSAS-II project (.gpx) file and
-a JSON format file
-(see `Introducing JSON <http://json.org/>`_) that contains a single dict.
-This dict may have two keys:
-
-refinements:
-  This defines the a set of refinement steps in a JSON representation of a
-  :ref:`Refinement_recipe` list. 
-
-code:
-  This optionally defines Python code that will be executed after the project is loaded,
-  but before the refinement is started. This can be used to execute Python code to change
-  parameters that are not accessible via a :ref:`Refinement_recipe` dict (note that the
-  project object is accessed with variable ``proj``) or to define code that will be called
-  later (see key ``call`` in the :ref:`Refinement_recipe` section.)
-
-JSON website: `Introducing JSON <http://json.org/>`_.
-
-.. _API:
-
-============================================================
-API: Complete Documentation
-============================================================
-
-The classes and modules in this module are described below.
+Classes and routines defined in :mod:`GSASIIscriptable` follow. 
 A script will create one or more :class:`G2Project` objects by reading 
 a GSAS-II project (.gpx) file or creating a new one and will then
 perform actions such as adding a histogram (method :meth:`G2Project.add_powder_histogram`),
@@ -1235,8 +18,10 @@ or setting parameters and performing a refinement
 (method :meth:`G2Project.do_refinements`).
 
 To change settings within histograms, images and phases, one usually needs to use
-methods inside :class:`G2PwdrData`, :class:`G2Image` or :class:`G2Phase`. 
+methods inside :class:`G2PwdrData`, :class:`G2Image` or :class:`G2Phase`.
 """
+# Note that documentation for GSASIIscriptable.py has been moved
+# to file docs/source/GSASIIscriptable.rst
 
 #============================================================================
 # Notes for adding a new object type
@@ -1306,6 +91,31 @@ def SetPrintLevel(level):
         if mode in level.lower():
             printLevel = mode
             return
+
+def installScriptingShortcut():
+    '''Creates a file named G2script in the current Python site-packages directory.
+    This is equivalent to the "Install GSASIIscriptable shortcut" command in the GUI's
+    File menu. Once this is done, a shortcut for calling GSASIIscriptable is created, 
+    where the command:
+    
+    >>> import G2script as G2sc
+
+    will provide access to GSASIIscriptable without changing the sys.path; also see
+    :ref:`ScriptingShortcut`.
+
+    Note that this only affects the current Python installation. If more than one 
+    Python installation will be used with GSAS-II (for example because different 
+    conda environments are used), this command should be called from within each 
+    Python environment.
+
+    If more than one GSAS-II installation will be used with a Python installation, 
+    this shortcut can only be used with one of them.
+    '''
+    f = GSASIIpath.makeScriptShortcut()
+    if f:
+        G2fil.G2Print(f'success creating {f}')
+    else:
+        raise G2ScriptException('error creating G2script')
         
 def LoadG2fil():
     '''Setup GSAS-II importers. 
@@ -1756,11 +566,11 @@ def load_pwd_from_reader(reader, instprm, existingnames=[],bank=None):
                   'Yminmax': [Ymin, Ymax]}
     # apply user-supplied corrections to powder data
     if 'CorrectionCode' in Iparm1:
-        print('Applying corrections from instprm file')
+        G2fil.G2Print('Applying corrections from instprm file')
         corr = Iparm1['CorrectionCode'][0]
         try:
             exec(corr)
-            print('done')
+            G2fil.G2Print('done')
         except Exception as err:
             print(u'error: {}'.format(err))
             print('with commands -------------------')
@@ -1930,7 +740,7 @@ def patchControls(Controls):
         if d not in Controls: Controls[d] = {}
         for k in Controls[d]:  
             if type(k) is str:
-                print("Applying patch to Controls['{}']".format(d))
+                G2fil.G2Print("Applying patch to Controls['{}']".format(d))
                 Controls[d] = {G2obj.G2VarObj(k):v for k,v in Controls[d].items()}
                 break
     conv = False
@@ -1941,7 +751,7 @@ def patchControls(Controls):
                 conv = True
                 Controls['parmFrozen'][k] = [G2obj.G2VarObj(i) for i in Controls['parmFrozen'][k]]
                 break
-    if conv: print("Applying patch to Controls['parmFrozen']")
+    if conv: G2fil.G2Print("Applying patch to Controls['parmFrozen']")
     if 'newLeBail' not in Controls:
         Controls['newLeBail'] = False
     # end patch
@@ -2055,9 +865,10 @@ class G2Project(G2ObjectWrapper):
                                          'instrument_parameters.prm')
     >>> phase = proj.add_phase('my_phase.cif', histograms=[hist])
 
-    Parameters for Rietveld refinement can be turned on and off as well.
-    See :meth:`~G2Project.set_refinement`, :meth:`~G2Project.clear_refinements`,
-    :meth:`~G2Project.iter_refinements`, :meth:`~G2Project.do_refinements`.
+    Parameters for Rietveld refinement can be turned on and off at the project level 
+    as well as described in 
+    :meth:`~G2Project.set_refinement`, :meth:`~G2Project.iter_refinements` and 
+    :meth:`~G2Project.do_refinements`.
     """
     def __init__(self, gpxfile=None, author=None, filename=None, newgpx=None):
         if filename is not None and newgpx is not None:
@@ -2360,12 +1171,17 @@ class G2Project(G2ObjectWrapper):
         self.data[histname]['data'][0]['Dummy'] = True
         return self.histogram(histname)
     
-    def add_phase(self, phasefile, phasename=None, histograms=[],
-                      fmthint=None, mag=False):
-        """Loads a phase into the project from a .cif file
+    def add_phase(self, phasefile=None, phasename=None, histograms=[],
+                      fmthint=None, mag=False,
+                      spacegroup='P 1',cell=None):
+        """Loads a phase into the project, usually from a .cif file
 
-        :param str phasefile: The CIF file from which to import the phase.
-        :param str phasename: The name of the new phase, or None for the default
+        :param str phasefile: The CIF file (or other file type, see fmthint) 
+          that the phase will be read from. 
+          May be left as None (the default) if the phase will be constructed
+          a step at a time. 
+        :param str phasename: The name of the new phase, or None for the 
+          default. A phasename must be specified when a phasefile is not. 
         :param list histograms: The names of the histograms to associate with
             this phase. Use proj.histograms() to add to all histograms.
         :param str fmthint: If specified, only importers where the format name
@@ -2374,12 +1190,55 @@ class G2Project(G2ObjectWrapper):
           importers consistent with the file extension will be tried
           (equivalent to "guess format" in menu).
         :param bool mag: Set to True to read a magCIF
-
+        :param str spacegroup: The space group name as a string. The  
+          space group must follow the naming rules used in 
+          :func:`GSASIIspc.SpcGroup`. Defaults to 'P 1'. Note that 
+          this is only used when phasefile is None.
+        :param list cell: a list with six unit cell constants 
+            (a, b, c, alpha, beta and gamma in Angstrom/degrees).
+ 
         :returns: A :class:`G2Phase` object representing the
             new phase.
         """
         LoadG2fil()
         histograms = [self.histogram(h).name for h in histograms]
+        if phasefile is None:
+            if phasename is None:
+                raise Exception('add_phase: phasefile and phasename cannot both be None')
+            phaseNameList = [p.name for p in self.phases()]
+            phasename = G2obj.MakeUniqueLabel(phasename, phaseNameList)
+            self.data['Phases'] = self.data.get('Phases', {'data': None})
+            err,SGData=G2spc.SpcGroup(spacegroup)
+            if err != 0:
+                print('Space group error:', G2spc.SGErrors(err))
+                raise Exception('Space group error')
+            self.data['Phases'][phasename] = G2obj.SetNewPhase(
+                Name=phasename,SGData=SGData)
+            self.data['Phases'][phasename]['General']['Name'] = phasename
+            for hist in histograms:
+                self.link_histogram_phase(hist, phasename)
+
+            for obj in self.names:
+                if obj[0] == 'Phases':
+                    phasenames = obj
+                    break
+            else:
+                phasenames = [u'Phases']
+                self.names.append(phasenames)
+            phasenames.append(phasename)
+
+            data = self.data['Phases'][phasename]
+            if cell:
+                if len(cell) != 6:
+                    raise Exception('Error: Unit cell must have 6 entries')
+                data['General']['Cell'][1:7] = cell
+                data['General']['Cell'][7] = G2lat.calc_V(G2lat.cell2A(cell))
+            SetupGeneral(data, None)
+            self.index_ids()
+
+            self.update_ids()
+            return self.phase(phasename)
+        
         phasefile = os.path.abspath(os.path.expanduser(phasefile))
 
         # TODO handle multiple phases in a file
@@ -2636,7 +1495,7 @@ class G2Project(G2ObjectWrapper):
         return []
 
     def _images(self):
-        """Returns a list of all the phases in the project.
+        """Returns a list of all the images in the project.
         """
         return [i[0] for i in self.names if i[0].startswith('IMG ')]
     
@@ -2949,7 +1808,8 @@ class G2Project(G2ObjectWrapper):
             :meth:`G2Phase.set_refinements`
             :meth:`G2Phase.clear_refinements`
             :meth:`G2Phase.set_HAP_refinements`
-            :meth:`G2Phase.clear_HAP_refinements`"""
+            :meth:`G2Phase.clear_HAP_refinements`
+        """
 
         if histogram == 'all':
             hists = self.histograms()
@@ -3299,7 +2159,7 @@ class G2Project(G2ObjectWrapper):
           :meth:`add_constraint_raw` as consType. Should be one of "Hist", "Phase", 
           or "HAP" ("Global" not implemented).
         """
-        print('G2Phase.hold_many Warning: replace calls to hold_many() with add_Hold()')
+        G2fil.G2Print('G2Phase.hold_many Warning: replace calls to hold_many() with add_Hold()')
         for var in vars:
             if isinstance(var, str):
                 var = self.make_var_obj(var)
@@ -3357,7 +2217,8 @@ class G2Project(G2ObjectWrapper):
 
         return G2obj.G2VarObj(phase, hist, varname, atomId)
 
-    def add_image(self, imagefile, fmthint=None, defaultImage=None, indexList=None):
+    def add_image(self, imagefile, fmthint=None, defaultImage=None,
+                      indexList=None, cacheImage=False):
         """Load an image into a project
 
         :param str imagefile: The image file to read, a filename.
@@ -3372,6 +2233,8 @@ class G2Project(G2ObjectWrapper):
           to be used from the file when a file has multiple images. A value of
           ``[0,2,3]`` will cause the only first, third and fourth images in the file
           to be included in the project. 
+        :param bool cacheImage: When True, the image is cached to save 
+          in rereading it later. Default is False (no caching). 
 
         :returns: a list of :class:`G2Image` object(s) for the added image(s) 
         """
@@ -3478,8 +2341,11 @@ class G2Project(G2ObjectWrapper):
                 'Sample z':0.0,'Sample load':0.0}
             self.names.append([TreeName]+['Comments','Image Controls','Masks','Stress/Strain'])
             self.data[TreeName] = ImgDict
-            del rd.Image
-            objlist.append(G2Image(self.data[TreeName], TreeName, self))
+            if cacheImage:
+                objlist.append(G2Image(self.data[TreeName], TreeName, self, image=rd.Image))
+            else:
+                objlist.append(G2Image(self.data[TreeName], TreeName, self))
+                del rd.Image
         return objlist
     
     def imageMultiDistCalib(self,imageList=None,verbose=False):
@@ -3931,18 +2797,25 @@ class G2Project(G2ObjectWrapper):
         return (vals,cov)
 
 class G2AtomRecord(G2ObjectWrapper):
-    """Wrapper for an atom record. Has convenient accessors via @property:
-    label, type, refinement_flags, coordinates, occupancy, ranId, id, adp_flag, uiso
+    """Wrapper for an atom record. Allows many atom properties to be access 
+    and changed. See the :ref:`Atom Records description <Atoms_table>`  
+    for the details on what information is contained in an atom record.
 
-    Example:
+    Scripts should not try to create a :class:`G2AtomRecord` object directly as 
+    these objects are created via access from a :class:`G2Phase` object.
+
+    Example showing some uses of :class:`G2AtomRecord` methods:
 
     >>> atom = some_phase.atom("O3")
-    >>> # We can access the underlying data format
+    >>> # We can access the underlying data structure (a list):
     >>> atom.data
     ['O3', 'O-2', '', ... ]
-    >>> # We can also use wrapper accessors
+    >>> # We can also use wrapper accessors to get or change atom info:
     >>> atom.coordinates
     (0.33, 0.15, 0.5)
+    >>> atom.coordinates = [1/3, .1, 1/2]
+    >>> atom.coordinates
+    (0.3333333333333333, 0.1, 0.5)
     >>> atom.refinement_flags
     u'FX'
     >>> atom.ranId
@@ -3954,22 +2827,53 @@ class G2AtomRecord(G2ObjectWrapper):
         self.data = data
         self.cx, self.ct, self.cs, self.cia = indices
         self.proj = proj
-
+        
+#    @property
+#    def X(self):
+#        '''Get or set the associated atom's X. 
+#        Use as ``x = atom.X`` to obtain the value and 
+#        ``atom.X = x`` to set the value.
+#        '''
+#        pass
+#    @X.setter
+#    def X(self, val):
+#        pass
+        
     @property
     def label(self):
-        '''Get the associated atom's label
+        '''Get the associated atom's label. 
+        Use as ``x = atom.label`` to obtain the value and 
+        ``atom.label = x`` to set the value.
         '''
         return self.data[self.ct-1]
+    @label.setter
+    def label(self, val):
+        self.data[self.ct-1] = str(value)        
 
     @property
     def type(self):
-        '''Get the associated atom's type
+        '''Get or set the associated atom's type. Call as a variable 
+        (``x = atom.type``) to obtain the value or use 
+        ``atom.type = x`` to change the type. It is the user's 
+        responsibility to make sure that the atom type is valid; 
+        no checking is done here. 
+
+        .. seealso::
+            :meth:`element`
         '''
         return self.data[self.ct]
-
+    @type.setter
+    def type(self, val):
+        # TODO: should check if atom type is defined 
+        self.data[self.ct] = str(value)        
+    
     @property
     def element(self):
-        '''Get the associated atom's element symbol
+        '''Parses element symbol from the atom type symbol for the atom 
+        associated with the current object.
+
+        .. seealso::
+            :meth:`type`        
         '''
         import re
         try:
@@ -3980,10 +2884,11 @@ class G2AtomRecord(G2ObjectWrapper):
 
     @property
     def refinement_flags(self):
-        '''Get or set refinement flags for the associated atom
+        '''Get or set refinement flags for the associated atom.
+        Use as ``x = atom.refinement_flags`` to obtain the flags and 
+        ``atom.refinement_flags = "XU"`` (etc) to set the value.
         '''
         return self.data[self.ct+1]
-
     @refinement_flags.setter
     def refinement_flags(self, other):
         # Automatically check it is a valid refinement
@@ -3994,55 +2899,102 @@ class G2AtomRecord(G2ObjectWrapper):
 
     @property
     def coordinates(self):
-        '''Get the associated atom's coordinates
+        '''Get or set the associated atom's coordinates.
+        Use as ``x = atom.coordinates`` to obtain a tuple with 
+        the three (x,y,z) values and ``atom.coordinates = (x,y,z)`` 
+        to set the values.
+
+        Changes needed to adapt for changes in site symmetry have not yet been
+        implemented:
         '''
         return tuple(self.data[self.cx:self.cx+3])
-
+    @coordinates.setter
+    def coordinates(self, val):
+        if len(val) != 3:
+            raise ValueError(f"coordinates are of wrong length {val}")
+        try:
+            self.data[self.cx:self.cx+3] = [float(i) for i in val]
+        except:
+            raise ValueError(f"conversion error with coordinates {val}")
+        # TODO: should recompute the atom site symmetries here
+        
     @property
     def occupancy(self):
-        '''Get or set the associated atom's site fraction
+        '''Get or set the associated atom's site fraction. 
+        Use as ``x = atom.occupancy`` to obtain the value and 
+        ``atom.occupancy = x`` to set the value.
         '''
         return self.data[self.cx+3]
-    
     @occupancy.setter
     def occupancy(self, val):
         self.data[self.cx+3] = float(val)
 
     @property
     def mult(self):
-        '''Get the associated atom's multiplicity value
+        '''Get the associated atom's multiplicity value. Should not be 
+        changed by user. 
         '''
         return self.data[self.cs+1]
     
     @property
     def ranId(self):
-        '''Get the associated atom's Random Id number
+        '''Get the associated atom's Random Id number. Don't change this.
         '''
         return self.data[self.cia+8]
 
     @property
     def adp_flag(self):
-        '''Get the associated atom's iso/aniso setting, 'I' or 'A'
+        '''Get the associated atom's iso/aniso setting. The value
+        will be 'I' or 'A'. No API provision is offered to change
+        this.
         '''
         # Either 'I' or 'A'
         return self.data[self.cia]
 
     @property
-    def uiso(self):
-        '''Get or set the associated atom's Uiso or Uaniso value(s)
+    def ADP(self):
+        '''Get or set the associated atom's Uiso or Uaniso value(s). 
+        Use as ``x = atom.ADP`` to obtain the value(s) and 
+        ``atom.ADP = x`` to set the value(s). For isotropic atoms
+        a single float value is returned (or used to set). For 
+        anisotropic atoms a list of six values is used.
+
+        .. seealso::
+            :meth:`adp_flag`
+            :meth:`uiso`
         '''
         if self.adp_flag == 'I':
             return self.data[self.cia+1]
         else:
             return self.data[self.cia+2:self.cia+8]
-
-    @uiso.setter
-    def uiso(self, value):
+    @ADP.setter
+    def ADP(self, value):
         if self.adp_flag == 'I':
             self.data[self.cia+1] = float(value)
         else:
             assert len(value) == 6
             self.data[self.cia+2:self.cia+8] = [float(v) for v in value]
+
+    @property
+    def uiso(self):
+        '''A synonym for :meth:`ADP` to be used for Isotropic atoms. 
+        Get or set the associated atom's Uiso value. 
+        Use as ``x = atom.uiso`` to obtain the value and 
+        ``atom.uiso = x`` to set the value. A 
+        single float value is returned or used to set.
+
+        .. seealso::
+            :meth:`adp_flag`
+            :meth:`ADP`
+        '''
+        if self.adp_flag != 'I':
+            raise G2ScriptException(f"Atom {self.label} is not isotropic")
+        return self.ADP
+    @uiso.setter
+    def uiso(self, value):
+        if self.adp_flag != 'I':
+            raise G2ScriptException(f"Atom {self.label} is not isotropic")
+        self.ADP = value
 
 class G2PwdrData(G2ObjectWrapper):
     """Wraps a Powder Data Histogram. 
@@ -4055,6 +3007,9 @@ class G2PwdrData(G2ObjectWrapper):
           as documented for the :ref:`Powder Diffraction Tree<Powder_table>`.
           The actual histogram values are contained in the 'data' dict item,
           as documented for Data. 
+
+    Scripts should not try to create a :class:`G2PwdrData` object directly as 
+    :meth:`G2PwdrData.__init__` should be invoked from inside :class:`G2Project`.
 
     """
     def __init__(self, data, proj, name):
@@ -4879,6 +3834,42 @@ class G2PwdrData(G2ObjectWrapper):
             d = d[key]
         dlast[key] = newvalue
         
+    def calc_autobkg(self,opt=0,logLam=None):
+        """Sets fixed background points using the pybaselines Whittaker 
+        algorithm.
+
+       :param int opt: 0 for 'arpls' or 1 for 'iarpls'. Default is 0.
+
+       :param float logLam: log_10 of the Lambda value used in the 
+         pybaselines.whittaker.arpls/.iarpls computation. If None (default)
+         is provided, a guess is taken for an appropriate value based 
+         on the number of points. 
+
+       :returns: the array of computed background points  
+       """
+        bkgDict = self.data['Background'][1]
+        xydata = self.data['data'][1]
+        npts = len(xydata[1])
+        bkgDict['autoPrms'] = bkgDict.get('autoPrms',{})
+        try:
+            opt = int(opt)
+        except:
+            opt = 0
+        bkgDict['autoPrms']['opt'] = opt
+        try:
+            logLam = float(logLam)
+        except:
+            logLam =  min(10,float(int(10*np.log10(npts)**1.5)-9.5)/10.)
+            print('Using default value of',logLam,'for pybaselines.whittaker.[i]arpls background computation')
+        bkgDict['autoPrms']['logLam'] = logLam
+        bkgDict['autoPrms']['Mode'] = None
+        bkgdata = G2pwd.autoBkgCalc(bkgDict,xydata[1])
+        bkgDict['FixedPoints'] = [i for i in zip(
+                xydata[0].data[::npts//100],
+                bkgdata.data[::npts//100])]
+        bkgDict['autoPrms']['Mode'] = 'fixed'
+        return bkgdata
+        
 class G2Phase(G2ObjectWrapper):
     """A wrapper object around a given phase.
     The object contains these class variables:
@@ -4888,6 +3879,9 @@ class G2Phase(G2ObjectWrapper):
         * G2Phase.name: contains the name of the phase
         * G2Phase.data: contains the phases's associated data in a dict,
           as documented for the :ref:`Phase Tree items<Phase_table>`.
+
+    Scripts should not try to create a :class:`G2Phase` object directly as 
+    :meth:`G2Phase.__init__` should be invoked from inside :class:`G2Project`.
 
     Author: Jackson O'Donnell (jacksonhodonnell .at. gmail.com)
     """
@@ -4993,6 +3987,53 @@ class G2Phase(G2ObjectWrapper):
     def id(self, val):
         self.data['pId'] = val
 
+    def add_atom(self,x,y,z,element,lbl,occ=1.,uiso=0.01):
+        '''Adds an atom to the current phase
+
+        :param float x: atom fractional x coordinate
+        :param float y: atom fractional y coordinate
+        :param float z: atom fractional z coordinate
+        :param str element: an element symbol (capitalization is ignored). Optionally add
+          a valence (as in Ba+2)
+        :param str lbl: A label for this atom
+        :param float occ: A fractional occupancy for this atom (defaults to 1).
+        :param float uiso: A Uiso value for this atom (defaults to 0.01).
+
+        :returns: the :class:`~GSASIIscriptable.G2AtomRecord` atom object for the new atom
+        '''
+        x = float(x)
+        y = float(y)
+        z = float(z)
+        occ = float(occ)
+        uiso = float(uiso)
+        
+        generalData = self.data['General']
+        atomData = self.data['Atoms']
+        SGData = generalData['SGData']
+        
+        atId = ran.randint(0,sys.maxsize)
+        Sytsym,Mult = G2spc.SytSym([x,y,z],SGData)[:2]
+
+        if generalData['Type'] == 'macromolecular':
+            atomData.append([0,lbl,'',lbl,element,'',x,y,z,occ,Sytsym,Mult,'I',uiso,0,0,0,0,0,0,atId])
+        elif generalData['Type'] in ['nuclear','faulted',]:
+            if generalData['Modulated']:
+                atomData.append([lbl,element,'',x,y,z,occ,Sytsym,Mult,'I',uiso,0,0,0,0,0,0,atId,[],[],
+                    {'SS1':{'waveType':'Fourier','Sfrac':[],'Spos':[],'Sadp':[],'Smag':[]}}])
+            else:
+                atomData.append([lbl,element,'',x,y,z,occ,Sytsym,Mult,'I',uiso,0,0,0,0,0,0,atId])
+        elif generalData['Type'] == 'magnetic':
+            if generalData['Modulated']:
+                atomData.append([lbl,element,'',x,y,z,occ,0.,0.,0.,Sytsym,Mult,'I',uiso,0,0,0,0,0,0,atId,[],[],
+                    {'SS1':{'waveType':'Fourier','Sfrac':[],'Spos':[],'Sadp':[],'Smag':[]}}])
+            else:
+                atomData.append([lbl,element,'',x,y,z,occ,0.,0.,0.,Sytsym,Mult,'I',uiso,0,0,0,0,0,0,atId])
+
+        SetupGeneral(self.data, None)
+        #self.proj.index_ids()  # needed? 
+        #self.proj.update_ids()  # needed?
+        return self.atom(lbl)
+        
     def get_cell(self):
         """Returns a dictionary of the cell parameters, with keys:
             'length_a', 'length_b', 'length_c', 'angle_alpha', 'angle_beta', 'angle_gamma', 'volume'
@@ -5237,7 +4278,7 @@ class G2Phase(G2ObjectWrapper):
             elif key == 'Mustrain':
                 for h in histograms:
                     mustrain = self.data['Histograms'][h]['Mustrain']
-                    newType = None
+                    newType = mustrain[0]
                     direction = None
                     if isinstance(val, strtypes):
                         if val in ['isotropic', 'uniaxial', 'generalized']:
@@ -5245,7 +4286,7 @@ class G2Phase(G2ObjectWrapper):
                         else:
                             raise ValueError("Not a Mustrain type: " + val)
                     elif isinstance(val, dict):
-                        newType = val.get('type', None)
+                        newType = val.get('type', newType)
                         direction = val.get('direction', None)
 
                     if newType:
@@ -5293,7 +4334,7 @@ class G2Phase(G2ObjectWrapper):
                     newSize = float(val['value'])
                 for h in histograms:
                     size = self.data['Histograms'][h]['Size']
-                    newType = None
+                    newType = size[0]
                     direction = None
                     if isinstance(val, strtypes):
                         if val in ['isotropic', 'uniaxial', 'ellipsoidal']:
@@ -5301,7 +4342,7 @@ class G2Phase(G2ObjectWrapper):
                         else:
                             raise ValueError("Not a valid Size type: " + val)
                     elif isinstance(val, dict):
-                        newType = val.get('type', None)
+                        newType = val.get('type', size[0])
                         direction = val.get('direction', None)
 
                     if newType:
@@ -5767,10 +4808,133 @@ class G2Phase(G2ObjectWrapper):
             dlast = d
             d = d[key]
         dlast[key] = newvalue
+
+    def _getBondRest(self,nam):
+        if 'Restraints' not in self.proj.data:
+            raise G2ScriptException(f"{nam} error: Restraints entry not in data tree")
+        try:
+            return self.proj.data['Restraints']['data'][self.name]['Bond']
+        except:
+            raise G2ScriptException(f"{nam} error: Bonds for phase not in Restraints")
+
+        
+    def setDistRestraintWeight(self, factor=1):
+        '''Sets the weight for the bond distance restraint(s) to factor
+
+        :param float factor: the weighting factor for this phase's restraints. Defaults
+          to 1 but this value is typically much larger (10**2 to 10**4)
+
+        .. seealso::
+           :meth:`G2Phase.addDistRestraint`
+        '''
+        bondRestData = self._getBondRest('setDistRestraintWeight')
+        bondRestData['wtFactor'] = float(factor)
+
+    def clearDistRestraint(self):
+        '''Deletes any previously defined bond distance restraint(s) for the selected phase
+
+        .. seealso::
+           :meth:`G2Phase.addDistRestraint`
+
+        '''
+        bondRestData = self._getBondRest('clearDistRestraint')
+        bondRestData['Bonds'] = []
+
+    def addDistRestraint(self, origin, target, bond, factor=1.1, ESD=0.01):
+        '''Adds bond distance restraint(s) for the selected phase
+
+        This works by search for interatomic distances between atoms in the
+        origin list and the target list (the two lists may be the same but most 
+        frequently will not) with a length between bond/factor and bond*factor.
+        If a distance is found in that range, it is added to the restraints
+        if it was not already found.
+
+        :param list origin: a list of atoms, each atom may be an atom 
+           object, an index or an atom label
+        :param list target: a list of atoms, each atom may be an atom 
+           object, an index or an atom label
+        :param float bond: the target bond length in A for the located atom
+        :param float factor: a tolerance factor used when searching for 
+           bonds (defaults to 1.1)
+        :param float ESD: the uncertainty for the bond (defaults to 0.01)
+
+        :returns: returns the number of new restraints that are found
+
+        As an example:: 
+
+            gpx = G2sc.G2Project('restr.gpx')
+            ph = gpx.phases()[0]
+            ph.clearDistRestraint()
+            origin = [a for a in ph.atoms() if a.element == 'Si']
+            target = [i for i,a in enumerate(ph.atoms()) if a.element == 'O']
+            c = ph.addDistRestraint(origin, target, 1.64)
+            print(c,'new restraints found')
+            ph.setDistRestraintWeight(1000)
+            gpx.save('restr-mod.gpx')
+
+        This example locates the first phase in a project file, clears any previous
+        restraints. Then it places restraints on bonds between Si and O atoms at 
+        1.64 A. Each restraint is weighted 1000 times in comparison to 
+        (obs-calc)/sigma for a data point. To show how atom selection can 
+        work, the origin atoms are identified here 
+        by atom object while the target atoms are identified by atom index. 
+        The methods are interchangeable. If atom labels are unique, then::
+
+           origin = [a.label for a in ph.atoms() if a.element == 'Si']
+        
+        would also work identically. 
+
+        '''
+        import GSASIImath as G2mth
+        bondRestData = self._getBondRest('addDistRestraint')
+        originList = []
+        for a in origin:
+            if type(a) is G2AtomRecord:
+                ao = a
+            elif type(a) is int:
+                ao = self.atoms()[a]
+            elif type(a) is str:
+                ao = self.atom(a)
+                if ao is None:
+                    raise G2ScriptException(
+                        f'addDistRestraint error: Origin atom matching label "{a}" not found')
+            else:
+                raise G2ScriptException(
+                    f'addDistRestraint error: Origin atom input {a} has unknown type ({type(a)})')
+            originList.append([ao.ranId, ao.element, list(ao.coordinates)])
+        targetList = []
+        for a in target:
+            if type(a) is G2AtomRecord:
+                ao = a
+            elif type(a) is int:
+                ao = self.atoms()[a]
+            elif type(a) is str:
+                ao = self.atom(a)
+                if ao is None:
+                    raise G2ScriptException(
+                        f'addDistRestraint error: Target atom matching label "{a}" not found')
+            else:
+                raise G2ScriptException(
+                    f'addDistRestraint error: Target atom input {a} has unknown type ({type(a)})')
+            targetList.append([ao.ranId, ao.element, list(ao.coordinates)])
+                    
+        GType = self.data['General']['Type']
+        SGData = self.data['General']['SGData']
+        Amat,Bmat = G2lat.cell2AB(self.data['General']['Cell'][1:7])
+        bondlst = G2mth.searchBondRestr(originList,targetList,bond,factor,GType,SGData,Amat,ESD)
+        count = 0
+        for newBond in bondlst:
+            if newBond not in bondRestData['Bonds']:
+                count += 1
+                bondRestData['Bonds'].append(newBond)
+        return count
     
 class G2SeqRefRes(G2ObjectWrapper):
     '''Wrapper for a Sequential Refinement Results tree entry, containing the 
     results for a refinement
+
+    Scripts should not try to create a :class:`G2SeqRefRes` object directly as 
+    this object will be created when a .gpx project file is read. 
 
     As an example:: 
 
@@ -6035,8 +5199,8 @@ class G2PDF(G2ObjectWrapper):
     """Wrapper for a PDF tree entry, containing the information needed to 
     compute a PDF and the S(Q), G(r) etc. after the computation is done. 
     Note that in a GSASIIscriptable script, instances of G2PDF will be created by 
-    calls to :meth:`G2Project.add_PDF` or :meth:`G2Project.pdf`, not via calls 
-    to :meth:`G2PDF.__init__`.
+    calls to :meth:`G2Project.add_PDF` or :meth:`G2Project.pdf`. 
+    Scripts should not try to create a :class:`G2PDF` object directly.
 
     Example use of :class:`G2PDF`::
 
@@ -6219,16 +5383,22 @@ class G2PDF(G2ObjectWrapper):
             PDFsaves[i] = lbl.lower() in formats.lower()
         G2fil.PDFWrite(PDFentry,fileroot,PDFsaves,self.data['PDF Controls'],inst,limits)
 
-blkSize = 256   #256 seems to be optimal; will break in polymask if >1024
-'Integration block size; 256 seems to be optimal, must be <=1024 (for polymask)'
+blkSize = 128
+'''Integration block size; 128 or 256 seems to be optimal for CPU use, but 128 uses 
+less memory, must be <=1024 (for polymask/histogram3d)
+'''
 
 def calcMaskMap(imgprms,mskprms):
-    '''Computes the mask array for a set of image controls and mask parameters
+    '''Computes a set of blocked mask arrays for a set of image controls and mask parameters. 
+    This capability is also provided with :meth:`G2Image.IntMaskMap`.
     '''
     return G2img.MakeUseMask(imgprms,mskprms,blkSize)
 
 def calcThetaAzimMap(imgprms):
-    '''Computes the array for theta-azimuth mapping for a set of image controls
+    '''Computes the set of blocked arrays for theta-azimuth mapping from 
+    a set of image controls, which can be cached and reused for  
+    integration of multiple images with the same calibration parameters. 
+    This capability is also provided with :meth:`G2Image.IntThetaAzMap`.
     '''
     return G2img.MakeUseTA(imgprms,blkSize)
 
@@ -6237,7 +5407,9 @@ class G2Image(G2ObjectWrapper):
 
     Note that in a GSASIIscriptable script, instances of G2Image will be created by 
     calls to :meth:`G2Project.add_image` or :meth:`G2Project.images`. 
-    Scripts will not use ``G2Image()`` to call :meth:`G2Image.__init__` directly. 
+    Scripts should not try to create a :class:`G2Image` object directly as 
+    :meth:`G2Image.__init__` should be invoked from inside :class:`G2Project`.
+
     The object contains these class variables:
 
         * G2Image.proj: contains a reference to the :class:`G2Project`
@@ -6245,6 +5417,9 @@ class G2Image(G2ObjectWrapper):
         * G2Image.name: contains the name of the image
         * G2Image.data: contains the image's associated data in a dict,
           as documented for the :ref:`Image Data Structure<Image_table>`.
+        * G2Image.image: optionally contains a cached the image to 
+          save time in reloading. This is saved only when cacheImage=True
+          is specified when :meth:`G2Project.add_image` is called. 
 
     Example use of G2Image:
 
@@ -6257,7 +5432,8 @@ class G2Image(G2ObjectWrapper):
     >>> imlst[0].setControl('outAzimuths',3)
     >>> pwdrList = imlst[0].Integrate()
  
-    More detailed image processing examples are shown at :ref:`ImageProc`.
+    More detailed image processing examples are shown in the 
+    :ref:`ImageProc` section of this chapter.
 
     '''
     # parameters in that can be accessed via setControl. This may need future attention
@@ -6284,11 +5460,17 @@ class G2Image(G2ObjectWrapper):
     correct.
     ''' 
         
-    def __init__(self, data, name, proj):
+    def __init__(self, data, name, proj, image=None):
         self.data = data
         self.name = name
         self.proj = proj
+        self.image = image
 
+    def clearImageCache(self):
+        '''Clears a cached image, if one is present
+        '''
+        self.image = None
+        
     def setControl(self,arg,value):
         '''Set an Image Controls parameter in the current image.
         If the parameter is not found an exception is raised.
@@ -6475,7 +5657,10 @@ class G2Image(G2ObjectWrapper):
         '''Initialize Masks, including resetting the Thresholds values
         '''
         self.data['Masks'] = {'Points':[],'Rings':[],'Arcs':[],'Polygons':[],'Frames':[]}
-        ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
+        if self.image is not None:
+            ImageZ = self.image
+        else:
+            ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
         Imin = max(0.,np.min(ImageZ))
         Imax = np.max(ImageZ)
         self.data['Masks']['Thresholds'] = [(0,Imax),[Imin,Imax]]
@@ -6484,7 +5669,7 @@ class G2Image(G2ObjectWrapper):
         '''load masks from an IMG tree entry
         '''
         return self.data['Masks']
-        
+    
     def setMasks(self,maskDict,resetThresholds=False):
         '''load masks dict (from :meth:`getMasks`) into current IMG record
 
@@ -6496,14 +5681,73 @@ class G2Image(G2ObjectWrapper):
         '''
         self.data['Masks'] = copy.deepcopy(maskDict)
         if resetThresholds:
-            ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
+            if self.image is not None:
+                ImageZ = self.image
+            else:
+                ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
             Imin = max(0.,np.min(ImageZ))
             Imax = np.max(ImageZ)
-            self.data['Masks']['Thresholds'] [(0,Imax),[Imin,Imax]]        
+            self.data['Masks']['Thresholds'] = [(0,Imax),[Imin,Imax]]        
 
+    def IntThetaAzMap(self):
+        '''Computes the set of blocked arrays for 2theta-azimuth mapping from 
+        the controls settings of the current image for image integration.
+        The output from this is optionally supplied as input to 
+        :meth:`~G2Image.Integrate`. Note that if not supplied, image 
+        integration will compute this information as it is needed, but this 
+        is a relatively slow computation so time can be saved by caching and 
+        reusing this computation for other images that have the 
+        same calibration parameters as the current image.
+        '''
+        return G2img.MakeUseTA(self.getControls(),blkSize)
+
+    def IntMaskMap(self):
+        '''Computes a series of masking arrays for the current image (based on 
+        mask input, but not calibration parameters or the image intensities). 
+        See :meth:`GSASIIimage.MakeMaskMap` for more details. The output from 
+        this is optionally supplied as input to :meth:`~G2Image.Integrate`).
+
+        Note this is not the same as pixel mask
+        searching (:meth:`~G2Image.GeneratePixelMask`).
+        '''
+        return G2img.MakeUseMask(self.getControls(),self.getMasks(),blkSize)
+            
+    def MaskThetaMap(self):
+        '''Computes the theta mapping matrix from the controls settings 
+        of the current image to be used for pixel mask computation
+        in :meth:`~G2Image.GeneratePixelMask`.
+        This is optional, as if not supplied, mask computation will compute
+        this, but this is a relatively slow computation and the
+        results computed here can be reused for other images that have the 
+        same calibration parameters.
+        '''
+        ImShape = self.getControls()['size']
+        return G2img.Make2ThetaAzimuthMap(self.getControls(), (0, ImShape[0]), (0, ImShape[1]))[0]
+    
+    def MaskFrameMask(self):
+        '''Computes a Frame mask from map input for the current image to be 
+        used for a pixel mask computation in 
+        :meth:`~G2Image.GeneratePixelMask`.
+        This is optional, as if not supplied, mask computation will compute
+        this, but this is a relatively slow computation and the
+        results computed here can be reused for other images that have the 
+        same calibration parameters.
+        '''
+        Controls = self.getControls()
+        Masks = self.getMasks()
+        frame = Masks['Frames']
+        if self.image is not None:
+            ImageZ = self.image
+        else:
+            ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
+        tam = ma.make_mask_none(ImageZ.shape)
+        if frame:
+            tam = ma.mask_or(tam,G2img.MakeFrameMask(Controls,frame))
+        return tam
+    
     def getVary(self,*args):
-        '''Return the refinement flag(s) for Image Controls parameter(s)
-        in the current image.
+        '''Return the refinement flag(s) for calibration of 
+        Image Controls parameter(s) in the current image.
         If the parameter is not found, an exception is raised.
 
         :param str arg: the name of a refinement parameter in the 
@@ -6511,7 +5755,6 @@ class G2Image(G2ObjectWrapper):
           'dep', 'det-X', 'det-Y', 'dist', 'phi', 'tilt', or 'wave'
         :param str arg1: the name of a parameter (dict entry) as before,
           optional
-
 
         :returns: a list of bool value(s)
         '''
@@ -6525,7 +5768,7 @@ class G2Image(G2ObjectWrapper):
     
     def setVary(self,arg,value):
         '''Set a refinement flag for Image Controls parameter in the 
-        current image.
+        current image that is used for fitting calibration parameters.
         If the parameter is not '*' or found, an exception is raised.
 
         :param str arg: the name of a refinement parameter in the 
@@ -6534,7 +5777,7 @@ class G2Image(G2ObjectWrapper):
           or it may be a list or tuple of names, 
           or it may be '*' in which all parameters are set accordingly.
         :param value: the value to set the parameter. The value is 
-          cast as the appropriate type from :data:`ControlList`.
+          cast as bool.
         '''
         if arg == '*':
             for a in self.data['Image Controls']['varyList']:
@@ -6555,7 +5798,10 @@ class G2Image(G2ObjectWrapper):
         This may produce a better result if run more than once.
         '''
         LoadG2fil()
-        ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
+        if self.image is not None:
+            ImageZ = self.image
+        else:
+            ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
         G2img.ImageRecalibrate(None,ImageZ,self.data['Image Controls'],self.data['Masks'])
 
     def Integrate(self,name=None,MaskMap=None,ThetaAzimMap=None):
@@ -6572,11 +5818,18 @@ class G2Image(G2ObjectWrapper):
 
         :param str name: base name for created histogram(s). If None (default), 
           the histogram name is taken from the image name. 
-        :param list MaskMap: from :func:`calcMaskMap` 
-        :param list ThetaAzimMap: from :func:`calcThetaAzimMap`
+        :param list MaskMap: from :func:`IntMaskMap` 
+        :param list ThetaAzimMap: from :meth:`G2Image.IntThetaAzMap`
         :returns: a list of created histogram (:class:`G2PwdrData`) objects.
         '''
-        ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
+        if self.image is not None:
+            ImageZ = self.image
+        else:
+            ImageZ = _getCorrImage(Readers['Image'],self.proj,self)
+        # Apply a Pixel Mask to image, if present
+        Masks = self.getMasks()
+        if Masks.get('SpotMask',{'spotMask':None})['spotMask'] is not None:
+            ImageZ = ma.array(ImageZ,mask=Masks['SpotMask']['spotMask'])
         # do integration
         ints,azms,Xvals,cancel = G2img.ImageIntegrate(ImageZ,
                 self.data['Image Controls'],self.data['Masks'],blkSize=blkSize,
@@ -6727,6 +5980,124 @@ class G2Image(G2ObjectWrapper):
             IntgOutList.append(self.proj.histogram(Aname))
         return IntgOutList
 
+    def TestFastPixelMask(self):
+        '''Tests to see if the fast (C) code for pixel masking is installed. 
+
+        :returns: A value of True is returned if fast pixel masking is 
+          available. Otherwise False is returned. 
+        '''
+        return G2img.TestFastPixelMask()
+
+    def GeneratePixelMask(self,esdMul=3.0,ttmin=0.,ttmax=180.,
+                              FrameMask=None,ThetaMap=None,
+                              fastmode=True,combineMasks=False):
+        '''Generate a Pixel mask with True at the location of pixels that are 
+        statistical outliers (in comparison with others with the same 2theta 
+        value.) The process for this is that a median is computed for pixels 
+        within a small 2theta window and then the median difference is computed 
+        from magnitude of the difference for those pixels from that median. The
+        medians are used for this rather than a standard deviation as the 
+        computation used here is less sensitive to outliers. 
+        (See :func:`GSASIIimage.AutoPixelMask` and 
+        :func:`scipy.stats.median_abs_deviation` for more details.)
+
+        Mask is placed into the G2image object where it will be 
+        accessed during integration. Note that this increases the .gpx file 
+        size significantly; use :meth:`~G2Image.clearPixelMask` to delete 
+        this if it need not be saved. 
+
+        This code is based on :func:`GSASIIimage.FastAutoPixelMask`
+        but has been modified to recycle expensive computations 
+        where possible.
+
+        :param float esdMul: Significance threshold applied to remove 
+          outliers. Default is 3. The larger this number, the fewer 
+          "glitches" that will be removed. 
+        :param float ttmin: A lower 2theta limit to be used for pixel 
+          searching. Pixels outside this region may be considered for
+          establishing the medians, but only pixels with 2theta >= :attr:`ttmin`
+          are masked. Default is 0.
+        :param float ttmax: An upper 2theta limit to be used for pixel 
+          searching. Pixels outside this region may be considered for
+          establishing the medians, but only pixels with 2theta < :attr:`ttmax`
+          are masked. Default is 180.
+        :param np.array FrameMask: An optional precomputed Frame mask 
+          (from :func:`~G2Image.MaskFrameMask`). Compute this once for 
+          a series of similar images to reduce computational time. 
+        :param np.array ThetaMap: An optional precomputed array that 
+          defines 2theta for each pixel, computed in 
+          :func:`~G2Image.MaskThetaMap`. Compute this once for 
+          a series of similar images to reduce computational time. 
+        :param bool fastmode: If True (default) fast Pixel map 
+          searching is done if the C module is available. If the 
+          module is not available or this is False, the pure Python
+          implementatruion is used. It is not clear why False is 
+          ever needed. 
+        :param bool combineMasks: When True, the current Pixel mask
+          will be combined with any previous Pixel map. If False (the
+          default), the Pixel map from the current search will 
+          replace any previous ones. The reason for use of this as 
+          True would be where different :attr:`esdMul` values are 
+          used for different regions of the image (by setting 
+          :attr:`ttmin` & :attr:`ttmax`) so that the outlier level 
+          can be tuned by combining different searches. 
+        '''
+        import math
+        sind = lambda x: math.sin(x*math.pi/180.)
+        if self.image is not None:
+            Image = self.image
+        else:
+            Image = _getCorrImage(Readers['Image'],self.proj,self)
+        Controls = self.getControls()
+        Masks = self.getMasks()
+        if FrameMask is None:
+            frame = Masks['Frames']
+            tam = ma.make_mask_none(Image.shape)
+            if frame:
+                tam = ma.mask_or(tam,G2img.MakeFrameMask(Controls,frame))
+        else:
+            tam = FrameMask
+        if ThetaMap is None:
+            TA = G2img.Make2ThetaAzimuthMap(Controls, (0, Image.shape[0]), (0, Image.shape[1]))[0]
+        else:
+            TA = ThetaMap
+        LUtth = np.array(Controls['IOtth'])
+        wave = Controls['wavelength']
+        dsp0 = wave/(2.0*sind(LUtth[0]/2.0))
+        dsp1 = wave/(2.0*sind(LUtth[1]/2.0))
+        x0 = G2img.GetDetectorXY2(dsp0,0.0,Controls)[0]
+        x1 = G2img.GetDetectorXY2(dsp1,0.0,Controls)[0]
+        if not np.any(x0) or not np.any(x1):
+            raise Exception
+        numChans = int(1000*(x1-x0)/Controls['pixelSize'][0])//2
+        if G2img.TestFastPixelMask() and fastmode:
+            import fmask
+            G2fil.G2Print(f'Fast mask: Spots greater or less than {esdMul:.1f} of median abs deviation are masked')
+            outMask = np.zeros_like(tam,dtype=bool).ravel()
+            TThs = np.linspace(LUtth[0], LUtth[1], numChans, False)
+            try:
+                masked = fmask.mask(esdMul, tam.ravel(), TA.ravel(),
+                                        Image.ravel(), TThs, outMask, ttmin, ttmax)
+            except Exception as msg:
+                print('Exception in fmask.mask\n\t',msg)
+                raise Exception(msg)
+            outMask = outMask.reshape(Image.shape)
+        else: # slow search, no sense using cache to save time
+            Masks['SpotMask']['SearchMin'] = ttmin
+            Masks['SpotMask']['SearchMax'] = ttmax
+            outMask = G2img.AutoPixelMask(Image, Masks, Controls, numChans)
+        if Masks['SpotMask'].get('spotMask') is not None and combineMasks:
+            Masks['SpotMask']['spotMask'] |= outMask
+        else:
+            Masks['SpotMask']['spotMask'] = outMask
+
+    def clearPixelMask(self):
+        '''Removes a pixel map from an image, to reduce the .gpx file 
+        size & memory use
+        '''
+        self.getMasks()['SpotMask']['spotMask'] = None
+            
+            
 ##########################
 # Command Line Interface #
 ##########################

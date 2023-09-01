@@ -1,19 +1,16 @@
 # -*- coding: utf-8 -*-
 #GSASIImath - major mathematics routines
 ########### SVN repository information ###################
-# $Date: 2023-01-16 12:09:28 -0600 (Mon, 16 Jan 2023) $
+# $Date: 2023-07-31 10:49:24 -0500 (Mon, 31 Jul 2023) $
 # $Author: vondreele $
-# $Revision: 5477 $
+# $Revision: 5639 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIImath.py $
-# $Id: GSASIImath.py 5477 2023-01-16 18:09:28Z vondreele $
+# $Id: GSASIImath.py 5639 2023-07-31 15:49:24Z vondreele $
 ########### SVN repository information ###################
 '''
-*GSASIImath: computation module*
-================================
-
-Routines for least-squares minimization and other stuff
-
+Routines defined in :mod:`GSASIImath` follow.
 '''
+
 from __future__ import division, print_function
 import random as rn
 import numpy as np
@@ -23,7 +20,7 @@ import time
 import math
 import copy
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5477 $")
+GSASIIpath.SetVersionNumber("$Revision: 5639 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -853,6 +850,21 @@ def GetAtomFracByID(pId,parmDict,AtLookup,indx):
 #            U6 = Atom[cia+2:cia+8]
     
 
+def GetAtomMomsByID(pId,parmDict,AtLookup,indx):
+    '''default doc string
+    
+    :param type name: description
+    
+    :returns: type name: description
+    
+    '''
+    pfx = [str(pId)+'::A'+i+':' for i in ['Mx','My','Mz']]
+    Mom = []
+    for ind in indx:
+        names = [pfx[i]+str(AtLookup[ind]) for i in range(3)]
+        Mom.append([parmDict[name] for name in names])
+    return Mom
+    
 def ApplySeqData(data,seqData,PF2=False):
     '''Applies result from seq. refinement to drawing atom positions & Uijs
     
@@ -3180,6 +3192,81 @@ def GetDATSig(Oatoms,Atoms,Amat,SGData,covData={}):
             sig = sigVals[M-3]
     
     return Val,sig
+
+def GetMag(mag,Cell):
+    '''
+    Compute magnetic moment magnitude.
+    :param list mag: atom magnetic moment parms (must be magnetic!)
+    :param list Cell: lattice parameters
+    
+    :returns: moment magnitude as float
+    
+    '''
+    G = G2lat.fillgmat(Cell)
+    ast = np.sqrt(np.diag(G))
+    GS = G/np.outer(ast,ast)
+    mag = np.array(mag)
+    Mag = np.sqrt(np.inner(mag,np.inner(mag,GS)))
+    return Mag 
+
+def GetMagDerv(mag,Cell):
+    '''
+    Compute magnetic moment derivatives numerically
+    :param list mag: atom magnetic moment parms (must be magnetic!)
+    :param list Cell: lattice parameters
+    
+    :returns: moment derivatives as floats
+    
+    '''
+    def getMag(m):
+        return np.sqrt(np.inner(m,np.inner(m,GS)))
+    
+    derv = np.zeros(3)
+    dm = 0.0001
+    twodm = 2.*dm
+    G = G2lat.fillgmat(Cell)
+    ast = np.sqrt(np.diag(G))
+    GS = G/np.outer(ast,ast)
+    mag = np.array(mag)
+    for i in [0,1,2]:
+        mag[i] += dm
+        Magp = getMag(mag)
+        mag[i] -= 2*dm
+        derv[i] = (Magp-getMag(mag))
+        mag[i] += dm
+    return derv/twodm
+
+def searchBondRestr(origAtoms,targAtoms,bond,Factor,GType,SGData,Amat,
+                    defESD=0.01,dlg=None):
+    '''Search for bond distance restraints. 
+    '''
+    foundBonds = []
+    indices = (-2,-1,0,1,2)
+    Units = np.array([[h,k,l] for h in indices for k in indices for l in indices])
+    Norig = 0
+    for Oid,Otype,Ocoord in origAtoms:
+        Norig += 1
+        if dlg: dlg.Update(Norig)
+        for Tid,Ttype,Tcoord in targAtoms:
+            if 'macro' in GType:
+                result = [[Tcoord,1,[0,0,0],[]],]
+            else:
+                result = G2spc.GenAtom(Tcoord,SGData,False,Move=False)
+            for Txyz,Top,Tunit,Spn in result:
+                Dx = (Txyz-np.array(Ocoord))+Units
+                dx = np.inner(Amat,Dx)
+                dist = ma.masked_less(np.sqrt(np.sum(dx**2,axis=0)),bond/Factor)
+                IndB = ma.nonzero(ma.masked_greater(dist,bond*Factor))
+                if np.any(IndB):
+                    for indb in IndB:
+                        for i in range(len(indb)):
+                            unit = Units[indb][i]+Tunit
+                            if np.any(unit):
+                                Topstr = '%d+%d,%d,%d'%(Top,unit[0],unit[1],unit[2])
+                            else:
+                                Topstr = str(Top)
+                            foundBonds.append([[Oid,Tid],['1',Topstr],bond,defESD])
+    return foundBonds
         
 def ValEsd(value,esd=0,nTZ=False):
     '''Format a floating point number with a given level of precision or
@@ -4642,6 +4729,27 @@ def getEDsigDeriv(ins,pos):
     '''
     return pos**2,pos,1.0
     
+def getEDgam(ins,pos):
+    '''get ED peak profile gam
+    
+    :param dict ins: instrument parameters with at least X, Y & Z
+      as values only
+    :param float pos: energy of peak as keV
+    :returns: float getEDsig: peak gam im keV
+    
+    '''
+    return ins['X']*pos**2+ins['Y']*pos+ins['Z']
+
+def getEDgamDeriv(ins,pos):
+    '''get derivatives of ED peak profile gam wrt X, Y & Z
+    
+    :param float pos: energy of peak in keV
+    
+    :returns: list getEDsigDeriv: d(gam)/dX, d(gam)/dY & d(gam)/dZ,
+    
+    '''
+    return pos**2,pos,1.0
+    
 def getTOFsig(ins,dsp):
     '''get TOF peak profile sigma^2
     
@@ -4721,7 +4829,7 @@ def getTOFalpha(ins,dsp):
     return ins['alpha']/dsp
     
 def getTOFalphaDeriv(dsp):
-    '''get derivatives of TOF peak profile beta wrt alpha
+    '''get alpha derivatives of TOF peak profile
     
     :param float dsp: d-spacing of peak
     
@@ -4730,46 +4838,90 @@ def getTOFalphaDeriv(dsp):
     '''
     return 1./dsp
     
-def getPinkalpha(ins,tth):
-    '''get TOF peak profile alpha
+def getPinkNalpha(ins,tth):
+    '''get pink neutron peak alpha profile
     
     :param dict ins: instrument parameters with at least 'alpha'
       as values only
     :param float tth: 2-theta of peak
     
-    :returns: flaot getPinkalpha: peak alpha
+    :returns: float getPinkNalpha: peak alpha
     
     '''
-    return ins['alpha-0']+ ins['alpha-1']*tand(tth/2.)
+    return ins['alpha-0']+ ins['alpha-1']*sind(tth/2.)
     
-def getPinkalphaDeriv(tth):
-    '''get derivatives of TOF peak profile beta wrt alpha
+def getPinkXalpha(ins,tth):
+    '''get pink x-ray peak alpha profile
     
-    :param float dsp: d-spacing of peak
-    
-    :returns: float getTOFalphaDeriv: d(alp)/d(alpha-0), d(alp)/d(alpha-1)
-    
-    '''
-    return 1.0,tand(tth/2.)
-    
-def getPinkbeta(ins,tth):
-    '''get TOF peak profile beta
-    
-    :param dict ins: instrument parameters with at least 'beat-0' & 'beta-1'
+    :param dict ins: instrument parameters with at least 'alpha'
       as values only
     :param float tth: 2-theta of peak
     
-    :returns: float getaPinkbeta: peak beta
+    :returns: float getPinkXalpha: peak alpha
+    
+    '''
+    return ins['alpha-0']+ ins['alpha-1']*tand(tth/2.)
+
+def getPinkNalphaDeriv(tth):
+    '''get alpha derivatives of pink neutron peak profile 
+    
+    :param float tth: 2-theta of peak
+    
+    :returns: float getPinkNalphaDeriv: d(alp)/d(alpha-0), d(alp)/d(alpha-1)
+    
+    '''
+    return 1.0,sind(tth/2.)
+    
+def getPinkXalphaDeriv(tth):
+    '''get alpha derivatives of pink x-ray peak profile
+    
+    :param float tth: 2-theta of peak
+    
+    :returns: float getPinkXalphaDeriv: d(alp)/d(alpha-0), d(alp)/d(alpha-1)
+    
+    '''
+    return 1.0,tand(tth/2.)
+
+def getPinkNbeta(ins,tth):
+    '''get pink neutron peak profile beta
+    
+    :param dict ins: instrument parameters with at least 'beta-0' & 'beta-1'
+      as values only
+    :param float tth: 2-theta of peak
+    
+    :returns: float getPinkbeta: peak beta
+    
+    '''
+    return ins['beta-0']+ins['beta-1']*sind(tth/2.)
+    
+def getPinkXbeta(ins,tth):
+    '''get pink x-ray peak profile beta
+    
+    :param dict ins: instrument parameters with at least 'beta-0' & 'beta-1'
+      as values only
+    :param float tth: 2-theta of peak
+    
+    :returns: float getPinkXbeta: peak beta
     
     '''
     return ins['beta-0']+ins['beta-1']*tand(tth/2.)
     
-def getPinkbetaDeriv(tth):
-    '''get derivatives of TOF peak profile beta wrt beta-0 & beta-1
+def getPinkNbetaDeriv(tth):
+    '''get beta derivatives of pink neutron peak profile
     
-    :param float dsp: d-spacing of peak
+    :param float tth: 2-theta of peak
     
-    :returns: list getTOFbetaDeriv: d(beta)/d(beta-0) & d(beta)/d(beta-1)
+    :returns: list getPinkNbetaDeriv: d(beta)/d(beta-0) & d(beta)/d(beta-1)
+    
+    '''
+    return 1.0,sind(tth/2.)
+    
+def getPinkXbetaDeriv(tth):
+    '''get beta derivatives of pink x-ray peak profile
+    
+    :param float tth: 2-theta of peak
+    
+    :returns: list getPinkXbetaDeriv: d(beta)/d(beta-0) & d(beta)/d(beta-1)
     
     '''
     return 1.0,tand(tth/2.)
@@ -4828,16 +4980,21 @@ def setPeakparms(Parms,Parms2,pos,mag,ifQ=False,useFit=False):
             ins[x] = Parms.get(x,[0.0,0.0])[ind]
         if ifQ:                              #qplot - convert back to 2-theta
             pos = 2.0*asind(pos*getWave(Parms)/(4*math.pi))
-        alp = getPinkalpha(ins,pos)
-        bet = getPinkbeta(ins,pos)
+        if 'X' in Parms['Type'][0]:
+            alp = getPinkXalpha(ins,pos)
+            bet = getPinkXbeta(ins,pos)
+        else:
+            alp = getPinkNalpha(ins,pos)
+            bet = getPinkNbeta(ins,pos)
         sig = getCWsig(ins,pos)
         gam = getCWgam(ins,pos)           
         XY = [pos,0,mag,1,alp,0,bet,0,sig,0,gam,0]       #default refine intensity 1st
     elif 'E' in Parms['Type'][0]:
-        for x in ['A','B','C']:
+        for x in ['A','B','C','X','Y','Z']:
             ins[x] = Parms.get(x,[0.0,0.0])[ind]
         sig = getEDsig(ins,pos)
-        XY = [pos,0,mag,1,sig,0]       #default refine intensity 1st
+        gam = getEDgam(ins,pos)          
+        XY = [pos,0,mag,1,sig,0,gam,0]       #default refine intensity 1st
         
     return XY
     
@@ -5758,7 +5915,7 @@ def Q2Mat(Q):
     M = [[aa+bb-cc-dd, 2.*(bc-ad),  2.*(ac+bd)],
         [2*(ad+bc),   aa-bb+cc-dd,  2.*(cd-ab)],
         [2*(bd-ac),    2.*(ab+cd), aa-bb-cc+dd]]
-    return np.array(M)
+    return np.around(np.array(M),8)
     
 def AV2Q(A,V):
     ''' convert angle (radians) & vector to quaternion
@@ -5872,13 +6029,13 @@ def make2Quat(A,B):
     '''
 
     V1 = np.cross(A,B)
-    if nl.norm(V1):
+    if nl.norm(V1) > 1.e-5:
         V1 = V1/nl.norm(V1)
     else:
         V1 = np.zeros(3)
-    Q = np.array([0.,0.,0.,1./np.sqrt(2.0)])
+    Q = np.array([1.,0.,0.,1.]/np.sqrt(2.0))
     D = 180.
-    if nl.norm(V1):
+    if nl.norm(V1) > 1.e-5:
         A1 = A/nl.norm(A)
         B1 = B/nl.norm(B)
         D1 = min(1.0,max(-1.0,np.vdot(A1,B1)))

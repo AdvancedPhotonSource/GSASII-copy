@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
-"""
-*GSASIIspc: Space group module*
--------------------------------
-
-Space group interpretation routines. Note that space group information is
-stored in a :ref:`Space Group (SGData)<SGData_table>` object.
-
-"""
 ########### SVN repository information ###################
-# $Date: 2023-03-14 08:25:52 -0500 (Tue, 14 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5513 $
+# $Date: 2023-08-03 22:57:51 -0500 (Thu, 03 Aug 2023) $
+# $Author: toby $
+# $Revision: 5641 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIspc.py $
-# $Id: GSASIIspc.py 5513 2023-03-14 13:25:52Z vondreele $
+# $Id: GSASIIspc.py 5641 2023-08-04 03:57:51Z toby $
 ########### SVN repository information ###################
+''':mod:`GSASIIspc` Classes & routines follow
+'''
 from __future__ import division, print_function
 import numpy as np
 import numpy.linalg as nl
@@ -23,7 +17,7 @@ import copy
 import os.path as ospath
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5513 $")
+GSASIIpath.SetVersionNumber("$Revision: 5641 $")
 
 npsind = lambda x: np.sin(x*np.pi/180.)
 npcosd = lambda x: np.cos(x*np.pi/180.)
@@ -41,7 +35,7 @@ def SpcGroup(SGSymbol):
     :param SGSymbol: space group symbol (string) with spaces between axial fields
     :returns: (SGError,SGData)
     
-       * SGError = 0 for no errors; >0 for errors (see SGErrors below for details)
+       * SGError = 0 for no errors; >0 for errors (see :func:`SGErrors` for details)
        * SGData - is a dict (see :ref:`Space Group object<SGData_table>`) with entries:
        
              * 'SpGrp': space group symbol, slightly cleaned up
@@ -636,6 +630,41 @@ def SpaceGroup(SGSymbol):
 ################################################################################
 #### Magnetic space group stuff
 ################################################################################
+
+def SplitMagSpSG(MSpSg):
+    SpSG = StandardizeSpcName(MSpSg.replace("'",''))    #removes all mag. op. marks & makes axial fields
+    Sflds = SpSG.split()                #2-4 axial fields
+    Axf = []
+    MSpSg += ' '
+    Psym = MSpSg[0]
+    Ib = 0
+    if '_' in MSpSg:
+        Psym = MSpSg[:3]
+        Ib = 2
+    Ib += 1
+    if len(Sflds) == 2:                 #simple: one axial field
+        return Psym+' '+MSpSg[Ib:]
+    if '/' in MSpSg[Ib:]:               #more fields - do 1st axial field
+        Is = MSpSg.index('/')
+        If = Is+1
+        if "'" in MSpSg[Is+2]:
+            If += 1
+        Axf.append(MSpSg[Ib:If+1])
+        Ib = If+1
+    else:
+        If = Ib+len(Sflds[1])
+        if "'" == MSpSg[If]:
+            If += 1
+        Axf.append(MSpSg[Ib:If])
+        Ib = If
+    for i in range(len(Sflds)-2):   #do rest
+        If = Ib+len(Sflds[i+2])
+        if "'" == MSpSg[If]:
+            If += 1
+        Axf.append(MSpSg[Ib:If])
+        Ib = If
+    MSpcGp = Psym+' '+' '.join(Axf)
+    return MSpcGp
         
 def SetMagnetic(SGData):
     GenSym,GenFlg,BNSsym = GetGenSym(SGData)
@@ -1258,58 +1287,113 @@ def MagSSText2MTS(Opr,G2=False):
 
 def GetSGSpin(SGData,MSgSym):
     'get spin generators from magnetic space group symbol'
+
     SpGrp = SGData['SpGrp']
     mSgSym = MSgSym+' '
-    Flds = SpGrp.split()
-    iB = 0
-    Spn = [1,]          #for identity generator
-    if len(Flds) == 2:  #-1,  2/m, 4/m & 6/m; 1 or 2 generators
-        fld = Flds[1]
-        iF = mSgSym[iB:].index(fld[0])+iB
-        jF = mSgSym[iF:].index(fld[-1])+iF
-        if '/' in mSgSym[iF:jF]:
-            if "'" in mSgSym[iF:jF]:
-                Spn.append(-1)
-            else:
-                Spn.append(1)
-        if "'" == mSgSym[jF+1]:
-            Spn.append(-1)
+    mFlds = mSgSym.split()
+    mSpn = SGData['SGSpin']
+    SGPtGrp = SGData['SGPtGrp']
+    SGLaue = SGData['SGLaue']
+    GenSym = GetGenSym(SGData)[0][1:]       #skip identity
+    if SGLaue in ['-1',]:
+        if "'" in mFlds[1]:
+            mSpn[1] = -1
+    elif SGLaue in ['2/m','4/m','6/m']: #all ok
+        Uniq = {'a':1,'b':2,'c':3,'':1}
+        Id = [0,1]
+        if len(mFlds) > 2:
+            Id = [0,Uniq[SGData['SGUniq']]]
+        sym = mFlds[Id[1]].split('/')
+        if len(GenSym) == 3:
+            for j in [0,1,2]:
+                if mFlds[j+1] != '1':
+                    for i in range(len(GenSym)):
+                        if "'" in sym[i]:
+                            mSpn[i+1] = -1                      
         else:
-            Spn.append(1)
-    elif len(Flds) == 3:    # 3m & m3; 1 or 2 generator
-        if SGData['SGPtGrp'] == '-3m':
-            if not mSgSym.count("'"):
-                Spn += [1,1,]
-            elif mSgSym.count("'") == 2:
-                Spn += [-1,1,]
-            elif "3'" in mSgSym:
-                Spn += [1,-1,]
-            else:
-                Spn += [-1,-1,]
+            for i in range(len(GenSym)):
+                if "'" in sym[i]:
+                    mSpn[i+1] = -1                      
+    elif SGPtGrp in ['mmm','mm2','m2m','2mm','222']:
+        for i in [0,1,2]:
+            if "'" in mFlds[i+1]:
+                mSpn[i+1] = -1
+    elif SGLaue == '6/mmm': #ok
+        if len(GenSym) == 2:
+            for i in [0,1]:
+                if "'" in mFlds[i+2]:
+                    mSpn[i+1] = -1
         else:
-            if "'" in mSgSym:   #could be 1 or 2 '; doesn't matter. 
-                Spn.append(-1)
-            else:
-                Spn.append(1)
-    else:                   #the rest; 3 generators. NB:  any ' before / in 1st field ignored
-        if '3' in Flds[1]:
-            if "'" in mSgSym:   #could be 1 or 2 '; doesn't matter. 
-                Spn.append(-1)
-            else:
-                Spn.append(1)
+            sym = mFlds[1].split('/')
+            if "'" in sym[1]:
+                mSpn[1] = -1
+            for i in [1,2]:
+                if "'" in mFlds[i+1]:
+                    mSpn[i+1] = -1
+    elif SGLaue == '4/mmm':
+        if len(GenSym) == 2:
+            for i in [0,1]:
+                if "'" in mFlds[i+2]:
+                    mSpn[i+1] = -1
         else:
-            for fld in Flds[1:]:
-                iF = mSgSym[iB:].index(fld[0])+iB
-                jF = mSgSym[iF:].index(fld[-1])+iF
-                if "'" == mSgSym[jF+1]:
-                    Spn.append(-1)
-                    iB = jF+2
-                else:
-                    Spn.append(1)
-                    iB = jF+1
-    Spn.append(1)
-    return Spn
-            
+            if '/' in mFlds[1]:    #P 4/m m m, etc.
+                sym = mFlds[1].split('/')
+                if "'" in sym[1]:
+                    mSpn[1] = -1
+                for i in [1,2]:
+                    if "'" in mFlds[i+1]:
+                        mSpn[i+1] = -1
+            else:
+                for i in [0,1]:
+                    if "'" in mFlds[i+2]:
+                        mSpn[i+1] = -1
+    elif SGLaue in ['3','3m1','31m']:   #ok 
+        if len(GenSym) == 1:    #all ok
+            Id = 2
+            if (len(mFlds) == 4) and (mFlds[2] == '1'):
+                Id = 3
+            if '3' in GenSym[0]:
+                Id = 1
+            if "'" in mFlds[Id]:
+                mSpn[1] = -1
+        elif len(GenSym) == 2:
+            if 'R' in GenSym[1]:
+                if "'" in mFlds[-1]:
+                    mSpn[1] = -1
+            else:
+                i,j = [1,2]
+                if mFlds[2] == '1':
+                    i,j = [1,3]
+                if "'" in mFlds[i]:
+                    mSpn[1:3] = [1,-1] 
+                elif "'" in mFlds[i]:
+                    mSpn[1:3] = [-1,-1]
+                elif "'" in mFlds[i] and "'" in mFlds[i]:
+                    mSpn[1:3] = [-1,1]
+        elif len(GenSym):
+            if 'c' not in mFlds[2]:
+                i,j = [1,2]
+                if "'" in mFlds[i]:
+                    mSpn[1:3] = [1,-1] 
+                elif "'" in mFlds[i]:
+                    mSpn[1:3] = [-1,-1]
+                elif "'" in mFlds[i] and "'" in mFlds[i]:
+                    mSpn[2:4] = [-1,1]
+    elif SGData['SGPtGrp'] == 'm3':
+        if "'" in mFlds[1] and "'" in mFlds[2]:
+            mSpn[1]  = -1
+    elif SGData['SGPtGrp'] in ['432','-43m']:
+        if "'" in mFlds[1] and "'" in mFlds[3]:
+            mSpn[1] = -1
+    elif SGData['SGPtGrp'] == 'm3m':
+        if "'" in mFlds[1] and "'" in mFlds[2]:
+            mSpn[1:3] = [-1,1]
+        elif "'" in mFlds[3]:
+            mSpn[1:3] = [1,-1]
+        elif "'" in mFlds[1] and "'" in mFlds[2] and "'" in mFlds[3]:
+            mSpn[1:3] = [-1,-1]
+    return mSpn
+
 def GenMagOps(SGData):
     FlpSpn = SGData['SGSpin']
     Nsym = len(SGData['SGOps'])
@@ -1341,7 +1425,12 @@ def GenMagOps(SGData):
         for ieqv in range(Nsym):
             for iunq in range(Nfl):
                 if SGData['SGGen'][ieqv%Ngen] & GenFlg[iunq]:
-                    SpnFlp[ieqv] *= FlpSpn[iunq]
+                    try:
+                        SpnFlp[ieqv] *= FlpSpn[iunq]
+                    except IndexError:
+                        print('index error: ',Nsym,ieqv,Nfl,iunq)
+                        FlpSpn = FlpSpn+[1,]
+                        SpnFlp[ieqv] *= FlpSpn[iunq]
         for incv in range(Ncv):
             if incv:
                 try:
@@ -2271,7 +2360,7 @@ def checkMagextc(HKL,SGData):
     nsum = 0.
     nA = 0
     for dhkl,phkl in zip(DHKL,PHKL):
-        if not np.allclose(dhkl,HKL):           #test for eq(5)
+        if not np.allclose(dhkl,HKL,atol=1.e-3):           #test for eq(5)
             continue
         else:
             nA += 1
@@ -2280,7 +2369,7 @@ def checkMagextc(HKL,SGData):
             Psum += pterm
     if nsum/nA > 1.:        #only need to look at nA=1 frok eq(8)
         return False
-    if np.allclose(Psum,np.zeros(3)):
+    if np.allclose(Psum,np.zeros(3),atol=1.e-3):
         return True
     else:
         if np.inner(HKL,Psum):
@@ -3613,7 +3702,7 @@ def ApplyStringOpsMom(A,SGData,SSGData,Mom):
     if Ax[0] < 0:
         NA += len(SGOps)
     M,T = SGOps[nA]
-    newMom = np.inner(Mom,M).T*SGData['SpnFlp'][NA+nC]
+    newMom = np.inner(Mom,M).T*SGData['SpnFlp'][NA+nC]*nl.det(M)
     if SSGData is not None:
         if SSGData['SSGCen'][iAx//100][3]:     #flip spin for BNS centered atoms
             newMom *= -1.

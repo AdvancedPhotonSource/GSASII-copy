@@ -1,27 +1,14 @@
 # -*- coding: utf-8 -*-
 #GSASIIpath - file location & update routines
 ########### SVN repository information ###################
-# $Date: 2023-01-23 15:29:21 -0600 (Mon, 23 Jan 2023) $
+# $Date: 2023-07-28 15:55:56 -0500 (Fri, 28 Jul 2023) $
 # $Author: toby $
-# $Revision: 5479 $
+# $Revision: 5638 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpath.py $
-# $Id: GSASIIpath.py 5479 2023-01-23 21:29:21Z toby $
+# $Id: GSASIIpath.py 5638 2023-07-28 20:55:56Z toby $
 ########### SVN repository information ###################
 '''
-*GSASIIpath: locations & updates*
----------------------------------
-
-Routines for dealing with file locations, etc.
-
-Determines the location of the compiled (.pyd or .so) libraries.
-
-Interfaces with subversion (svn): 
-Determine the subversion release number by determining the highest version number
-where :func:`SetVersionNumber` is called (best done in every GSASII file).
-Other routines will update GSASII from the subversion server if svn can be
-found.
-
-Accesses configuration options, as defined in config.py
+:mod:`GSASIIpath` Classes & routines follow
 '''
 
 from __future__ import division, print_function
@@ -86,18 +73,19 @@ def addPrevGPX(fil,configDict):
         pass
     except AttributeError:
         configDict['previous_GPX_files'][1] = []
-    configDict['previous_GPX_files'][1].insert(0,fil)
-    configDict['previous_GPX_files'][1] = configDict['previous_GPX_files'][1][:5]
+    files = list(configDict['previous_GPX_files'][1])
+    files.insert(0,fil)
+    configDict['previous_GPX_files'][1] = files[:5]
 
 # routines for looking a version numbers in files
 version = -1
 def SetVersionNumber(RevString):
     '''Set the subversion version number
 
-    :param str RevString: something like "$Revision: 5479 $"
+    :param str RevString: something like "$Revision: 5638 $"
       that is set by subversion when the file is retrieved from subversion.
 
-    Place ``GSASIIpath.SetVersionNumber("$Revision: 5479 $")`` in every python
+    Place ``GSASIIpath.SetVersionNumber("$Revision: 5638 $")`` in every python
     file.
     '''
     try:
@@ -947,7 +935,13 @@ def IPyBreak_base(userMsg=None):
             print ('IPython InteractiveShellEmbed not found')
             return
     import inspect
-    ipshell = InteractiveShellEmbed()
+    #from IPython import __version__
+    #if __version__.startswith('8.12.'): # see https://github.com/ipython/ipython/issues/13966
+    from IPython.core import getipython
+    if getipython.get_ipython() is None:
+        ipshell = InteractiveShellEmbed.instance()
+    else:
+        ipshell = InteractiveShellEmbed()
 
     frame = inspect.currentframe().f_back
     msg   = 'Entering IPython console inside {0.f_code.co_filename} at line {0.f_lineno}\n'.format(frame)
@@ -1555,6 +1549,49 @@ def addCondaPkg():
         print(err)
     if currenv == "base":
         print('\nUnexpected action: adding conda to base environment???')
+
+def makeScriptShortcut():
+    '''Creates a shortcut to GSAS-II in the current Python installation
+    so that "import G2script" (or "import G2script as GSASIIscripting")
+    can be used without having to add GSASII to the path.
+
+    The new shortcut is then tested.
+
+    :returns: returns the name of the created file if successful. None
+      indicates an error. 
+    '''
+    import datetime as dt
+    for p in sys.path:
+        if 'site-packages' in p: break
+    else:
+        print('No site-packages directory found in Python path')
+        return
+    newfil = os.path.join(p,'G2script.py')
+    fp = open(newfil,'w')
+    fp.write(f'#Created in makeScriptShortcut from {__file__}')
+    fp.write(dt.datetime.strftime(dt.datetime.now(),
+                                      " at %Y-%m-%dT%H:%M\n"))
+
+    fp.write(f"""import sys,os
+Path2GSASII='{path2GSAS2}'
+if os.path.exists(os.path.join(Path2GSASII,'GSASIIscriptable.py')):
+    print('setting up GSASIIscriptable from',Path2GSASII)
+    if Path2GSASII not in sys.path:
+        sys.path.insert(0,Path2GSASII)
+    from GSASIIscriptable import *
+else:
+    print('GSASIIscriptable not found in ',Path2GSASII)
+    print('Rerun "Install GSASIIscriptable shortcut" from inside GSAS-II')
+    sys.exit()
+""")
+    fp.close()
+    print('Created file',newfil)
+    try:
+        import G2script
+    except ImportError:
+        print('Unexpected error: import of G2script failed!')
+        return
+    return newfil
 
 if __name__ == '__main__':
     '''What follows is called to update (or downdate) GSAS-II in a separate process. 

@@ -1,24 +1,13 @@
 # -*- coding: utf-8 -*-
 #GSASII - phase data display routines
 #========== SVN repository information ###################
-# $Date: 2023-04-13 11:17:53 -0500 (Thu, 13 Apr 2023) $
+# $Date: 2023-08-14 20:10:19 -0500 (Mon, 14 Aug 2023) $
 # $Author: toby $
-# $Revision: 5537 $
+# $Revision: 5649 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIphsGUI.py $
-# $Id: GSASIIphsGUI.py 5537 2023-04-13 16:17:53Z toby $
+# $Id: GSASIIphsGUI.py 5649 2023-08-15 01:10:19Z toby $
 #========== SVN repository information ###################
 '''
-*GSASIIphsGUI: Phase GUI*
--------------------------
-
-Module to create the GUI for display of phase information
-in the data display window when a phase is selected.
-Phase information is stored in one or more
-:ref:`Phase Tree Item <Phase_table>` objects.
-Note that there are functions
-that respond to some tabs in the phase GUI in other modules
-(such as GSASIIddata).
-
 Main routine here is :func:`UpdatePhaseData`, which displays the phase information
 (called from :func:`GSASIIdataGUI:SelectDataTreeItem`).
 
@@ -26,7 +15,9 @@ Other top-level routines are:
 :func:`GetSpGrpfromUser` (called locally only);
 :func:`FindBondsDraw` and :func:`FindBondsDrawCell` (called locally and in GSASIIplot); 
 :func:`SetPhaseWindow` (called locally and in GSASIIddataGUI and GSASIIrestrGUI, multiple locations)
-to control scrolling. 
+to control scrolling.
+
+Routines for Phase dataframes follow. 
 '''
 from __future__ import division, print_function
 import platform
@@ -44,7 +35,7 @@ import subprocess as subp
 import distutils.file_util as disfile
 import scipy.optimize as so
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5537 $")
+GSASIIpath.SetVersionNumber("$Revision: 5649 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
@@ -931,7 +922,7 @@ class DIFFaXcontrols(wx.Dialog):
             parmsel.Bind(wx.EVT_COMBOBOX,OnParmSel)
             parmSel.Add(parmsel,0,WACV)
             mainSizer.Add(parmSel)
-            mainSizer.Add(wx.StaticText(self.panel,label=' Enter parameter range & no. steps: '),0,WACV)
+            mainSizer.Add(wx.StaticText(self.panel,label=' Enter parameter range & no. steps: '))
             parmRange =  wx.BoxSizer(wx.HORIZONTAL)
             numChoice = [str(i+1) for i in range(10)]
 #            Zstep = G2G.ValidatedTxtCtrl(drawOptions,drawingData,'Zstep',nDig=(10,2),xmin=0.01,xmax=4.0)
@@ -1703,7 +1694,14 @@ def UpdatePhaseData(G2frame,Item,data):
                             continue
                         RfList[newName] = RfList[oldName]
                         del RfList[oldName]                            
-                NameTxt.SetValue(generalData['Name'])
+                    NameTxt.SetValue(newName)
+                    # rename Restraints
+                    resId = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,'Restraints')
+                    Restraints = G2frame.GPXtree.GetItemPyData(resId)
+                    i = G2gd.GetGPXtreeItemId(G2frame,resId,oldName)
+                    if i: G2frame.GPXtree.SetItemText(i,newName)
+                    Restraints[newName] = Restraints[oldName]
+                    del Restraints[oldName]
                                                 
             def OnPhaseType(event):
                 if not len(generalData['AtomTypes']):             #can change only if no atoms!
@@ -3104,20 +3102,21 @@ def UpdatePhaseData(G2frame,Item,data):
                 else:
                     CSI = G2spc.GetCSxinel(SytSym)
                     atMxyz.append([SytSym,CSI[0]])
-            dlg = UseMagAtomDialog(G2frame,magchoices[sel],Atms,AtCods,atMxyz,ifMag=ifMag,ifDelete=True)
-            try:
-                opt = dlg.ShowModal()
-                if  opt == wx.ID_YES:
-                    G2frame.OnFileSave(event)       #saves current state of Unit Cell List
-                    newPhase['Atoms'],atCodes = dlg.GetSelection()
-                    generalData['Lande g'] = len(generalData['AtomTypes'])*[2.,]
-                elif opt == wx.ID_DELETE:
-                    magData[magId]['Keep'] = False
-                    return
-                else:   #wx.ID_NO
-                    return
-            finally:
-                dlg.Destroy()
+            if ifMag:
+                dlg = UseMagAtomDialog(G2frame,magchoices[sel],Atms,AtCods,atMxyz,ifMag=ifMag,ifDelete=True)
+                try:
+                    opt = dlg.ShowModal()
+                    if  opt == wx.ID_YES:
+                        G2frame.OnFileSave(event)       #saves current state of Unit Cell List
+                        newPhase['Atoms'],atCodes = dlg.GetSelection()
+                        generalData['Lande g'] = len(generalData['AtomTypes'])*[2.,]
+                    elif opt == wx.ID_DELETE:
+                        magData[magId]['Keep'] = False
+                        return
+                    else:   #wx.ID_NO
+                        return
+                finally:
+                    dlg.Destroy()
         else:
             return
         NShkl = len(G2spc.MustrainNames(SGData))
@@ -3141,6 +3140,134 @@ def UpdatePhaseData(G2frame,Item,data):
             G2frame.OnFileSaveas(event)
         G2frame.GPXtree.SelectItem(sub)
         
+    def OnApplySubgroups(event):
+        '''Select and apply a transformation matrix from the Bilbao web site 
+        to replace current phase with a subgroup
+        '''
+        PatternName = data['magPhases']
+        PatternId = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,PatternName)
+        UnitCellsId = G2gd.GetGPXtreeItemId(G2frame,PatternId, 'Unit Cells List')
+        UCdata = list(G2frame.GPXtree.GetItemPyData(UnitCellsId))
+        if len(UCdata[0]) < 17:     #old version of k-SUBGROUPSMAG
+            baseList = range(1,len(UCdata[5])+1)
+        else:
+            baseList = UCdata[0][16]
+        subKeep = []
+        subIds = []
+        subchoices = []
+        ifMag = False
+        itemList = [phase.get('gid',ip+1) for ip,phase in enumerate(UCdata[5])]
+        phaseDict = dict(zip(itemList,UCdata[5]))
+        for im,mid in enumerate(baseList):
+            if phaseDict[mid]['Keep']:
+                phaseDict[mid]['No.'] = im+1
+                trans = G2spc.Trans2Text(phaseDict[mid]['Trans'])
+                vec = G2spc.Latt2text([phaseDict[mid]['Uvec'],])
+                subKeep.append(phaseDict[mid])
+                subIds.append(mid)
+                subchoices.append('(%d) %s; (%s) + (%s)'%(im+1,phaseDict[mid]['Name'],trans,vec))
+        if not len(subKeep):
+            G2frame.ErrorDialog('Subgroup phase selection error','No subgroups available; be sure to "Keep" some')
+            return
+        dlg = G2G.G2MultiChoiceDialog(G2frame,
+                    'Make new project using subgroups','Select subgroup(s)',
+                    subchoices)
+        opt = dlg.ShowModal()
+        sels = []
+        if opt == wx.ID_OK:
+            sels = dlg.GetSelections()
+        if not sels: return
+        #
+        G2frame.OnFileSave(None) # save
+        orgFilName = G2frame.GSASprojectfile
+        phsnam = data['General']['Name']
+        # get restraints & clear geometrical restraints
+        resId = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,'Restraints')
+        Restraints = G2frame.GPXtree.GetItemPyData(resId)
+        resId = G2gd.GetGPXtreeItemId(G2frame,resId,phsnam)
+        Restraints[phsnam]['Bond']['Bonds'] = []
+        Restraints[phsnam]['Angle']['Angles'] = []
+        savedRestraints = Restraints[phsnam]
+        orgData = copy.deepcopy(data)
+        del Restraints[phsnam]
+        for sel in sels:
+            data.update(copy.deepcopy(orgData))   # get rid of prev phase
+            magchoice = subKeep[sel]
+            spg = magchoice['SGData']['SpGrp'].replace(' ','')
+            subId = subIds[sel]
+            # generate the new phase            
+            newPhase = copy.deepcopy(data)
+            generalData = newPhase['General']
+            generalData['SGData'] = copy.deepcopy(magchoice['SGData'])
+            generalData['Cell'][1:] = magchoice['Cell'][:]
+            generalData['MagDmin'] = 1.0
+            SGData = generalData['SGData']
+            vvec = np.array([0.,0.,0.])
+            newPhase['MagXform'] = (magchoice['Trans'],magchoice['Uvec'],vvec)
+            newPhase,atCodes = G2lat.TransformPhase(data,newPhase,magchoice['Trans'],magchoice['Uvec'],vvec,ifMag)
+            Atoms = newPhase['Atoms']
+            Atms = []
+            AtCods = []
+            atMxyz = []
+            for ia,atom in enumerate(Atoms):
+                atom[0] += '_%d'%ia
+                atom[2] = ''                    #clear away refinement flags
+                SytSym,Mul,Nop,dupDir = G2spc.SytSym(atom[3:6],SGData)
+                Atms.append(atom)
+                AtCods.append(atCodes[ia])
+                CSI = G2spc.GetCSxinel(SytSym)
+                atMxyz.append([SytSym,CSI[0]])
+            NShkl = len(G2spc.MustrainNames(SGData))
+            NDij = len(G2spc.HStrainNames(SGData))
+            UseList = newPhase['Histograms']
+            detTrans = np.abs(nl.det(magchoice['Trans']))
+            newPhase['Drawing'] = []
+            for hist in UseList:
+                UseList[hist]['Scale'] /= detTrans      #scale by 1/volume ratio
+                # reset Dij & microstrain terms where # of terms changes
+                if len(UseList[hist]['Mustrain'][4]) != NShkl:
+                    UseList[hist]['Mustrain'][4:6] = [NShkl*[0.01,],NShkl*[False,]]
+                if len(UseList[hist]['HStrain'][0]) != NDij:
+                    UseList[hist]['HStrain'] = [NDij*[0.0,],NDij*[False,]]
+            newPhase['General']['Map'] = mapDefault.copy()
+            # phase name rename
+            newName = generalData['Name'] = f"{phsnam}_{magchoice['No.']}_{spg}"
+            phaseRIdList,usedHistograms = G2frame.GetPhaseInfofromTree()
+            phaseNameList = usedHistograms.keys() # phase names in use
+            generalData['Name'] = newName
+            G2frame.GPXtree.SetItemText(Item,generalData['Name'])
+            # change phase name key in Reflection Lists for each histogram
+            for hist in data['Histograms']:
+                ht = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,hist)
+                rt = G2gd.GetGPXtreeItemId(G2frame,ht,'Reflection Lists')
+                if not rt: continue
+                RfList = G2frame.GPXtree.GetItemPyData(rt)
+                RfList[newName] = []
+                if phsnam in RfList:
+                    del RfList[phsnam]
+            # copy cleared restraints
+            Restraints[generalData['Name']] = savedRestraints
+            if resId: G2frame.GPXtree.SetItemText(resId,newName)
+            data.update(newPhase)
+            #clear away prev subgroup choices
+            if 'magPhases' in data: del data['magPhases']
+            UCdata[5] = []
+            G2frame.GPXtree.SetItemPyData(UnitCellsId,UCdata)
+            # save new file
+            G2frame.GSASprojectfile = os.path.splitext(orgFilName
+                            )[0]+'_'+spg.replace('/','_')+'.gpx'
+            #G2frame.OnFileSaveas(event)
+            G2IO.ProjFileSave(G2frame)
+
+        # restore the original saved project
+        G2frame.OnFileOpen(None,filename=orgFilName,askSave=False)
+        # reopen tree to the original phase
+        def _ShowPhase():
+            phId = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,'Phases')
+            G2frame.GPXtree.Expand(phId)        
+            phId = G2gd.GetGPXtreeItemId(G2frame,phId,phsnam)
+            G2frame.GPXtree.SelectItem(phId)
+        wx.CallLater(100,_ShowPhase)
 #####  Atom routines ################################################################################
     def FillAtomsGrid(Atoms):
         '''Display the contents of the Atoms tab
@@ -4679,13 +4806,13 @@ def UpdatePhaseData(G2frame,Item,data):
         UseList = Map['RefList']
         pId = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,UseList[0])       #only use 1st histogram
         if not pId:
-            wx.MessageBox('You must prepare a fourier map before running Dysnomia','Dysnomia Error',
+            wx.MessageBox('You must prepare a Fourier map before running Dysnomia','Dysnomia Error',
                 style=wx.ICON_ERROR)
             return            
         reflSets = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,pId,'Reflection Lists'))
         reflData = reflSets[generalData['Name']]['RefList']
         if 'Type' not in Map:
-            wx.MessageBox('You must prepare a fourier map before running Dysnomia','Dysnomia Error',
+            wx.MessageBox('You must prepare a Fourier map before running Dysnomia','Dysnomia Error',
                 style=wx.ICON_ERROR)
             return            
         Type = Map['Type']
@@ -4895,10 +5022,13 @@ def UpdatePhaseData(G2frame,Item,data):
                     style=wx.FD_OPEN ,wildcard=fil+'(*.*)|*.*')
                 if dlg.ShowModal() == wx.ID_OK:
                     fpath,fName = os.path.split(dlg.GetPath())
-                    if fpath != G2frame.LastGPXdir:
-                        disfile.copy_file(dlg.GetPath(),os.path.join(G2frame.LastGPXdir,fName))
-                    if os.path.exists(fName):
+                    if os.path.exists(fName): # is there a file by this name in the current directory?
                         RMCPdict['files'][fil][0] = fName
+                    else: # nope, copy it
+                        disfile.copy_file(dlg.GetPath(),os.path.join(G2frame.LastGPXdir,fName))
+                    if not os.path.exists(fName): # sanity check
+                        print(f'Error: file {fName} not found in .gpx directory ({G2frame.LastGPXdir})')
+                        return
                     G2frame.LastImportDir = fpath    #set so next file is found in same place
                     dlg.Destroy()
                     RMCPdict['ReStart'][0] = True
@@ -5269,9 +5399,10 @@ def UpdatePhaseData(G2frame,Item,data):
         def fullrmcSizer(RMCPdict):
             mainSizer = wx.BoxSizer(wx.VERTICAL)
             mainSizer.Add(wx.StaticText(G2frame.FRMC,label=
-'''* "Atomic Stochastic Modeling & Optimization with fullrmc", B. Aoun, J. Appl. Cryst. 2022, (in press);
+'''* "Atomic Stochastic Modeling & Optimization with fullrmc", B. Aoun, J. Appl. Cryst. 2022, 55(6) 1664-1676, 
+ DOI: 10.1107/S1600576722008536;
 * "Fullrmc, a Rigid Body Reverse Monte Carlo Modeling Package Enabled with Machine Learning and Artificial 
-   Intelligence", B. Aoun, Jour. Comp. Chem. (2016), 37, 1102-1111. doi: https://doi.org/10.1002/jcc.24304; 
+   Intelligence", B. Aoun, Jour. Comp. Chem. (2016), 37, 1102-1111. DOI: 10.1002/jcc.24304; 
 * www.fullrmc.com
  '''))
             # if G2pwd.findfullrmc() is None:
@@ -6527,6 +6658,10 @@ S.J.L. Billinge, J. Phys, Condens. Matter 19, 335219 (2007)., Jour. Phys.: Cond.
             rname = 'Seq_PDFfit.py'
         else:
             rname = pName+'-PDFfit.py'
+            if not os.path.exists(rname):
+                wx.MessageBox(f'File {rname} does not exist. Has the Operations/"Setup RMC" menu command been run?',
+                                  caption='Run setup',style=wx.ICON_WARNING)
+                return
         wx.MessageBox(''' For use of PDFfit2, please cite:
       PDFfit2 and PDFgui: computer progerama for studying nanostructures in crystals, 
 C.L. Farrow, P.Juhas, J.W. Liu, D. Bryndin, E.S. Bozin, J. Bloch, Th. Proffen & 
@@ -6537,7 +6672,17 @@ S.J.L. Billinge, J. Phys, Condens. Matter 19, 335219 (2007)., Jour. Phys.: Cond.
         print (' GSAS-II project saved')
         if sys.platform.lower().startswith('win'):
             batch = open('pdffit2.bat','w')
-            # TODO: should probably include an activate command here
+            # Include an activate command here
+            p = os.path.split(PDFfit_exec)[0]
+            while p:
+                if os.path.exists(os.path.join(p,'Scripts','activate')):
+                    batch.write('call '+os.path.join(p,'Scripts','activate')+'\n')
+                    break
+                prevp = p
+                p = os.path.split(p)[0]
+                if prevp == p:
+                    print('Note, no activate command found')
+                    break
             batch.write(PDFfit_exec+' '+rname+'\n')
             # batch.write('pause')
             if 'normal' in RMCPdict['refinement']:
@@ -6546,7 +6691,18 @@ S.J.L. Billinge, J. Phys, Condens. Matter 19, 335219 (2007)., Jour. Phys.: Cond.
         else:
             batch = open('pdffit2.sh','w')
             batch.write('#!/bin/bash\n')
-            # TODO: should probably include an activate command here
+            # include an activate command here
+            p = os.path.split(PDFfit_exec)[0]
+            while p:
+                if os.path.exists(os.path.join(p,'bin','activate')):
+                    batch.write('source '+os.path.join(p,'Scripts','activate')+'\n')
+                    break
+                prevp = p
+                p = os.path.split(p)[0]
+                if prevp == p:
+                    print('Note, no activate command found')
+                    break
+
             batch.write('cd ' + os.path.split(os.path.abspath(rname))[0] + '\n')
             batch.write(PDFfit_exec + ' ' + os.path.abspath(rname) + '\n')
             batch.close()
@@ -6768,13 +6924,13 @@ S.J.L. Billinge, J. Phys, Condens. Matter 19, 335219 (2007)., Jour. Phys.: Cond.
 
       "Atomic Stochastic Modeling & Optimization 
       with fullrmc", B. Aoun, J. Appl. Cryst. 2022, 
-      (in press). 
+      55(6) 1664-1676, DOI: 10.1107/S1600576722008536.
 
       "Fullrmc, a Rigid Body Reverse Monte Carlo 
       Modeling Package Enabled with Machine Learning 
       and Artificial Intelligence",
       B. Aoun, Jour. Comp. Chem. 2016, 37, 1102-1111. 
-      DOI: https://doi.org/10.1002/jcc.24304
+      DOI: 10.1002/jcc.24304
 
       Note: A more advanced version of fullrmc can be found at www.fullrmc.com''',
                              'Please cite fullrmc')
@@ -11219,6 +11375,8 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
             dlg.Destroy()
         
     def OnSelDataCopy(event):
+        '''Select HAP items to copy from one Phase/Hist to other(s)
+        '''
         hist = G2frame.hist
         sourceDict = data['Histograms'][hist]
         keyList = G2frame.dataWindow.HistsInPhase[:]
@@ -11252,7 +11410,78 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     data['Histograms'][keyList[sel]].update(copy.deepcopy(copyDict))
         finally:
             dlg.Destroy()            
-        
+
+    def OnSelDataRead(event):
+        '''Select HAP items to copy from another GPX file to current 
+        phase & hist
+        '''
+        sourceDict = data['Histograms'][G2frame.hist]
+        try:
+            dlg = G2G.gpxFileSelector(parent=G2frame)
+            if wx.ID_OK == dlg.ShowModal():
+                filename = dlg.Selection
+            else:
+                return
+        finally:
+            dlg.Destroy()
+
+        import pickle
+        phases = None
+        phasenames = []
+        try:
+            fp = open(filename,'rb')
+            while True:
+                try:
+                    d = pickle.load(fp)
+                except EOFError:
+                    break
+                if d[0][0] == 'Phases':
+                    phases = d
+                    phasenames = [phases[i][0] for i in range(1,len(phases))]
+        except:
+            return
+        finally:
+            fp.close()
+        if not phasenames: return
+        if len(phasenames) == 1:
+            phNum = 1
+        else:
+            dlg = wx.SingleChoiceDialog(G2frame,'Select Phase to use',
+                                            'Select',phasenames)
+            if dlg.ShowModal() == wx.ID_OK:
+                phNum = dlg.GetSelection()+1
+            else:
+                return
+        histograms = list(phases[phNum][1]['Histograms'].keys())
+        if len(histograms) == 0:
+            return
+        elif len(histograms) == 1:
+            histNam = histograms[0]
+        else:
+            dlg = wx.SingleChoiceDialog(G2frame,'Select histogram to use',
+                                            'Select',histograms)
+            if dlg.ShowModal() == wx.ID_OK:
+                histNam = histograms[dlg.GetSelection()]
+            else:
+                return
+        if 'HKLF' in histNam:
+            copyNames = ['Extinction','Babinet','Flack','Twins']
+        else:  #PWDR  
+            copyNames = ['Pref.Ori.','Size','Mustrain','HStrain','Extinction','Babinet','LeBail','newLeBail','Layer Disp']
+        copyNames += ['Scale','Fix FXU','FixedSeqVars']
+        dlg = G2G.G2MultiChoiceDialog(G2frame,'Select which parameters to copy',
+            'Select phase data parameters', copyNames)
+        selectedItems = []
+        try:
+            if dlg.ShowModal() == wx.ID_OK:
+                selectedItems = [copyNames[i] for i in dlg.GetSelections()]
+        finally:
+            dlg.Destroy()
+        if not selectedItems: return # nothing to copy
+        for i in selectedItems:
+            sourceDict[i] = phases[phNum][1]['Histograms'][histNam][i]
+        wx.CallAfter(G2ddG.UpdateDData,G2frame,DData,data)
+
     def OnPwdrAdd(event):
         generalData = data['General']
         SGData = generalData['SGData']
@@ -11679,10 +11908,13 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                     shoSizer.Add(wx.StaticText(RigidBodies,label=' Radius: '),0,WACV)
                     shoSizer.Add(G2G.ValidatedTxtCtrl(RigidBodies,RBObj['Radius'][iSh],0,nDig=(8,5),xmin=0.0,xmax=5.0,
                         typeHint=float,size=(70,-1),OnLeave=NewSHC),0,WACV)
-                    radref = wx.CheckBox(RigidBodies,label=' refine? ')
-                    radref.SetValue(RBObj['Radius'][iSh][1])
-                    radref.Bind(wx.EVT_CHECKBOX,OnRadRef)
-                    Indx[radref.GetId()] = iSh
+                    if 'Q' in RBObj['atType'][iSh]:
+                        radref = wx.StaticText(RigidBodies,label=' For drawing only')
+                    else:
+                        radref = wx.CheckBox(RigidBodies,label=' refine? ')
+                        radref.SetValue(RBObj['Radius'][iSh][1])
+                        radref.Bind(wx.EVT_CHECKBOX,OnRadRef)
+                        Indx[radref.GetId()] = iSh
                     shoSizer.Add(radref,0,WACV)
                     shSizer.Add(shoSizer)
                     if not RBObj['nSH'][iSh]:
@@ -11961,7 +12193,7 @@ u''' The 2nd column below shows the last saved mode values. The 3rd && 4th colum
                 return
             Indx.clear()
             rbObj = data['RBModels'][rbType][rbIndx]
-            data['Drawing']['viewPoint'][0] = data['Atoms'][AtLookUp[RBObj['Ids'][0]]][cx:cx+3]
+            data['Drawing']['viewPoint'][0] = data['Atoms'][AtLookUp[rbObj['Ids'][0]]][cx:cx+3]
             Quad = rbObj['Orient'][0]
             data['Drawing']['Quaternion'] = G2mth.invQ(Quad)
             if rbType == 'Residue':
@@ -14471,7 +14703,7 @@ of the crystal structure.
             print (' distance for atoms %s = %.3f'%(str(indx),G2mth.getRestDist(xyz,Amat)))
         else:
             print (' angle for atoms %s = %.2f'%(str(indx),G2mth.getRestAngle(xyz,Amat)))
-                                    
+
     def OnFourierMaps(event):
         generalData = data['General']
         mapData = generalData['Map']
@@ -14830,6 +15062,7 @@ of the crystal structure.
         G2frame.Bind(wx.EVT_MENU, OnCompare, id=G2G.wxID_COMPARESTRUCTURE)
         G2frame.Bind(wx.EVT_MENU, OnCompareCells, id=G2G.wxID_COMPARECELLS)
         G2frame.Bind(wx.EVT_MENU, OnUseBilbao, id=G2G.wxID_USEBILBAOMAG)
+        G2frame.Bind(wx.EVT_MENU, OnApplySubgroups, id=G2G.wxID_USEBILBAOSUB)
         G2frame.Bind(wx.EVT_MENU, OnValidProtein, id=G2G.wxID_VALIDPROTEIN)
         # Data (unless Hist/Phase tree entry shown)
         if not GSASIIpath.GetConfigValue('SeparateHistPhaseTreeItem',False):
@@ -14838,6 +15071,7 @@ of the crystal structure.
             G2frame.Bind(wx.EVT_MENU, OnDataCopy, id=G2G.wxID_DATACOPY)
             G2frame.Bind(wx.EVT_MENU, OnDataCopyFlags, id=G2G.wxID_DATACOPYFLAGS)
             G2frame.Bind(wx.EVT_MENU, OnSelDataCopy, id=G2G.wxID_DATASELCOPY)
+            G2frame.Bind(wx.EVT_MENU, OnSelDataRead, id=G2G.wxID_DATASELREAD)
             G2frame.Bind(wx.EVT_MENU, OnPwdrAdd, id=G2G.wxID_PWDRADD)
             G2frame.Bind(wx.EVT_MENU, OnHklfAdd, id=G2G.wxID_HKLFADD)
             G2frame.Bind(wx.EVT_MENU, OnDataDelete, id=G2G.wxID_DATADELETE)
@@ -15136,6 +15370,17 @@ of the crystal structure.
     G2frame.dataWindow.AtomCompute.Enable(G2G.wxID_ISODISP,'ISODISTORT' in data)
     G2frame.dataWindow.GeneralCalc.Enable(G2G.wxID_VALIDPROTEIN,'macro' in data['General']['Type'])
     G2frame.dataWindow.GeneralCalc.Enable(G2G.wxID_USEBILBAOMAG,'magPhases' in data)
+    flag = False
+    if 'magPhases' in data:
+        PatternName = data['magPhases']
+        PatternId = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,PatternName)
+        if (PatternId):
+            UnitCellsId = G2gd.GetGPXtreeItemId(G2frame,PatternId, 'Unit Cells List')
+            UCdata = list(G2frame.GPXtree.GetItemPyData(UnitCellsId))
+            flag = not any(['magAtms' in i for i in UCdata[5]])
+        else:
+            del data['magPhases']
+    G2frame.dataWindow.GeneralCalc.Enable(G2G.wxID_USEBILBAOSUB,flag)
     G2frame.phaseDisplay.Bind(wx.aui.EVT_AUINOTEBOOK_PAGE_CHANGED, OnPageChanged)
     FillMenus()
     if G2frame.lastSelectedPhaseTab in Pages:
@@ -15198,7 +15443,8 @@ def checkPDFfit(G2frame):
         msg = ('GSAS-II does not supply a version of PDFfit2 compatible with '+
         'this Python installation. Since Python was not installed under conda you need '+
         'to correct this for yourself. You likely need to '+
-        'install the GSL (GNU Software Library) and use "pip install diffpy.pdffit2".')
+        'install the GSL (GNU Software Library) and use "pip install diffpy.pdffit2".'+
+        ' This is best done in a separate Python installation/virtual environment.')
         G2G.G2MessageBox(G2frame,msg,'PDFfit2 not provided; No conda')
         return False
 
@@ -15230,7 +15476,10 @@ def checkPDFfit(G2frame):
             print('command line conda install did not provide package. Unexpected!')
             return False
         
-    if 'gsl' not in conda.cli.python_api.run_command(conda.cli.python_api.Commands.LIST,'gsl')[0].lower():
+    if ('gsl' not in conda.cli.python_api.run_command(
+             conda.cli.python_api.Commands.LIST,'gsl')[0].lower()
+        and
+             glob.glob(os.path.join(GSASIIpath.binaryPath,'pdffit*'))):
         msg = ('The gsl (GNU Software Library), needed by PDFfit2, '+
                    ' is not installed in this Python. Do you want to have this installed?')
         dlg = wx.MessageDialog(G2frame,msg,caption='Install?',
@@ -15258,32 +15507,9 @@ def checkPDFfit(G2frame):
         return True
     except Exception as err:
         msg = 'Failed to import PDFfit2 with error:\n'+str(err)
-        G2G.G2MessageBox(G2frame,msg,'PDFfit2 import error')
-
-    # can we install pdffit2 into our current environment?
-    msg = ('Do you want to try using conda to install PDFfit2 into the '+
-                'current Python (conda) environment, freezing the current '+
-               'configuration? (There is a low chance for success with this.)'+
-               ' The alternative is to install PDFfit2 in a separate environment.'+
-               ' This will be offered next')
-    dlg = wx.MessageDialog(G2frame,msg,caption='Install?',
-                                   style=wx.YES_NO|wx.ICON_QUESTION)
-    if dlg.ShowModal() == wx.ID_YES:
-        try:
-            wx.BeginBusyCursor()
-            print('Preparing to install diffpy.pdffit. This may take a few minutes...')
-            res = GSASIIpath.condaInstall(['diffpy.pdffit2','gsl',
-                                        '-c','diffpy','-c','conda-forge',
-                                           '--freeze-installed'])
-        finally:
-            wx.EndBusyCursor()
-        try: # PDFfit now runs?
-            from diffpy.pdffit2 import PdfFit
-            #pf = PdfFit()
-            return True
-        except Exception as err:
-            msg = 'Failed to import PDFfit2 with error:\n'+str(err)
-            print(msg)
+        print(msg)
+        if glob.glob(os.path.join(GSASIIpath.binaryPath,'pdffit*')):
+            G2G.G2MessageBox(G2frame,msg,'PDFfit2 import error')
 
     # Last effort: With conda we should be able to create a separate Python in a separate
     # environment
@@ -15297,9 +15523,13 @@ def checkPDFfit(G2frame):
     try:
         wx.BeginBusyCursor()
         print('Preparing to create a conda environment. This may take a few minutes...')
+        # for now use the older diffpy version of pdffit:
+        #   conda create -n pdffit2 python=3.7 conda gsl diffpy.pdffit2=1.2 -c conda-forge -c diffpy
         res,PDFpython = GSASIIpath.condaEnvCreate('pdffit2',
-                    ['python=3.7', 'conda', 'gsl', 'diffpy.pdffit2',
+                    ['python=3.7', 'conda', 'gsl', 'diffpy.pdffit2=1.2',
                          '-c', 'conda-forge', '-c', 'diffpy'])
+        # someday perhaps this will work:
+        #   conda create -n pdffit2 python conda gsl diffpy.pdffit2 -c conda-forge
     finally:
         wx.EndBusyCursor()
     if os.path.exists(PDFpython):
@@ -15307,7 +15537,7 @@ def checkPDFfit(G2frame):
         vars['pdffit2_exec'][1] = PDFpython
         GSASIIpath.SetConfigValue(vars)
         G2G.SaveConfigVars(vars)
-        print('config',GSASIIpath.GetConfigValue('pdffit2_exec'))
+        print('pdffit2_exec config set with ',GSASIIpath.GetConfigValue('pdffit2_exec'))
         return True
     else:
         msg = 'Failed to install PDFfit2 with error:\n'+str(PDFpython)
