@@ -1,115 +1,18 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-04-13 11:17:53 -0500 (Thu, 13 Apr 2023) $
+# $Date: 2023-07-27 18:21:18 -0500 (Thu, 27 Jul 2023) $
 # $Author: toby $
-# $Revision: 5537 $
+# $Revision: 5636 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIplot.py $
-# $Id: GSASIIplot.py 5537 2023-04-13 16:17:53Z toby $
+# $Id: GSASIIplot.py 5636 2023-07-27 23:21:18Z toby $
 ########### SVN repository information ###################
 '''
-*GSASIIplot: plotting routines*
-===============================
-
-This module performs all visualization using matplotlib and OpenGL graphics. The following plotting
-routines are defined: 
-
-============================  ===========================================================================
-plotting routine               action        
-============================  ===========================================================================
-:func:`PlotPatterns`          Powder pattern plotting
-:func:`PublishRietveldPlot`   Create publication-quality Rietveld plots from :func:`PlotPatterns` plot
-:func:`PlotImage`             Plots of 2D detector images
-:func:`PlotPeakWidths`        Plot instrument broadening terms as function of 2-theta/TOF
-:func:`PlotCovariance`        Show covariance terms in 2D 
-:func:`PlotStructure`         Crystal structure plotting with balls, sticks, lines,
-                              ellipsoids, polyhedra and magnetic moments
-:func:`PlotBeadModel`         Plots representation of protein shape from small angle scattering
-:func:`Plot1DSngl`            1D stick plots of structure factors                              
-:func:`PlotSngl`              Structure factor plotting
-:func:`Plot3DSngl`            3D Structure factor plotting
-:func:`PlotDeltSig`           Normal probability plot (powder or single crystal)
-:func:`PlotISFG`              PDF analysis: displays I(Q), S(Q), F(Q) and G(r)
-:func:`PlotCalib`             CW or TOF peak calibration
-:func:`PlotXY`                Simple plot of xy data
-:func:`PlotXYZ`               Simple contour plot of xyz data
-:func:`PlotXYZvect`           Quiver Plot for 3D cartesian vectors
-:func:`Plot3dXYZ`             Surface Plot for 3D vectors
-:func:`PlotAAProb`            Protein "quality" plot 
-:func:`PlotStrain`            Plot of strain data, used for diagnostic purposes
-:func:`PlotSASDSizeDist`      Small angle scattering size distribution plot
-:func:`PlotPowderLines`       Plot powder pattern as a stick plot (vertical lines)
-:func:`PlotSizeStrainPO`      Plot 3D mustrain/size/preferred orientation figure
-:func:`PlotTexture`           Pole figure, inverse pole figure plotting
-:func:`ModulationPlot`        Plots modulation information
-:func:`PlotTorsion`           Plots MC torsion angles
-:func:`PlotRama`              Ramachandran of energetically allowed regions for dihedral
-                              angles in protein
-:func:`PlotSelectedSequence`  Plot one or more sets of values selected from the sequential
-                              refinement table
-:func:`PlotIntegration`       Rectified plot of 2D image after image integration with 2-theta and
-                              azimuth as coordinates
-:func:`PlotTRImage`           test plot routine
-:func:`PlotRigidBody`         show rigid body structures as balls & sticks
-:func:`PlotLayers`            show layer structures as balls & sticks
-:func:`PlotFPAconvolutors`    plots the convolutors from Fundamental Parameters
-:func:`PlotClusterXYZ`        plots the result of cluster analysis
-============================  ===========================================================================
-
-These plotting routines place their graphics in the GSAS-II Plot Window, which contains a
-:class:`G2PlotNoteBook` tabbed panel allowing multiple plots to be viewed. Methods 
-:meth:`G2PlotNoteBook.addMpl` (2-D matplotlib), 
-:meth:`G2PlotNoteBook.add3D` (3-D matplotlib), and 
-:meth:`G2PlotNoteBook.addOgl` (OpenGL) are used to
-create tabbed plot objects to hold plots of the following classes:
-:class:`G2PlotMpl` (2-D matplotlib), 
-:class:`G2Plot3D` (3-D matplotlib), and 
-:class:`G2PlotOgl` (OpenGL). Note that two :class:`G2PlotNoteBook` methods are
-potentially used to determine how plot updates after a refinement are handled: 
-
-============================================     ========================================================
-class method                                      description
-============================================     ========================================================
-:meth:`G2PlotNoteBook.RegisterRedrawRoutine`      This specifies a function 
-                                                  to redraw the plot after the data tree has been
-                                                  reloaded. Be sure this updates data
-                                                  objects with new values from the tree, when needed.
-                                                  
-:meth:`G2PlotNoteBook.SetNoDelete`                Use this to indicate that a plot does not need to be
-                                                  updated after a refinement and should not be closed.
-============================================     ========================================================
-
-These two methods define the following attributes (variables) in the plot tab classes: 
-
-======================    ===============     ============================================================
-variable                   default             use
-======================    ===============     ============================================================
-replotFunction              None               Defines a routine to be called to update the plot 
-                                               after a refinement (unless None). Use
-                                               :meth:`G2PlotNoteBook.RegisterRedrawRoutine`
-                                               to define this (and replotArgs & replotKwArgs). 
-                                               Plotting functions that take significant time
-                                               to complete should probably not use this.)
-replotArgs                  []                 Defines the positional arguments to be supplied to
-                                               the replotFunction function or method.
-replotKwArgs                {}                 Defines the keyword arguments to be supplied to
-                                               the replotFunction function or method. 
-plotRequiresRedraw         True                If set to True, after a refinement, the plot will be
-                                               closed (in :func:`GSASIIdataGUI.GSASII.CleanupOldPlots`)
-                                               if it was not updated after the refinement. Set this to
-                                               False using :meth:`G2PlotNoteBook.SetNoDelete`
-                                               for plots that should not be deleted or do
-                                               not change based on refinement results.
-plotInvalid                 False              Used to track if a plot has been updated. Set to False
-                                               in :meth:`G2PlotNoteBook.FindPlotTab` when a plot is
-                                               drawn. After a refinement is completed, method
-                                               :func:`GSASIIdataGUI.GSASII.ResetPlots` sets
-                                               plotInvalid to False for all plots before any routines
-                                               are called. 
-======================    ===============     ============================================================
-
-Note that the plot toolbar is customized with :class:`GSASIItoolbar` 
-                                        
+Classes and routines defined in :mod:`GSASIIplot` follow. 
 '''
+# Note that documentation for GSASIIplot.py has been moved
+# to file docs/source/GSASIIplot.rst
+
+
 from __future__ import division, print_function
 import platform
 import time
@@ -134,14 +37,14 @@ try:
         mpl.use('wxAgg')
     import matplotlib.figure as mplfig
     import matplotlib.collections as mplC
-    import mpl_toolkits.mplot3d.axes3d as mp3d
+#    import mpl_toolkits.mplot3d.axes3d as mp3d
     from scipy.ndimage import map_coordinates
 except (ImportError, ValueError) as err:
     print('GSASIIplot: matplotlib not imported')
     if GSASIIpath.GetConfigValue('debug'): print('error msg:',err)
 
 Clip_on = GSASIIpath.GetConfigValue('Clip_on',True)
-GSASIIpath.SetVersionNumber("$Revision: 5537 $")
+GSASIIpath.SetVersionNumber("$Revision: 5636 $")
 import GSASIIdataGUI as G2gd
 import GSASIIimage as G2img
 import GSASIIpwd as G2pwd
@@ -275,6 +178,12 @@ try:
         mpl.cm.register_cmap(cmap=oldpaired_r,name='GSPaired_r')   #deprecated
 except Exception as err:
     if GSASIIpath.GetConfigValue('debug'): print('\nMPL CM setup error: {}\n'.format(err))
+    
+def GetColorMap(color):
+    try:
+        return mpl.colormaps[color]
+    except:
+        return mpl.cm.get_cmap(color)
 
 # options for publication-quality Rietveld plots
 plotOpt = {}
@@ -292,7 +201,9 @@ plotOpt['phaseList']  = []
 plotOpt['phaseLabels']  = {}
 plotOpt['fmtChoices']  = {}
 plotOpt['lineWid'] = '1'
-
+plotOpt['saveCSV'] = False
+plotOpt['CSVfile'] = None
+ 
 def Write2csv(fil,dataItems,header=False):
     '''Write a line to a CSV file
 
@@ -561,7 +472,8 @@ class G2PlotNoteBook(wx.Panel):
             elif Type == 'ogl':
                 Plot = self.addOgl(label)
             elif Type == '3d':
-                Plot = mp3d.Axes3D(self.add3D(label))
+                Plot = self.add3D(label).add_subplot(111, projection='3d')
+#                Plot = mp3d.Axes3D(self.add3D(label))  #doesn't work in mpl 3.6.2 (+)
             plotNum = self.plotList.index(label)
             Page = self.nb.GetPage(plotNum)
             self.SetSelectionNoRefresh(plotNum) # raises plot tab
@@ -2059,7 +1971,11 @@ def Plot3DSngl(G2frame,newPlot=False,Data=None,hklRef=None,Title=False):
         
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glLoadIdentity()
-        GL.glViewport(0,0,VS[0],VS[1])
+        if sys.platform == "darwin":
+            f = int(Page.GetContentScaleFactor())
+            GL.glViewport(0,0,f*VS[0],f*VS[1])
+        else:
+            GL.glViewport(0,0,VS[0],VS[1])
         GLU.gluPerspective(20.,aspect,cPos-Zclip,cPos+Zclip)
         GLU.gluLookAt(0,0,cPos,0,0,0,0,1,0)
         SetLights()            
@@ -2410,6 +2326,10 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                 if event.key == KeyItem[0]:
                     KeyItem[1]()
                     break
+        elif event.key == 'v' and 'PWDR' in plottype and G2frame.SinglePlot:
+            plotOpt['CSVfile'] = G2G.askSaveFile(G2frame,'','.csv',
+                                        'Comma separated variable file')
+            if plotOpt['CSVfile']: plotOpt['saveCSV'] = True
         else:
             #print('no binding for key',event.key)
             return
@@ -2889,8 +2809,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             if mode == 'Add':
                 backDict['FixedPoints'].append(xy)
                 Plot = Page.figure.gca()
-                Plot.plot(event.xdata,event.ydata,'rD',clip_on=Clip_on,
-                                picker=True,pickradius=3.)
+                Plot.plot(event.xdata,event.ydata,'rD',clip_on=Clip_on,picker=True,pickradius=3.)
                 Page.canvas.draw()
                 return
             elif G2frame.itemPicked is not None: # end of drag in move
@@ -3325,8 +3244,8 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
             kwargs={'PatternName':G2frame.GPXtree.GetItemText(G2frame.PatternId)}
             if G2frame.PickId:
                 kwargs['PickName'] = G2frame.GPXtree.GetItemText(G2frame.PickId)
-            G2frame.G2plotNB.RegisterRedrawRoutine(G2frame.G2plotNB.lastRaisedPlotTab,ReplotPattern,
-                (G2frame,newPlot,plotType),kwargs)
+            wx.CallAfter(G2frame.G2plotNB.RegisterRedrawRoutine(G2frame.G2plotNB.lastRaisedPlotTab,ReplotPattern,
+                (G2frame,newPlot,plotType),kwargs))
     except:         #skip a C++ error
         pass
     # now start plotting
@@ -3388,6 +3307,8 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                      '/: normalize']
             else:
                 Page.Choice = Page.Choice+ ['p: toggle partials (if available)',]
+            if G2frame.SinglePlot:
+                Page.Choice += ['v: CSV output of plot']
         elif plottype in ['SASD','REFD']:
             Page.Choice = [' key press',
                 'b: toggle subtract background file','g: toggle grid',
@@ -3720,7 +3641,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                 lims = G2lat.Pos2dsp(Parms,lims)
             # limit lines
             Lines.append(Plot.axvline(lims[0][0],color='g',dashes=(5,5),picker=True,pickradius=3.))    
-            Lines.append(Plot.axvline(lims[0][1],color='r',dashes=(5,5),picker=True,pickradius=3.)) 
+            Lines.append(Plot.axvline(lims[0][1],color='r',dashes=(5,5),picker=True,pickradius=3.))
             # excluded region lines
             for i,item in enumerate(lims[1:]):
                 Lines.append(Plot.axvline(item[0],color='m',dashes=(5,5),picker=True,pickradius=3.))    
@@ -3919,6 +3840,41 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                             DifLine = Plot.plot(X,D/ymax,colors[3],linewidth=1.5,
                                 picker=True,pickradius=1.,label=incCptn('diff'))                 #Io-Ic
                     Plot.axhline(0.,color='k',label='_zero')
+                    # write a .csv file; not fully tested, but probably works where allowed
+                    if 'PWDR' in plottype and G2frame.SinglePlot and plotOpt['saveCSV']:
+                        plotOpt['saveCSV'] = False
+                        fp = open(plotOpt['CSVfile'],'w')
+                        Write2csv(fp,['"limits"',lims[0][0],lims[0][1]])
+                        l = []
+                        PeakId = G2gd.GetGPXtreeItemId(G2frame,G2frame.PatternId, 'Peak List')
+                        peaks = G2frame.GPXtree.GetItemPyData(PeakId)
+                        for i,item in enumerate(peaks['peaks']):
+                            if type(item) is dict: continue
+                            pos = item[0]
+                            if Page.plotStyle['qPlot']:
+                                l.append(2.*np.pi/G2lat.Pos2dsp(Parms,pos))
+                            elif Page.plotStyle['dPlot']:
+                                l.append(G2lat.Pos2dsp(Parms,pos))
+                            else:
+                                l.append(pos)
+                        if l: Write2csv(fp,['"peaks"']+l)
+                        peaks['LaueFringe'] = peaks.get('LaueFringe',{})
+                        l = []
+                        for pos in peaks['LaueFringe'].get('satellites',[]):
+                            if Page.plotStyle['qPlot']:
+                                l.append(2.*np.pi/G2lat.Pos2dsp(Parms,pos))
+                            elif Page.plotStyle['dPlot']:
+                                l.append(G2lat.Pos2dsp(Parms,pos))
+                            else:
+                                l.append(pos)
+                        if l: Write2csv(fp,['"satellites"']+l)
+
+                        Write2csv(fp,['masked X','X','obs','calc','bkg','diff'],header=True)
+                        for i in range(len(X)):
+                            Write2csv(fp,[X[i],X.data[i],Y[i],Z[i],W[i],D[i]],header=False)
+                        fp.close()
+                        print('file',plotOpt['CSVfile'],'written')
+                        
                 Page.SetToolTipString('')
                 if PickId:
                     if G2frame.GPXtree.GetItemText(PickId) == 'Peak List':
@@ -4068,8 +4024,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
     
     if G2frame.Contour:
         time0 = time.time()
-#        acolor = mpl.cm.get_cmap(G2frame.ContourColor) #deprecated
-        acolor = mpl.colormaps[G2frame.ContourColor]
+        acolor = GetColorMap(G2frame.ContourColor)
         Vmin = Ymax*G2frame.Cmin
         Vmax = Ymax*G2frame.Cmax
         if unequalArrays:
@@ -4111,6 +4066,8 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         G2frame.Lines = Lines
         G2frame.MagLines = magMarkers
     if PickId and G2frame.GPXtree.GetItemText(PickId) == 'Background':
+        mag2th = [0]+[x for x,m in data[0].get('Magnification',[])][1:]
+        magmult = [m for x,m in data[0].get('Magnification',[])]
         # plot fixed background points
         backDict = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,G2frame.PatternId, 'Background'))[1]
         try:
@@ -4118,6 +4075,10 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
         except TypeError:
             Parms = None
         for x,y in backDict.get('FixedPoints',[]):
+            if magmult:
+                mult = magmult[np.searchsorted(mag2th, x, side = 'right')-1]
+            else:
+                mult = 1.
             # "normal" intensity modes only!
             if G2frame.SubBack or G2frame.Weight or G2frame.Contour or not G2frame.SinglePlot:
                 break
@@ -4135,7 +4096,7 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                     x = G2lat.Dsp2pos(Parms,x)
                 else:
                     break
-            Plot.plot(x,y,'rD',clip_on=Clip_on,picker=True,pickradius=10.)
+            Plot.plot(x,y*mult,'rD',clip_on=Clip_on,picker=True,pickradius=10.)
 
     # plot the partials. TODO: get partials to show up in publication plot
     plotOpt['lineList']  = ['obs','calc','bkg','zero','diff']
@@ -5713,7 +5674,7 @@ def PlotISFG(G2frame,data,newPlot=False,plotType='',peaks=None):
 #            else:
 #                Plot.plot(X,Y,colors[N%6],picker=False)
     if G2frame.Contour and len(PlotList)>1:
-        acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+        acolor = GetColorMap(G2frame.ContourColor)
         Img = Plot.imshow(ContourZ,cmap=acolor,
                     vmin=Ymax*G2frame.Cmin,vmax=Ymax*G2frame.Cmax,
                     interpolation=G2frame.Interpolate, 
@@ -5740,7 +5701,7 @@ def PlotISFG(G2frame,data,newPlot=False,plotType='',peaks=None):
             pass
         if Peaks == None:
             normcl = mpcls.Normalize(Ymin,Ymax)
-            acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+            acolor = GetColorMap(G2frame.ContourColor)
             wx.BeginBusyCursor()
             if XYlist.shape[0]>1:
                 if G2frame.Waterfall:
@@ -6148,9 +6109,9 @@ def PlotXYZ(G2frame,XY,Z,labelX='X',labelY='Y',newPlot=False,Title='',zrange=Non
     else:
         Plot.set_ylabel(r'Y',fontsize=14)
     if color is None:
-        acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+        acolor = GetColorMap(G2frame.ContourColor)
     else:
-        acolor = mpl.cm.get_cmap(color)
+        acolor = GetColorMap(color)
     if zrange is None:
         zrange=[0,Zmax*G2frame.Cmax]
     Img = Plot.imshow(Z.T,cmap=acolor,interpolation=G2frame.Interpolate,origin='lower', \
@@ -6587,7 +6548,7 @@ def PlotPowderLines(G2frame):
 
 ##### PlotPeakWidths            
 def PlotPeakWidths(G2frame,PatternName=None):
-    ''' Plotting of instrument broadening terms as function of 2-theta
+    ''' Plotting of instrument broadening terms as function of Q
     Seen when "Instrument Parameters" chosen from powder pattern data tree.
     Parameter PatternName allows the PWDR to be referenced as a string rather than
     a wx tree item, defined in G2frame.PatternId. 
@@ -6744,36 +6705,58 @@ def PlotPeakWidths(G2frame,PatternName=None):
             Plot.plot(Qp,Gp,'+',color='m',label='Lorentzian peak')
         Plot.legend(loc='best')
     elif 'E' in Parms['Type'][0]:
+        Plot.set_ylabel(r'$\Delta Q/Q, \Delta d/d, \Delta E/E$',fontsize=14)
         isig = 4
+        igam = 6
         Xmin,Xmax = limits[1]
         X = np.linspace(Xmin,Xmax,num=101,endpoint=True)
-        Q = 2.*np.pi*X*npsind(tth/2.)/12.3986
+        EtoQ = 4.*np.pi*npsind(tth/2.)/12.3986
+        Q = EtoQ*X
         Z = np.ones_like(X)
         data = G2mth.setPeakparms(Parms,Parms2,X,Z)
-        # if np.any(data[isig] < 0.):
-        #     negWarn = True
-        s = np.sqrt(data[isig])   #var -> sig(radians)
+        s = np.sqrt(data[isig])
+        g = data[igam]
+        G = G2pwd.getgamFW(g,s)
         Y = sq8ln2*s/X
+        Z = g/X
+        W = G/X
         Plot.plot(Q,Y,color='r',label='Gaussian')
+        Plot.plot(Q,Z,color='g',label='Lorentzian')
+        Plot.plot(Q,W,color='b',label='G+L')
         
         fit = G2mth.setPeakparms(Parms,Parms2,X,Z,useFit=True)
-        if np.any(fit[isig] < 0.):
-            negWarn = True
+        for did in [isig,igam]:
+            if np.any(fit[did] < 0.):
+                negWarn = True
         sf = np.sqrt(fit[isig])
+        gf = fit[igam]
+        Gf = G2pwd.getgamFW(gf,sf)
         Yf = sq8ln2*sf/X
+        Zf = gf/X
+        Wf = Gf/X
         Plot.plot(Q,Yf,color='r',dashes=(5,5),label='Gaussian fit')
-        
+        Plot.plot(Q,Zf,color='g',dashes=(5,5),label='Lorentzian fit')
+        Plot.plot(Q,Wf,color='b',dashes=(5,5),label='G+L fit')
+
         Xp = []
         Yp = []
+        Zp = []
+        Wp = []
         for peak in peaks:
-            Xp.append(2.*np.pi*peak[0]*npsind(tth/2.)/12.3986)
+            Xp.append(EtoQ*peak[0])
             try:
                 s = math.sqrt(peak[isig])
+                g = peak[igam]
             except ValueError:
                 s = 0.01
+            G = G2pwd.getgamFW(g,s)         #/2.
             Yp.append(sq8ln2*s/peak[0])
+            Zp.append(g/peak[0])
+            Wp.append(G/peak[0])
         if len(peaks):
             Plot.plot(Xp,Yp,'+',color='r',label='G peak')
+            Plot.plot(Xp,Zp,'+',color='g',label='L peak')
+            Plot.plot(Xp,Wp,'+',color='b',label='G+L peak')
         legend = Plot.legend(loc='best')
         SetupLegendPick(legend,new)
         Page.canvas.draw()
@@ -6790,9 +6773,6 @@ def PlotPeakWidths(G2frame,PatternName=None):
         Q = 4.*np.pi*npsind(X/2.)/lam
         Z = np.ones_like(X)
         data = G2mth.setPeakparms(Parms,Parms2,X,Z)
-        # for did in [isig,igam]:
-        #     if np.any(data[did] < 0.):
-        #         negWarn = True
         s = np.sqrt(data[isig])*np.pi/18000.   #var -> sig(radians)
         g = data[igam]*np.pi/18000.    #centideg -> radians
         G = G2pwd.getgamFW(g,s)     #/2.  #delt-theta from TCH fxn
@@ -7123,7 +7103,7 @@ def PlotSizeStrainPO(G2frame,data,hist='',Start=False):
             Plot.clabel(CS,fontsize=9,inline=1)
         except ValueError:
             pass
-        acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+        acolor = GetColorMap(G2frame.ContourColor)
         Img = Plot.imshow(Z.T,aspect='equal',cmap=acolor,extent=[-1,1,-1,1],interpolation='bilinear')
         Plot.plot(y,x,'+',picker=True,pickradius=3)
         Page.figure.colorbar(Img)
@@ -7248,7 +7228,7 @@ def PlotTexture(G2frame,data,Start=False):
                 Plot.clabel(CS,fontsize=9,inline=1)
             except ValueError:
                 pass
-            acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+            acolor = GetColorMap(G2frame.ContourColor)
             Img = Plot.imshow(Z.T,aspect='equal',cmap=acolor,extent=[-1,1,-1,1],interpolation='bilinear')
             Page.figure.colorbar(Img)
             x,y,z = SHData['PFxyz']
@@ -7303,7 +7283,7 @@ def PlotTexture(G2frame,data,Start=False):
                 Plot.clabel(CS,fontsize=9,inline=1)
             except ValueError:
                 pass
-            acolor = mpl.cm.get_cmap(G2frame.ContourColor)
+            acolor = GetColorMap(G2frame.ContourColor)
             Img = Plot.imshow(Z.T,aspect='equal',cmap=acolor,extent=[-1,1,-1,1],interpolation='bilinear')
             Page.figure.colorbar(Img)
             if 'det Angles' in textureData and textureData['ShoDet']:
@@ -7428,7 +7408,7 @@ def ModulationPlot(G2frame,data,atom,ax,off=0):
     Plot.set_xlabel('t')
     Plot.set_ylabel(r'$\mathsf{\Delta}$%s'%(Ax))
     Slab = np.hstack((slab,slab,slab))   
-    acolor = mpl.cm.get_cmap('RdYlGn')
+    acolor = GetColorMap('RdYlGn')
     if 'delt' in MapType:
         Plot.contour(Slab[:,:21],20,extent=(0.,2.,-.5+Doff,.5+Doff),cmap=acolor)
     else:
@@ -7533,7 +7513,7 @@ def PlotCovariance(G2frame,Data):
     G2frame.G2plotNB.status.SetStatusText('',1)
     G2frame.G2plotNB.status.SetStatusWidths([G2frame.G2plotNB.status.firstLen,-1])
     if Page.varyList:
-        acolor = mpl.cm.get_cmap(G2frame.VcovColor)
+        acolor = GetColorMap(G2frame.VcovColor)
         Img = Plot.imshow(Page.covArray,aspect='equal',cmap=acolor,interpolation='nearest',origin='lower',
             vmin=-1.,vmax=1.)   #,extent=[0.5,nVar+.5,0.5,nVar+.5])
         imgAx = Img.axes
@@ -7668,7 +7648,7 @@ def PlotRama(G2frame,phaseName,Rama,RamaName,Names=[],PhiPsi=[],Coeff=[]):
     Page.Choice = ['s: to change colors']
     Page.keyPress = OnPlotKeyPress
     G2frame.G2plotNB.status.SetStatusText('Use mouse LB to identify phi/psi atoms',1)
-    acolor = mpl.cm.get_cmap(G2frame.RamaColor)
+    acolor = GetColorMap(G2frame.RamaColor)
     if RamaName == 'All' or '-1' in RamaName:
         if len(Coeff): 
             X,Y = np.meshgrid(np.linspace(-180.,180.,45),np.linspace(-180.,180.,45))
@@ -8776,7 +8756,7 @@ def PlotImage(G2frame,newPlot=False,event=None,newImage=True):
     xlim = (0,Xmax)
     ylim = (Ymax,0)
     Imin,Imax = Data['range'][1]
-    acolor = mpl.cm.get_cmap(Data['color'])
+    acolor = GetColorMap(Data['color'])
     xcent,ycent = Data['center']
     if Data['det2theta']:
         xcent += Data['distance']*nptand(Data['tilt']*npsind(Data['rotation'])+Data['det2theta'])
@@ -9023,7 +9003,7 @@ def PlotIntegration(G2frame,newPlot=False,event=None):
     xsc = G2frame.Integrate[1]
     ysc = G2frame.Integrate[2]
     Imin,Imax = Data['range'][1]
-    acolor = mpl.cm.get_cmap(Data['color'])
+    acolor = GetColorMap(Data['color'])
     Plot.set_title(G2frame.GPXtree.GetItemText(G2frame.Image)[4:])
     Plot.set_ylabel('azimuth',fontsize=12)
     Plot.set_xlabel('2-theta',fontsize=12)
@@ -9084,7 +9064,7 @@ def PlotTRImage(G2frame,tax,tay,taz,newPlot=False):
     Imin,Imax = Data['range'][1]
     step = (Imax-Imin)/5.
     V = np.arange(Imin,Imax,step)
-    acolor = mpl.cm.get_cmap(Data['color'])
+    acolor = GetColorMap(Data['color'])
     Plot.set_title(G2frame.GPXtree.GetItemText(G2frame.Image)[4:])
     Plot.set_xlabel('azimuth',fontsize=12)
     Plot.set_ylabel('2-theta',fontsize=12)
@@ -10414,7 +10394,11 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
             
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glLoadIdentity()
-        GL.glViewport(0,0,VS[0],VS[1])
+        if sys.platform == "darwin":
+            f = int(Page.GetContentScaleFactor())
+            GL.glViewport(0,0,f*VS[0],f*VS[1])
+        else:
+            GL.glViewport(0,0,VS[0],VS[1])
         GLU.gluPerspective(20.,aspect,cPos-Zclip,cPos+Zclip)
         GLU.gluLookAt(0,0,cPos,0,0,0,0,1,0)
         SetLights()
@@ -10709,7 +10693,7 @@ def PlotStructure(G2frame,data,firstCall=False,pageCallback=None):
             if drawingData.get('showSlice') in [1,]:
                 contourSet = ax0.contour(Z,colors='k',linewidths=1)
             if drawingData.get('showSlice') in [2,3]:
-                acolor = mpl.cm.get_cmap(drawingData.get('contourColor','Paired'))                    
+                acolor = GetColorMap(drawingData.get('contourColor','Paired'))                    
                 ax0.imshow(ZU,aspect='equal',cmap=acolor,alpha=0.7,interpolation='bilinear')
                 if drawingData.get('showSlice') in [3,]:
                     contourSet = ax0.contour(ZU,colors='k',linewidths=1)
@@ -11018,7 +11002,11 @@ def PlotBeadModel(G2frame,Atoms,defaults,PDBtext):
         
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glLoadIdentity()
-        GL.glViewport(0,0,VS[0],VS[1])
+        if sys.platform == "darwin":
+            f = int(Page.GetContentScaleFactor())
+            GL.glViewport(0,0,f*VS[0],f*VS[1])
+        else:
+            GL.glViewport(0,0,VS[0],VS[1])
         GLU.gluPerspective(50.,aspect,1.,500.)
         GLU.gluLookAt(0,0,cPos,0,0,0,0,1,0)
         SetLights()            
@@ -11306,7 +11294,11 @@ def PlotRigidBody(G2frame,rbType,AtInfo,rbData,defaults):
         
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glLoadIdentity()
-        GL.glViewport(0,0,VS[0],VS[1])
+        if sys.platform == "darwin":
+            f = int(Page.GetContentScaleFactor())
+            GL.glViewport(0,0,f*VS[0],f*VS[1])
+        else:
+            GL.glViewport(0,0,VS[0],VS[1])
         GLU.gluPerspective(20.,aspect,1.,500.)
         GLU.gluLookAt(0,0,cPos,0,0,0,0,1,0)
         SetLights()            
@@ -11810,7 +11802,11 @@ def PlotLayers(G2frame,Layers,laySeq,defaults):
         
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glLoadIdentity()
-        GL.glViewport(0,0,VS[0],VS[1])
+        if sys.platform == "darwin":
+            f = int(Page.GetContentScaleFactor())
+            GL.glViewport(0,0,f*VS[0],f*VS[1])
+        else:
+            GL.glViewport(0,0,VS[0],VS[1])
         GLU.gluPerspective(20.,aspect,1.,500.)
         GLU.gluLookAt(0,0,cPos,0,0,0,0,1,0)
         SetLights()            

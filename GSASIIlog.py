@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
 #GSASIIlog - Routines used to track and replay "actions"
 ########### SVN repository information ###################
-# $Date: 2021-02-03 11:50:38 -0600 (Wed, 03 Feb 2021) $
+# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
 # $Author: toby $
-# $Revision: 4800 $
+# $Revision: 5572 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIlog.py $
-# $Id: GSASIIlog.py 4800 2021-02-03 17:50:38Z toby $
+# $Id: GSASIIlog.py 5572 2023-05-10 02:43:48Z toby $
 ########### SVN repository information ###################
 '''
-*GSASIIlog: Logging of "Actions"*
----------------------------------
-
 Module to provide logging services, e.g. track and replay "actions"
 such as menu item, tree item, button press, value change and so on. 
 

@@ -2,16 +2,13 @@
 # -*- coding: utf-8 -*-
 #defaultIparms
 ########### SVN repository information ###################
-# $Date: 2020-09-28 13:23:10 -0500 (Mon, 28 Sep 2020) $
-# $Author: toby $
-# $Revision: 4578 $
+# $Date: 2023-07-18 09:34:20 -0500 (Tue, 18 Jul 2023) $
+# $Author: vondreele $
+# $Revision: 5629 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/defaultIparms.py $
-# $Id: defaultIparms.py 4578 2020-09-28 18:23:10Z toby $
+# $Id: defaultIparms.py 5629 2023-07-18 14:34:20Z vondreele $
 ########### SVN repository information ###################
 '''
-*defaultIparms: Table of instrument parameters*
------------------------------------------------
-
 Defines some default instrument parameters.
 Format for each is a list of strings finished with a '\n'.
 Begin with '#GSAS-II...' as the reader routine checks this.
@@ -63,6 +60,14 @@ defaultIparms.append([
     'X:-0.0977791308891;Y:4.40147397286;Z:0.0;SH/L:0.0264356231583\n',
 ])
 
+defaultIparm_lbl.append('X-ray EDS data')
+defaultIparms.append([
+    '#GSAS-II instrument parameter file energy dispersive data\n',
+    'Type:PXE;Bank:1\n',
+    '2-theta:5.000;XE:10.0;YE:0.0488;ZE:0.0\n',
+    'A:0.0;B:0.0005;C:.005\n',
+    'X:0.0;Y:0.0;Z:0.0\n',
+])
 defaultIparm_lbl.append('1.9A ILL D1A CW data')
 defaultIparms.append([
     '#GSAS-II instrument parameter file\n',

@@ -1,19 +1,14 @@
 # -*- coding: utf-8 -*-
 #GSASIIdataGUI - Main GUI routines
 #========== SVN repository information ###################
-# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
+# $Date: 2023-08-31 16:58:38 -0500 (Thu, 31 Aug 2023) $
 # $Author: toby $
-# $Revision: 5529 $
+# $Revision: 5655 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIdataGUI.py $
-# $Id: GSASIIdataGUI.py 5529 2023-04-02 19:20:32Z toby $
+# $Id: GSASIIdataGUI.py 5655 2023-08-31 21:58:38Z toby $
 #=========- SVN repository information ###################
 '''
-*GSASIIdataGUI: Main GSAS-II GUI*
-------------------------------------
-
-Module that defines GUI routines and classes for the main GUI Frame (window)
-and the main routines that define the GSAS-II tree panel and much of the
-data editing panel. 
+Routines for main GUI wx.Frame follow. 
 '''
 from __future__ import division, print_function
 import platform
@@ -63,7 +58,7 @@ try:
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5529 $")
+GSASIIpath.SetVersionNumber("$Revision: 5655 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIfiles as G2fil
@@ -369,8 +364,8 @@ should generate warnings or error messages.
    removing code that is specific to Python 2.7. 
  * A problem has been noted with wx4.0.7.post2 with Python 3.10 that we can't 
    yet duplicate (2/4/22).
- * We anticipate that Python 3.10 will flag code that previously worked fine,
-   because it reports an errors where we pass a floating point number to a 
+ * We anticipate that Python 3.10+ will flag code that previously worked fine,
+   because it reports errors where we pass a floating point number to a 
    wxpython routine that expects a int value. We are fixing these as we learn about them.
 
 * wxPython:
@@ -382,6 +377,8 @@ should generate warnings or error messages.
    some issues with Python 3.x. 
  * wxpython 4.1 has some serious internal bugs with Python 3.10+ so we recommend 
    4.2+ for compatibility with newer Python versions.
+ * 4.2.0 has a problem on MacOS where buttons w/default size are not displayed properly.
+   (see https://github.com/wxWidgets/Phoenix/issues/2319). Worked around (mostly?) in our code. 
 
 * Matplotlib:
 
@@ -391,6 +388,9 @@ should generate warnings or error messages.
     3-D surfaces, such as microstrain vs crystal axes. The plots may appear 
     distorted as the lengths of x, y & z will not be constrained as equal.
     Preferably use 3.0.x as 3.3.x is not fully tested.
+  * between 3.3.x vs 3.6.x there seems to be a change in how 3d graphics
+    are handled; we seem to have this fixed, but not sure how <3.3 will work. 
+    Since 3.1 & 3.2 have problems; warn w/mpl <3.3.0
 
 * numpy: 
 
@@ -399,17 +399,17 @@ should generate warnings or error messages.
 
 '''
 # add comments above when changing anything below
-versionDict['tooOld'] = {'matplotlib': '1.', 'Python':'2.7'}
+versionDict['tooOld'] = {'matplotlib': '2.', 'Python':'2.7'}
 'modules that will certainly fail'
-versionDict['tooOldWarn'] = {'wx': '2.','Python':'3.6'}
+versionDict['tooOldWarn'] = {'wx': '3.99','Python':'3.6','matplotlib': '3.2.99'}
 'modules that may fail and should be updated'
 versionDict['badVersionWarn'] = {'numpy':['1.16.0'],
                                  'matplotlib': ['3.1','3.2'],
                                  'wx':['4.1']}
 'versions of modules that are known to have bugs'
-versionDict['tooNewWarn'] = {'wx':'4.2'}
+versionDict['tooNewWarn'] = {} 
 'module versions newer than what we have tested & where problems are suspected'
-versionDict['tooNewUntested'] = {'Python':'3.11'}
+versionDict['tooNewUntested'] = {'Python':'3.11','wx': '4.2.1'}  # still catching up to wx4.2.0
 'module versions newer than what we have tested but no problems are suspected'
 
 def ShowVersions():
@@ -457,7 +457,8 @@ def ShowVersions():
         if s in versionDict['tooNewUntested'] and not warn:
             match = compareVersions(pkgver,versionDict['tooNewUntested'][s])
             if match >= 0:
-                msg += "New version not tested; please keep us posted"
+                msg += "\n              "
+                msg += "New untested version; please keep us posted"
                 warn = True
         if s in versionDict['tooNewWarn'] and not warn:
             match = compareVersions(pkgver,versionDict['tooNewWarn'][s])
@@ -516,11 +517,17 @@ def ShowVersions():
     #elif GSASIIpath.GetConfigValue('debug'):
     #    print('N.B. current binaries have been updated')
     if warn:
-        print(70*'=',
-            '\nYou are suggested to install a new version of GSAS-II. See\nhttps://bit.ly/G2install',
-              '\n\nFor information on GSAS-II package requirements see\nhttps://gsas-ii.readthedocs.io/en/latest/packages.html',
-              '\n'+70*'=')
-    print()
+        print(70*'=','''
+You are running GSAS-II in a Python environment with either untested 
+or known to be problematic packages, as noted above. If you are seeing 
+problems in running GSAS-II you are suggested to install an additional 
+copy of GSAS-II from one of the gsas2full installers (see 
+https://bit.ly/G2install). This will provide a working Python 
+environment as well as the latest GSAS-II version. 
+
+For information on GSAS-II package requirements see 
+https://gsas-ii.readthedocs.io/en/latest/packages.html
+''',70*'=','\n')
 
 def TestOldVersions():
     '''Test the versions of required Python packages, etc.
@@ -728,16 +735,27 @@ class GSASII(wx.Frame):
             item = parent.Append(wx.ID_ANY,'Edit proxy...','Edit proxy internet information (used for updates)')
             self.Bind(wx.EVT_MENU, self.EditProxyInfo, id=item.GetId())
         if GSASIIpath.GetConfigValue('debug'):
-            def OnIPython(event):
-                GSASIIpath.IPyBreak()
-            item = parent.Append(wx.ID_ANY,"IPython Console",'')
-            self.Bind(wx.EVT_MENU, OnIPython, item)
+            try: 
+                import IPython
+                item = parent.Append(wx.ID_ANY,"IPython Console",'')
+                self.Bind(wx.EVT_MENU,
+                              lambda event:GSASIIpath.IPyBreak(),
+                              item)
+            except ImportError:
+                pass
             def OnwxInspect(event):
                 import wx.lib.inspection as wxeye
                 wxeye.InspectionTool().Show()
             item = parent.Append(wx.ID_ANY,"wx inspection tool",'')
             self.Bind(wx.EVT_MENU, OnwxInspect, item)
+            item = parent.Append(wx.ID_ANY,'Reopen current\tCtrl+0','Reread the current GSAS-II project (.gpx) file')
+            self.Bind(wx.EVT_MENU, self.OnFileReread, id=item.GetId())
             
+        item = parent.Append(wx.ID_ANY,"Install GSASIIscriptable shortcut",'')
+        self.Bind(wx.EVT_MENU,
+                      lambda event: GSASIIpath.makeScriptShortcut(),
+                      item)
+
         item = parent.Append(wx.ID_EXIT,'Exit\tALT+F4','Exit from GSAS-II')
         self.Bind(wx.EVT_MENU, self.ExitMain, id=item.GetId())
         
@@ -1502,6 +1520,9 @@ class GSASII(wx.Frame):
     def _Add_ImportMenu_powder(self,parent):
         '''configure the Powder Data menus accord to the readers found in _init_Imports
         '''
+        def OnAutoImport(event):
+            G2G.AutoLoadFiles(self,FileTyp='pwd')
+            
         submenu = wx.Menu()
         item = parent.AppendSubMenu(submenu,'Powder Data','Import Powder data')
         for reader in self.ImportPowderReaderlist:
@@ -1514,8 +1535,6 @@ class GSASII(wx.Frame):
         item = submenu.Append(wx.ID_ANY,'Simulate a dataset','Create a powder data set entry that will be simulated')
         self.Bind(wx.EVT_MENU, self.OnDummyPowder, id=item.GetId())
         item = submenu.Append(wx.ID_ANY,'Auto Import','Import data files as found')
-        def OnAutoImport(event):
-            G2G.AutoLoadFiles(self,FileTyp='pwd')
         self.Bind(wx.EVT_MENU, OnAutoImport, id=item.GetId())
         
         item = submenu.Append(wx.ID_ANY,'Fit instr. profile from fundamental parms...','')
@@ -2021,6 +2040,8 @@ class GSASII(wx.Frame):
             Tmin1 = Tmin
             if 'NT' in Iparm1['Type'][0] and G2lat.Pos2dsp(Iparm1,Tmin) < 0.4:                
                 Tmin1 = G2lat.Dsp2pos(Iparm1,0.4)
+            if 'PXE' in Iparm1['Type'][0]:
+                Iparm1.update(rd.Inst)
             self.GPXtree.SetItemPyData(
                 self.GPXtree.AppendItem(Id,text='Limits'),
                 rd.pwdparms.get('Limits',[(Tmin,Tmax),[Tmin1,Tmax]])
@@ -3250,7 +3271,7 @@ class GSASII(wx.Frame):
         self.dirname = os.path.abspath(os.path.expanduser('~'))       #start in the users home directory by default; may be meaningless
         self.TutorialImportDir = None  # location to read tutorial files, set when a tutorial is viewed
         self.LastImportDir = None # last-used directory where an import was done
-        self.LastGPXdir = None    # directory where a GPX file was last  or saved
+        self.LastGPXdir = ''    # directory where a GPX file was last or saved
         self.LastExportDir = None  # the last directory used for exports, if any.
         self.dataDisplay = None
         self.init_vars()
@@ -4361,30 +4382,55 @@ class GSASII(wx.Frame):
         else:
             print('file not found',f)        
         
-    def _SaveOld(self):
+    def OnFileReread(self, event):
+        '''reread the current GPX file; no questions asked -- no save
+        for development purposes.
+        '''
+        def _setStart(nameParent,name):
+            '''Reload the last selected tree item by name'''
+            start = self.root
+            if GetGPXtreeItemId(self,self.root,nameParent):
+                start = GetGPXtreeItemId(self,self.root,nameParent)
+            Id = GetGPXtreeItemId(self,start,name)
+            #breakpoint()
+            self.GPXtree.SelectItem(Id)
+            SelectDataTreeItem(self,Id)
+        Id = self.GPXtree.GetSelection()
+        parent = self.GPXtree.GetItemParent(Id)
+        name = self.GPXtree.GetItemText(Id)
+        nameParent = self.GPXtree.GetItemText(parent)
+        f = os.path.join(self.LastGPXdir,self.GSASprojectfile)
+        if os.path.exists(f):
+            self.OnFileOpen(event, filename=f, askSave=False)
+        else:
+            print('file not found',f)
+        wx.CallLater(100,_setStart,nameParent,name)
+        
+    def _SaveOld(self,askSave=True):
         '''See if we should save current project and continue 
         to read another.
         returns True if the project load should continue
         '''
         if self.dataWindow:
             self.dataWindow.ClearData()
+        if self.dataWindow and askSave:
             dlg = wx.MessageDialog(self,
                     'Do you want to save and replace the current project?\n'
                     '(Use No to read without saving or Cancel to continue '
                     'with current project)',
                 'Save & Overwrite?',
                 wx.YES|wx.NO|wx.CANCEL)
-        try:
-            result = dlg.ShowModal()
-        finally:
-            dlg.Destroy()
-        if result == wx.ID_NO:
-            result = True
-        elif result == wx.ID_CANCEL:
-            return False
-        else:
-            if not self.OnFileSave(None):
+            try:
+                result = dlg.ShowModal()
+            finally:
+                dlg.Destroy()
+            if result == wx.ID_NO:
+                result = True
+            elif result == wx.ID_CANCEL:
                 return False
+            else:
+                if not self.OnFileSave(None):
+                    return False
         self.GPXtree.DeleteChildren(self.root)
         self.GSASprojectfile = ''
         self.HKL = []
@@ -4393,7 +4439,7 @@ class GSASII(wx.Frame):
             self.G2plotNB.clear()
         return True
         
-    def OnFileOpen(self, event, filename=None):
+    def OnFileOpen(self, event, filename=None, askSave=True):
         '''Gets a GSAS-II .gpx project file in response to the
         File/Open Project menu button
         '''
@@ -4416,7 +4462,7 @@ class GSASII(wx.Frame):
             
         self.EnablePlot = False
         if self.GPXtree.GetChildrenCount(self.root,False):
-            if not self._SaveOld(): return
+            if not self._SaveOld(askSave=askSave): return
 
         if not filename:
             GetGPX()
@@ -5460,7 +5506,9 @@ class GSASII(wx.Frame):
         Controls = self.GPXtree.GetItemPyData(GetGPXtreeItemId(self,self.root, 'Controls'))
         if Controls.get('newLeBail',False):
             dlgtxt = '''Do Le Bail refinement of intensities first?
-    recommended after major parameter changes'''
+            
+    If Yes, resets starting structure factors; recommended after major parameter changes.
+    If No, then previous structure factors are used.'''
             dlgb = wx.MessageDialog(self,dlgtxt,'Le Bail Refinement',style=wx.YES_NO)            
             result = wx.ID_NO
             try:
@@ -5955,7 +6003,9 @@ class GSASII(wx.Frame):
             histNames.reverse()
         if Controls.get('newLeBail',False):
             dlgtxt = '''Do Le Bail refinement of intensities first?
-    recommended after major parameter changes'''
+            
+    If Yes, resets starting structure factors; recommended after major parameter changes.    
+    If No, then previous structure factors are used.'''
             dlgb = wx.MessageDialog(self,dlgtxt,'Le Bail Refinement',style=wx.YES_NO)            
             result = wx.ID_NO
             try:
@@ -6824,7 +6874,7 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         # Phase / General tab
         G2G.Define_wxId('wxID_FOURCALC', 'wxID_FOURSEARCH', 'wxID_FOURCLEAR','wxID_CHARGEFLIP','wxID_VALIDPROTEIN', 
             'wxID_MULTIMCSA','wxID_SINGLEMCSA', 'wxID_4DCHARGEFLIP', 'wxID_TRANSFORMSTRUCTURE','wxID_USEBILBAOMAG',
-            'wxID_COMPARESTRUCTURE','wxID_COMPARECELLS')
+            'wxID_COMPARESTRUCTURE','wxID_COMPARECELLS','wxID_USEBILBAOSUB')
         self.DataGeneral = wx.MenuBar()
         self.PrefillDataMenu(self.DataGeneral)
         self.DataGeneral.Append(menu=wx.Menu(title=''),title='Select tab')
@@ -6842,13 +6892,15 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         self.GeneralCalc.Append(G2G.wxID_COMPARECELLS,'Compare Cells','Compare Unit Cells using NIST*LATTICE')
         self.GeneralCalc.Append(G2G.wxID_COMPARESTRUCTURE,'Compare polyhedra','Compare polyhedra to ideal octahedra/tetrahedra')
         self.GeneralCalc.Enable(G2G.wxID_COMPARESTRUCTURE,False)   
-        self.GeneralCalc.Append(G2G.wxID_USEBILBAOMAG,'Select magnetic/subgroup phase','If disabled, make in PWDR/Unit Cells')        
+        self.GeneralCalc.Append(G2G.wxID_USEBILBAOMAG,'Select magnetic/subgroup phase','If disabled, make in PWDR/Unit Cells')
+        self.GeneralCalc.Append(G2G.wxID_USEBILBAOSUB,'Make subgroup project file(s)','Requires subcell search in PWDR/Unit Cells')
         self.GeneralCalc.Append(G2G.wxID_VALIDPROTEIN,'Protein quality','Protein quality analysis')
         self.PostfillDataMenu()
         
         # Phase / Data tab or Hist/Phase menu (used in one place or other)
         G2G.Define_wxId('wxID_DATACOPY', 'wxID_DATACOPYFLAGS', 'wxID_DATASELCOPY', 'wxID_DATAUSE',
-            'wxID_PWDRADD', 'wxID_HKLFADD','wxID_DATADELETE', )
+            'wxID_PWDRADD', 'wxID_HKLFADD','wxID_DATADELETE',
+            'wxID_DATASELREAD', )
         self.DataMenu = wx.MenuBar()
         self.PrefillDataMenu(self.DataMenu)
         self.DataMenu.Append(menu=wx.Menu(title=''),title='Select tab')
@@ -6864,6 +6916,7 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         G2G.Define_wxId('wxID_DATADIJ')
         self.DataEdit.Append(G2G.wxID_DATADIJ,'Apply Strain to Lattice Constants',
                              'Shift cell by Dij of selected histogram')
+        self.DataEdit.Append(G2G.wxID_DATASELREAD,'Read selected data from .gpx','Read selected phase/hist data from a saved GSAS-II project')
         self.PostfillDataMenu()
             
         # Phase / Atoms tab
@@ -7448,13 +7501,6 @@ def UpdateControls(G2frame,data):
     mainSizer.Add(subSizer,0,wx.EXPAND)
     mainSizer.Add(SeqSizer())
     mainSizer.Add((5,15),0)
-    # G2G.HorizontalLine(mainSizer,G2frame.dataWindow)
-    # subSizer = wx.BoxSizer(wx.HORIZONTAL)
-    # subSizer.Add((-1,-1),1,wx.EXPAND)
-    # subSizer.Add(wx.StaticText(G2frame.dataWindow,label='Cluster Analysis Settings'),0,WACV)    
-    # subSizer.Add((-1,-1),1,wx.EXPAND)
-    # mainSizer.Add(subSizer,0,wx.EXPAND)
-    # mainSizer.Add((5,15),0)
     G2G.HorizontalLine(mainSizer,G2frame.dataWindow)
     subSizer = wx.BoxSizer(wx.HORIZONTAL)
     subSizer.Add((-1,-1),1,wx.EXPAND)
@@ -7816,8 +7862,16 @@ def UpdatePWHKPlot(G2frame,kind,item):
         mainSizer.Add(simSizer)
         mainSizer.Add(but,0)
     if 'Nobs' in data[0]:
-        mainSizer.Add(wx.StaticText(G2frame.dataWindow,-1,
-            ' Data residual wR: %.3f%% on %d observations'%(data[0]['wR'],data[0]['Nobs'])))
+        Rmsg = f" Data residual wR: {data[0]['wR']:.3f}% on {data[0]['Nobs']} observations"
+        covdata = G2frame.GPXtree.GetItemPyData(GetGPXtreeItemId(G2frame,G2frame.root,'Covariance'))
+        if 'Rvals' in covdata:
+            Rvals = covdata['Rvals']
+            if 'chisq' in Rvals and 'sumwYo' in data[0]:
+                # compute Chi**2 contribution from Rwp
+                chisq = (data[0]['wR']/100)**2 * data[0]['sumwYo']
+                frac = f"{100 * chisq / Rvals['chisq']:.1f}"
+                Rmsg += f". Contributes {frac}% to Chi**2"
+        mainSizer.Add(wx.StaticText(G2frame.dataWindow,wx.ID_ANY,Rmsg))
         if kind == 'PWDR':
             try:    #old gpx file
                 DBW = ma.getdata(data[0]['Durbin-Watson'])
@@ -8096,7 +8150,7 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
             if 'Rvals' in data:
                 Nvars = len(data['varyList'])
                 Rvals = data['Rvals']
-                text = ('\nResiduals after last refinement:                                       \n'+
+                text = ('\nTotal residuals after last refinement:                                       \n'+
                         '\twR = {:.3f}\n\tchi**2 = {:.1f}\n\tGOF = {:.2f}').format(
                         Rvals['Rwp'],Rvals['chisq'],Rvals['GOF'])
                 text += '\n\tNobs = {}\n\tNvals = {}\n\tSVD zeros = {}'.format(
@@ -8108,9 +8162,16 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
                 if '2' not in platform.python_version_tuple()[0]: # greek OK in Py2?
                     text += '\n\tReduced χ**2 = {:.2f}'.format(Rvals['GOF']**2)
                 subSizer.Add(wx.StaticText(G2frame.dataWindow,wx.ID_ANY,text))
+                if Rvals.get('RestraintSum',0) > 0:
+                    chisq_data = (Rvals['chisq']-Rvals['RestraintSum'])/(Rvals['Nobs']-Rvals['Nvars'])
+                    lbl = '\nData-only residuals (without restraints)'
+                    lbl += f'\n\tGOF = {np.sqrt(chisq_data):.2f}'
+                    lbl += f'\n\tReduced χ**2 = {chisq_data:.2f}'
+                    subSizer.Add(wx.StaticText(G2frame.dataWindow,label=lbl))
                 if 'Lastshft' in data and not data['Lastshft'] is None:
                     showShift = wx.Button(G2frame.dataWindow,label='Show shift/esd plot')
                     showShift.Bind(wx.EVT_BUTTON,OnShowShift)
+                    subSizer.Add((-1,10))
                     subSizer.Add(showShift)
             mainSizer.Add(subSizer)
             mainSizer.Add(G2G.HelpButton(G2frame.dataWindow,helpIndex='Covariance'))
@@ -8287,8 +8348,8 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
         #     import importlib as imp
         #     imp.reload(G2pdG)
         #     imp.reload(G2pwd)
-        #     imp.reload(G2plt)
-        #     print('reloading G2pdG')
+        #     #imp.reload(G2plt)
+        #     print('reloading G2pwdGUI and G2pwd')
         G2pdG.UpdatePeakGrid(G2frame,data)
         newPlot = False
         if hasattr(G2frame,'Contour'):

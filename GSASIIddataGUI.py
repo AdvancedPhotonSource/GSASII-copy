@@ -1,35 +1,28 @@
 # -*- coding: utf-8 -*-
 #GSASII - phase data display routines
 ########### SVN repository information ###################
-# $Date: 2022-12-25 14:51:17 -0600 (Sun, 25 Dec 2022) $
-# $Author: toby $
-# $Revision: 5446 $
+# $Date: 2023-08-10 08:53:51 -0500 (Thu, 10 Aug 2023) $
+# $Author: vondreele $
+# $Revision: 5645 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIddataGUI.py $
-# $Id: GSASIIddataGUI.py 5446 2022-12-25 20:51:17Z toby $
+# $Id: GSASIIddataGUI.py 5645 2023-08-10 13:53:51Z vondreele $
 ########### SVN repository information ###################
-'''
-*GSASIIddataGUI: Phase Diffraction Data GUI*
---------------------------------------------
-
-Module to create the GUI for display of diffraction data * phase
-information that is shown in the data display window
-(when a phase is selected.)
-
+'''Routines for Data tab in Phase dataframe follows. 
 '''
 from __future__ import division, print_function
 import copy
 import numpy as np
 import numpy.linalg as nl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5446 $")
+GSASIIpath.SetVersionNumber("$Revision: 5645 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIplot as G2plt
 import GSASIIpwd as G2pwd
 import GSASIIphsGUI as G2phG
 import GSASIIctrlGUI as G2G
-import GSASIIpy3 as G2py3
 import GSASIIdataGUI as G2gd
+import GSASIIfiles as G2fil
 
 try:
     import wx
@@ -456,7 +449,7 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
             laue = generalData['SGData']['SGLaue']
             if laue == '2/m':
                 laue += generalData['SGData']['SGUniq']
-            for cellGUI in G2py3.cellGUIlist:
+            for cellGUI in G2fil.cellGUIlist:
                 if laue in cellGUI[0]:
                     useGUI = cellGUI
                     break
@@ -525,7 +518,7 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
                 'Penalty hkls',hkls,filterBox=False)
             try:
                 if dlg.ShowModal() == wx.ID_OK:
-                    POData[6] = [hkls[i] for i in dlg.GetSelections()]
+                    POData[6] = [hkls[i].split(':')[0] for i in dlg.GetSelections()]
                     if not POData[6]:
                         POData[6] = ['',]
                 else:
@@ -534,8 +527,22 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
                 dlg.Destroy()
             wx.CallLater(100,RepaintHistogramInfo,DData.GetScrollPos(wx.VERTICAL))
             
-        A = G2lat.cell2A(generalData['Cell'][1:7])
-        hkls = G2lat.GenPfHKLs(10,SGData,A)    
+        Id = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,G2frame.hist)
+        Inst = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Id, 'Instrument Parameters'))[0]
+        reflSets = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Id,'Reflection Lists'))
+        hkls = []
+        if generalData['Name'] in reflSets:
+            reflData = reflSets[generalData['Name']]
+            if 'RefList' in reflData:
+                Super = generalData.get('Super',0)
+                nprfo = 12
+                if 'T' in Inst['Type'][0] or 'B' in Inst['Type'][0]:
+                    nprfo = 14
+                for ref in reflData['RefList']:
+                    if ref[nprfo+Super] < 0.:
+                        hkls += ['%d %d %d: %.3f'%(ref[0],ref[1],ref[2],ref[nprfo+Super]),]
+                    if len(hkls) > 10:
+                        break
         shPenalty = wx.BoxSizer(wx.HORIZONTAL)
         shPenalty.Add(wx.StaticText(DData,wx.ID_ANY,' Negative MRD penalty list: '),0,WACV)
         shPenalty.Add(wx.ComboBox(DData,value=POData[6][0],choices=POData[6],
@@ -925,10 +932,7 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
             lebail = wx.Button(DData,wx.ID_ANY,label=lbLabel)
             lebail.Bind(wx.EVT_BUTTON, OnLeBail)
             useBox.Add(lebail,0,WACV)
-        bottomSizer.Add(useBox)             #,0,wx.TOP|wx.BOTTOM|wx.LEFT,5)
-        if ifkeV:
-            G2G.HorizontalLine(bottomSizer,DData)
-            bottomSizer.Add(wx.StaticText(DData,label=' NB: No structure or sample broadening refinement possible from energy dispersive data'))
+        bottomSizer.Add(useBox)
         G2G.HorizontalLine(bottomSizer,DData)
         if G2frame.testSeqRefineMode() and not UseList[G2frame.hist]['LeBail']:
             bottomSizer.Add(wx.StaticText(DData,label='     Sequential Refinement Options'))
@@ -959,58 +963,57 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
             bottomSizer.Add(ScaleSizer(),0,wx.BOTTOM,5)
             
         if G2frame.hist[:4] == 'PWDR':
-            if not ifkeV:
-                if UseList[G2frame.hist]['Size'][0] == 'isotropic':
-                    isoSizer = wx.BoxSizer(wx.HORIZONTAL)
-                    isoSizer.Add(TopSizer(' Domain size model: ',['isotropic','uniaxial','ellipsoidal'],
-                        'Size',OnSizeType),0,WACV)
-                    isoSizer.Add(LGmixSizer('Size',[0.,1.],OnLGmixRef))
-                    isoSizer.Add(ResetSizer('isotropic',OnResetSize),0,WACV)
-                    bottomSizer.Add(isoSizer)
-                    bottomSizer.Add(IsoSizer(u'size(\xb5m): ','Size',(10,4),[0.,10.],OnSizeRef),0,wx.BOTTOM,5)
-                elif UseList[G2frame.hist]['Size'][0] == 'uniaxial':
-                    uniSizer = wx.BoxSizer(wx.HORIZONTAL)
-                    uniSizer.Add(TopSizer(' Domain size model: ',['isotropic','uniaxial','ellipsoidal'],
-                        'Size',OnSizeType),0,WACV)
-                    uniSizer.Add(LGmixSizer('Size',[0.,1.],OnLGmixRef))
-                    uniSizer.Add(ResetSizer('uniaxial',OnResetSize),0,WACV)
-                    bottomSizer.Add(UniSizer('Size',OnSizeAxis),0)
-                    bottomSizer.Add(uniSizer)
-                    bottomSizer.Add(UniDataSizer(u'size(\xb5m): ','Size',(10,3),[0.,10.],OnSizeRef),0,wx.BOTTOM,5)
-                elif UseList[G2frame.hist]['Size'][0] == 'ellipsoidal':
-                    ellSizer = wx.BoxSizer(wx.HORIZONTAL)
-                    ellSizer.Add(TopSizer(' Domain size model: ',['isotropic','uniaxial','ellipsoidal'],
-                        'Size',OnSizeType),0,WACV)
-                    ellSizer.Add(LGmixSizer('Size',[0.,1.],OnLGmixRef))
-                    ellSizer.Add(ResetSizer('ellipsoidal',OnResetSize),0,WACV)
-                    bottomSizer.Add(ellSizer)
-                    bottomSizer.Add(EllSizeDataSizer(),0,wx.BOTTOM,5)
-                
-                if UseList[G2frame.hist]['Mustrain'][0] == 'isotropic':
-                    isoSizer = wx.BoxSizer(wx.HORIZONTAL)
-                    isoSizer.Add(TopSizer(' Mustrain model: ',['isotropic','uniaxial','generalized',],
-                        'Mustrain',OnStrainType),0,WACV)
-                    isoSizer.Add(LGmixSizer('Mustrain',[0.,1.],OnLGmixRef))
-                    isoSizer.Add(ResetSizer('isotropic',OnResetStrain),0,WACV)
-                    bottomSizer.Add(isoSizer)
-                    bottomSizer.Add(IsoSizer(' microstrain: ','Mustrain',(10,1),[0.,1.e5],OnStrainRef),0,wx.BOTTOM,5)
-                elif UseList[G2frame.hist]['Mustrain'][0] == 'uniaxial':
-                    uniSizer = wx.BoxSizer(wx.HORIZONTAL)
-                    uniSizer.Add(TopSizer(' Mustrain model: ',['isotropic','uniaxial','generalized',],
-                        'Mustrain',OnStrainType),0,WACV)
-                    uniSizer.Add(LGmixSizer('Mustrain',[0.,1.],OnLGmixRef))
-                    uniSizer.Add(ResetSizer('uniaxial',OnResetStrain),0,WACV)
-                    bottomSizer.Add(uniSizer)
-                    bottomSizer.Add(UniSizer('Mustrain',OnStrainAxis),0)
-                    bottomSizer.Add(UniDataSizer('mustrain: ','Mustrain',(10,1),[0.,1.e5],OnStrainRef),0,wx.BOTTOM,5)
-                elif UseList[G2frame.hist]['Mustrain'][0] == 'generalized':
-                    genSizer = wx.BoxSizer(wx.HORIZONTAL)
-                    genSizer.Add(TopSizer(' Mustrain model: ',['isotropic','uniaxial','generalized',],
-                        'Mustrain',OnStrainType),0,WACV)
-                    genSizer.Add(LGmixSizer('Mustrain',[0.,1.],OnLGmixRef))
-                    genSizer.Add(ResetSizer('generalized',OnResetStrain),0,WACV)
-                    bottomSizer.Add(genSizer)
-                    bottomSizer.Add(GenStrainDataSizer(),0,wx.BOTTOM,5)
+            if UseList[G2frame.hist]['Size'][0] == 'isotropic':
+                isoSizer = wx.BoxSizer(wx.HORIZONTAL)
+                isoSizer.Add(TopSizer(' Domain size model: ',['isotropic','uniaxial','ellipsoidal'],
+                    'Size',OnSizeType),0,WACV)
+                isoSizer.Add(LGmixSizer('Size',[0.,1.],OnLGmixRef))
+                isoSizer.Add(ResetSizer('isotropic',OnResetSize),0,WACV)
+                bottomSizer.Add(isoSizer)
+                bottomSizer.Add(IsoSizer(u'size(\xb5m): ','Size',(10,4),[0.,10.],OnSizeRef),0,wx.BOTTOM,5)
+            elif UseList[G2frame.hist]['Size'][0] == 'uniaxial':
+                uniSizer = wx.BoxSizer(wx.HORIZONTAL)
+                uniSizer.Add(TopSizer(' Domain size model: ',['isotropic','uniaxial','ellipsoidal'],
+                    'Size',OnSizeType),0,WACV)
+                uniSizer.Add(LGmixSizer('Size',[0.,1.],OnLGmixRef))
+                uniSizer.Add(ResetSizer('uniaxial',OnResetSize),0,WACV)
+                bottomSizer.Add(UniSizer('Size',OnSizeAxis),0)
+                bottomSizer.Add(uniSizer)
+                bottomSizer.Add(UniDataSizer(u'size(\xb5m): ','Size',(10,3),[0.,10.],OnSizeRef),0,wx.BOTTOM,5)
+            elif UseList[G2frame.hist]['Size'][0] == 'ellipsoidal':
+                ellSizer = wx.BoxSizer(wx.HORIZONTAL)
+                ellSizer.Add(TopSizer(' Domain size model: ',['isotropic','uniaxial','ellipsoidal'],
+                    'Size',OnSizeType),0,WACV)
+                ellSizer.Add(LGmixSizer('Size',[0.,1.],OnLGmixRef))
+                ellSizer.Add(ResetSizer('ellipsoidal',OnResetSize),0,WACV)
+                bottomSizer.Add(ellSizer)
+                bottomSizer.Add(EllSizeDataSizer(),0,wx.BOTTOM,5)
+            
+            if UseList[G2frame.hist]['Mustrain'][0] == 'isotropic':
+                isoSizer = wx.BoxSizer(wx.HORIZONTAL)
+                isoSizer.Add(TopSizer(' Mustrain model: ',['isotropic','uniaxial','generalized',],
+                    'Mustrain',OnStrainType),0,WACV)
+                isoSizer.Add(LGmixSizer('Mustrain',[0.,1.],OnLGmixRef))
+                isoSizer.Add(ResetSizer('isotropic',OnResetStrain),0,WACV)
+                bottomSizer.Add(isoSizer)
+                bottomSizer.Add(IsoSizer(' microstrain: ','Mustrain',(10,1),[0.,1.e5],OnStrainRef),0,wx.BOTTOM,5)
+            elif UseList[G2frame.hist]['Mustrain'][0] == 'uniaxial':
+                uniSizer = wx.BoxSizer(wx.HORIZONTAL)
+                uniSizer.Add(TopSizer(' Mustrain model: ',['isotropic','uniaxial','generalized',],
+                    'Mustrain',OnStrainType),0,WACV)
+                uniSizer.Add(LGmixSizer('Mustrain',[0.,1.],OnLGmixRef))
+                uniSizer.Add(ResetSizer('uniaxial',OnResetStrain),0,WACV)
+                bottomSizer.Add(uniSizer)
+                bottomSizer.Add(UniSizer('Mustrain',OnStrainAxis),0)
+                bottomSizer.Add(UniDataSizer('mustrain: ','Mustrain',(10,1),[0.,1.e5],OnStrainRef),0,wx.BOTTOM,5)
+            elif UseList[G2frame.hist]['Mustrain'][0] == 'generalized':
+                genSizer = wx.BoxSizer(wx.HORIZONTAL)
+                genSizer.Add(TopSizer(' Mustrain model: ',['isotropic','uniaxial','generalized',],
+                    'Mustrain',OnStrainType),0,WACV)
+                genSizer.Add(LGmixSizer('Mustrain',[0.,1.],OnLGmixRef))
+                genSizer.Add(ResetSizer('generalized',OnResetStrain),0,WACV)
+                bottomSizer.Add(genSizer)
+                bottomSizer.Add(GenStrainDataSizer(),0,wx.BOTTOM,5)
                 
             bottomSizer.Add(wx.StaticText(DData,wx.ID_ANY,' Hydrostatic/elastic strain:'))
             bottomSizer.Add(HstrainSizer())
@@ -1035,8 +1038,10 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
                         poSizer.Add(wx.StaticText(DData,wx.ID_ANY,' Spherical harmonic coefficients: '+'Texture index: %.3f'%(textJ))
                             ,0,wx.TOP|wx.BOTTOM,5)
                         poSizer.Add(SHDataSizer(POData))  #,0,wx.TOP|wx.BOTTOM,5)
-                        poSizer.Add(SHPenalty(POData))  #,0,wx.TOP|wx.BOTTOM,5)
-                        
+                        try:
+                            poSizer.Add(SHPenalty(POData))  #,0,wx.TOP|wx.BOTTOM,5)
+                        except:
+                            print('SHPenalty error occurred')
                 bottomSizer.Add(poSizer)    #,0,wx.TOP|wx.BOTTOM,5)
                 bottomSizer.Add(ExtSizer('PWDR'),0,wx.TOP|wx.BOTTOM,5)
                 if generalData['Type'] != 'magnetic': 
@@ -1102,7 +1107,6 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
     mainSizer.Add(topSizer,0,wx.EXPAND)
     LeBailMsg = None
     if G2frame.hist:
-        ifkeV = 'E' in UseList[G2frame.hist].get('Type','')            
         topSizer = wx.FlexGridSizer(1,2,5,5)
         DData.select = wx.ListBox(DData,choices=G2frame.dataWindow.HistsInPhase,
                             style=wx.LB_SINGLE,size=(-1,160))
@@ -1110,7 +1114,7 @@ def UpdateDData(G2frame,DData,data,hist='',Scroll=0):
         DData.select.SetFirstItem(G2frame.dataWindow.HistsInPhase.index(G2frame.hist))
         DData.select.Bind(wx.EVT_LISTBOX,OnSelect)
         topSizer.Add(DData.select,0,WACV|wx.LEFT,5)
-        if any(['PWDR' in item for item in keyList]) and not ifkeV:
+        if any(['PWDR' in item for item in keyList]):
             topSizer.Add(PlotSizer())
         mainSizer.Add(topSizer)       
         G2frame.bottomSizer,LeBailMsg = ShowHistogramInfo()

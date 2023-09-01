@@ -2,25 +2,15 @@
 # -*- coding: utf-8 -*-
 #GSAS-II autointegration routines
 ########### SVN repository information ###################
-# $Date: 2022-12-25 14:51:17 -0600 (Sun, 25 Dec 2022) $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 5446 $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIIntPDFtool.py $
-# $Id: GSASIIIntPDFtool.py 5446 2022-12-25 20:51:17Z toby $
+# $Id: GSASIIIntPDFtool.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-.. _GSASIIautoint:
-
-*GSASIIIntPDFtool: autointegration routines*
----------------------------------------------
-
-Independent-running GSAS-II based auto-integration program with minimal
-GUI, no visualization but intended to implement significant levels of 
-parallelization.
 '''
-# Autointegration from 
-# $Id: GSASIIIntPDFtool.py 5446 2022-12-25 20:51:17Z toby $
-# hacked for stand-alone use
+# Autointegration GSASIIimgGUI and GSASIIimage, hacked for stand-alone use
 #
 # idea: select image file type & set filter from that
 #
@@ -38,11 +28,10 @@ import wx.grid as wg
 import numpy as np
 import GSASIIpath
 GSASIIpath.SetBinaryPath(True)
-GSASIIpath.SetVersionNumber("$Revision: 5446 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 import GSASIIIO as G2IO
 import GSASIIctrlGUI as G2G
 import GSASIIobj as G2obj
-import GSASIIpy3 as G2py3
 import GSASIIimgGUI as G2imG
 import GSASIIfiles as G2fil
 import GSASIIscriptable as G2sc

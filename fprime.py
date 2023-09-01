@@ -11,7 +11,7 @@ import numpy as np
 import sys
 import matplotlib as mpl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5534 $")
+GSASIIpath.SetVersionNumber("$Revision: 5623 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 
@@ -56,12 +56,14 @@ else:
 [wxID_FPRIMEKALPHAAGKA, wxID_FPRIMEKALPHACOKA, wxID_FPRIMEKALPHACRKA, 
  wxID_FPRIMEKALPHACUKA, wxID_FPRIMEKALPHAFEKA, wxID_FPRIMEKALPHAMNKA, 
  wxID_FPRIMEKALPHAMOKA, wxID_FPRIMEKALPHANIKA, wxID_FPRIMEKALPHAZNKA, 
-] = [wx.NewId() for _init_coll_KALPHA_Items in range(9)]
+wxID_FPRIMEKALPHAGAKA,wxID_FPRIMEKALPHAINKA, 
+] = [wx.NewId() for _init_coll_KALPHA_Items in range(11)]
 
 [wxID_FPRIMEABOUT] = [wx.NewId() for _init_coll_ABOUT_Items in range(1)]
 
 class Fprime(wx.Frame):
-    ''' '''
+    '''Creates a frame where input for absorption calculation is supplied
+    '''
     Elems = []
     Wave = 1.5405      #CuKa default
     Kev = 12.397639    #keV for 1A x-rays
@@ -110,8 +112,10 @@ without arguments fprime uses CuKa as default (Wave=1.54052A, E=8.0478keV)
         parent.Append(wxID_FPRIMEKALPHANIKA,'NiKa')
         parent.Append(wxID_FPRIMEKALPHACUKA,'CuKa')
         parent.Append(wxID_FPRIMEKALPHAZNKA,'ZnKa')
+        parent.Append(wxID_FPRIMEKALPHAGAKA,'GaKa')
         parent.Append(wxID_FPRIMEKALPHAMOKA,'MoKa')
         parent.Append(wxID_FPRIMEKALPHAAGKA,'AgKa')
+        parent.Append(wxID_FPRIMEKALPHAINKA,'InKa')
         self.Bind(wx.EVT_MENU, self.OnKALPHACrkaMenu, id=wxID_FPRIMEKALPHACRKA)
         self.Bind(wx.EVT_MENU, self.OnKALPHAMnkaMenu, id=wxID_FPRIMEKALPHAMNKA)
         self.Bind(wx.EVT_MENU, self.OnKALPHAFekaMenu, id=wxID_FPRIMEKALPHAFEKA)
@@ -119,8 +123,10 @@ without arguments fprime uses CuKa as default (Wave=1.54052A, E=8.0478keV)
         self.Bind(wx.EVT_MENU, self.OnKALPHANikaMenu, id=wxID_FPRIMEKALPHANIKA)
         self.Bind(wx.EVT_MENU, self.OnKALPHACukaMenu, id=wxID_FPRIMEKALPHACUKA)
         self.Bind(wx.EVT_MENU, self.OnKALPHAZnkaMenu, id=wxID_FPRIMEKALPHAZNKA)
+        self.Bind(wx.EVT_MENU, self.OnKALPHAGakaMenu, id=wxID_FPRIMEKALPHAGAKA)
         self.Bind(wx.EVT_MENU, self.OnKALPHAMokaMenu, id=wxID_FPRIMEKALPHAMOKA)
         self.Bind(wx.EVT_MENU, self.OnKALPHAAgkaMenu, id=wxID_FPRIMEKALPHAAGKA)
+        self.Bind(wx.EVT_MENU, self.OnKALPHAInkaMenu, id=wxID_FPRIMEKALPHAINKA)
 
     def _init_coll_FPRIME_Items(self, parent):
         parent.Append(wxID_FPRIMENEW,'&New Element','Add new element')
@@ -299,11 +305,17 @@ without arguments fprime uses CuKa as default (Wave=1.54052A, E=8.0478keV)
     def OnKALPHAZnkaMenu(self, event):
         self.SetWaveEnergy(1.43510)
 
+    def OnKALPHAGakaMenu(self, event):
+        self.SetWaveEnergy(1.34134)
+    
     def OnKALPHAMokaMenu(self, event):
         self.SetWaveEnergy(0.70926)
 
     def OnKALPHAAgkaMenu(self, event):
         self.SetWaveEnergy(0.55936)
+        
+    def OnKALPHAInkaMenu(self, event):
+        self.SetWaveEnergy(0.51357)
         
     def OnSpinText1(self, event):
         self.SetWaveEnergy(float(self.SpinText1.GetValue()))
@@ -578,7 +590,8 @@ without arguments fprime uses CuKa as default (Wave=1.54052A, E=8.0478keV)
         self.UpDateFPlot(self.Wave,rePlot=False)
 
     def OnABOUTItems0Menu(self, event):
-        ''' '''
+        '''Displays the About window
+        '''
         try:
             import wx.adv as wxadv  # AboutBox moved here in Phoenix
         except:

@@ -1,6 +1,6 @@
 .. 
-    This file is created using the makeVarTbl.py. Edit that not this file.
-         
+    This file is created using makeVarTbl.py. Edit that, not this file.
+
 .. list-table:: Naming for GSAS-II parameter names, ``p:h:<var>:n``
    :widths: 35 65
    :header-rows: 1
@@ -137,6 +137,8 @@
      - Spinning rigid body orientation parameter \ :math:`\scriptstyle S`\ ; where \ :math:`\scriptstyle S`\  is one of the characters a, i, j or k.
    * - RBSP\ :math:`\scriptstyle M`\  (example: ``RBSPx``)
      - Spinning rigid body \ :math:`\scriptstyle M`\  position parameter; where \ :math:`\scriptstyle M`\  is one of the characters x, y or z.
+   * - RBSShRadius
+     - Spinning rigid body shell radius.
    * - RBSShC\ :math:`\scriptstyle V`\  (example: ``RBSShC1``)
      - Spinning rigid body sph. harmonics term; where \ :math:`\scriptstyle V`\  is one of the characters 1, -, 2 or 0 ,, 1, -, 2 or 0.
    * - constr\ :math:`\scriptstyle G`\  (example: ``constr10``)

@@ -1,23 +1,21 @@
 # -*- coding: utf-8 -*-
-"""
-*GSASIIElem: functions for element types*
------------------------------------------
-
-"""
 # Copyright: 2008, Robert B. Von Dreele & Brian H. Toby (Argonne National Laboratory)
 ########### SVN repository information ###################
-# $Date: 2023-01-03 14:38:18 -0600 (Tue, 03 Jan 2023) $
-# $Author: vondreele $
-# $Revision: 5464 $
+# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
+# $Author: toby $
+# $Revision: 5572 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIElem.py $
-# $Id: GSASIIElem.py 5464 2023-01-03 20:38:18Z vondreele $
+# $Id: GSASIIElem.py 5572 2023-05-10 02:43:48Z toby $
 ########### SVN repository information ###################
+"""
+Routines used to define element settings follow. 
+"""
 
 import math
 import sys
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5464 $")
+GSASIIpath.SetVersionNumber("$Revision: 5572 $")
 import numpy as np
 import atmdata
 import GSASIImath as G2mth

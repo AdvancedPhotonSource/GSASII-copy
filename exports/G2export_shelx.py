@@ -1,24 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2017-10-23 11:39:16 -0500 (Mon, 23 Oct 2017) $
-# $Author: vondreele $
-# $Revision: 3136 $
+# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5576 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_shelx.py $
-# $Id: G2export_shelx.py 3136 2017-10-23 16:39:16Z vondreele $
+# $Id: G2export_shelx.py 5576 2023-05-11 19:22:54Z toby $
 ########### SVN repository information ###################
-'''
-*Module G2export_shelx: Examples*
--------------------------------------------
-
-Code to export coordinates in the SHELX .ins format
-(as best as I can makes sense of it).
-
+'''Classes in :mod:`G2export_shelx` follow:
 '''
 from __future__ import division, print_function
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 3136 $")
+GSASIIpath.SetVersionNumber("$Revision: 5576 $")
 import GSASIIIO as G2IO
 import GSASIIspc as G2spc
 

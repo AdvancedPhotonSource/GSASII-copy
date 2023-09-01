@@ -1,18 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-*SUBGROUPS: Interface to special GSAS Bilbao SUBGROUPS & k-SUBGROUPSMAG web pages*
--------------------------------
-
-Extraction of  space subgroups for a given space group and a propagation vector
-from the GSAS version of SUBGROUPS & k-SUBGROUPSMAG web page on the Bilbao Crystallographic server
-
-"""
 ########### SVN repository information ###################
-# $Date: 2020-03-19 10:51:52 -0500 (Thu, 19 Mar 2020) $
+# $Date: 2023-05-11 23:37:57 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 4374 $
+# $Revision: 5578 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/SUBGROUPS.py $
-# $Id: SUBGROUPS.py 4374 2020-03-19 15:51:52Z toby $
+# $Id: SUBGROUPS.py 5578 2023-05-12 04:37:57Z toby $
 ########### SVN repository information ###################
 from __future__ import division, print_function
 import numpy as np

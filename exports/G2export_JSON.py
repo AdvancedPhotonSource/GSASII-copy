@@ -1,27 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-04-03 17:00:26 -0500 (Sat, 03 Apr 2021) $
+# $Date: 2023-08-09 08:23:55 -0500 (Wed, 09 Aug 2023) $
 # $Author: toby $
-# $Revision: 4874 $
+# $Revision: 5643 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_JSON.py $
-# $Id: G2export_JSON.py 4874 2021-04-03 22:00:26Z toby $
+# $Id: G2export_JSON.py 5643 2023-08-09 13:23:55Z toby $
 ########### SVN repository information ###################
-'''
-*Module G2export_JSON: ASCII .gpx Export*
-------------------------------------------------------
+'''Classes in :mod:`G2export_JSON` follow:
 
-This implements a simple exporter :class:`ExportCIF` that can export the 
-contents of an entire project as a sort-of human readable (JSON) ASCII file.
-This provides a way to see the contents of a GSAS-II project file, but 
-this format does not provide a mechanism to change the contents of a .gpx file,
-as the likelihood of breaking a data structure is too high, so these
-JSON files cannot be imported back into GSAS-II. 
-If you want to change the contents of a .gpx file, use :mod:`GSASIIscriptable` 
-where you can access the native Python data structures and change things 
-with a good chance of getting things to work. 
-
-This code is dedicated to my friend Robert Papoular who wants to see what is 
+This code is to honor my friend Robert Papoular, who wants to see what is 
 inside a .gpx file.
 '''
 from __future__ import division, print_function
@@ -29,7 +17,7 @@ import json
 import wx
 import numpy as np
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4874 $")
+GSASIIpath.SetVersionNumber("$Revision: 5643 $")
 import GSASIIIO as G2IO
 
 class JsonEncoder(json.JSONEncoder):
@@ -44,9 +32,12 @@ class JsonEncoder(json.JSONEncoder):
             return {"_npmask":obj.mask.tolist(),'_npvalues':obj.tolist()}
         elif isinstance(obj, np.ndarray):
             return {"_nparray":obj.tolist()}
+        elif 'G2VarObj' in str(type(obj)):
+            return {"_GSASIIobj.G2VarObj":obj.varname()}
         else:
             print('Tell Brian to fix JsonEncoder to handle type=',type(obj),
                       '. Skipping for now')
+            #breakpoint()
             return "sorry, I don't know how to show a {} object".format(str(type(obj)))
     
 class ExportJSON(G2IO.ExportBaseclass):
@@ -66,6 +57,8 @@ class ExportJSON(G2IO.ExportBaseclass):
         self.InitExport(event)
         if self.ExportSelect(): return # set export parameters; get file name
         self.OpenFile()
+        self.Write('[\n')
+        first = True
         wx.BeginBusyCursor()
         G2frame = self.G2frame
         # crawl through the tree, dumping as we go
@@ -76,21 +69,27 @@ class ExportJSON(G2IO.ExportBaseclass):
                 name = G2frame.GPXtree.GetItemText(item)
                 #print('level 0',name)
                 data = {name:G2frame.GPXtree.GetItemPyData(item)}
-                self.Write('\n')
+                if first:
+                    first = False
+                    self.Write('\n')
+                else:
+                    self.Write('\n, ')
                 self.Write(json.dumps(
-                    "=========== '{}' Tree Item ==============".format(name)))
+                    "=========== '{}' Tree Item ==============".format(name))+',')
                 self.Write(json.dumps(data, indent=2, cls=JsonEncoder))
                 item2, cookie2 = G2frame.GPXtree.GetFirstChild(item)
                 while item2:
                     name2 = G2frame.GPXtree.GetItemText(item2)
                     #print('  level 1',name2)
-                    self.Write('\n')
+                    self.Write(',\n')
                     self.Write(json.dumps([
                         "=========== '{}' SubItem of Tree '{}' ==============".format(name2,name)]))
+                    self.Write(', ')
                     data = {name:{name2:G2frame.GPXtree.GetItemPyData(item)}}
                     self.Write(json.dumps(data, indent=2, cls=JsonEncoder))
                     item2, cookie2 = G2frame.GPXtree.GetNextChild(item, cookie2)                            
                 item, cookie = G2frame.GPXtree.GetNextChild(G2frame.root, cookie)                            
         finally:
             wx.EndBusyCursor()
+        self.Write(']\n')
         self.CloseFile()

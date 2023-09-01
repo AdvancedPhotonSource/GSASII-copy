@@ -1,5 +1,5 @@
-GSAS-II Requirements and Options
-==========================================
+GSAS-II Requirements, Optional and Included Packages
+======================================================
 
 Supported Platforms
 --------------------------------
@@ -27,32 +27,37 @@ Details for GSAS-II use on these specific platforms follows below:
   and packages. This is getting increasingly tough. We have not tried
   Windows-11, but expect the Windows-10 distribution to run fine there.
 
-* **MacOS**: GSAS-II can run natively on Intel or ARM ("M1" or "Apple
+* **MacOS**: GSAS-II can run natively on Intel or ARM ("M1",  "M2" or "Apple
   Silicon") processors. With the native code, Mac ARM machines offer
   the highest performance seen on any platform. 
   
   For Intel processor Macs, we provide an installer. This can also be
   used on ARM-equipped Macs but native M1 code runs way
-  faster. Native ARM code installation is a bit more complex; but 
+  faster. Installation of the native ARM code is a bit more complex; but 
   detailed instructions are provided
-  (https://subversion.xray.aps.anl.gov/trac/pyGSAS/wiki/MacM1Notes)
-  that require use of either the miniforge package or the homebrew
+  (https://subversion.xray.aps.anl.gov/trac/pyGSAS/wiki/MacM1Notes).
+  This requires use of either the miniforge package or the homebrew
   package installer. 
   Macs older than Catalina (10.15) will likely require older
   distributions of Python.  
 
-* **Linux** (Intel-compatible): Note that GSAS-II does not get a lot of testing
+* **Linux**: Note that GSAS-II does not get a lot of testing
   in Linux by us, but is used fairly widely on this platform
-  nonetheless.  One can use the 
-  installer that we provide, but compatibility with older and very new
-  versions of Linux may require compatibility
-  library installation, not always easy to do. It may be
+  nonetheless.  We provide an installer that includes Python and
+  needed packages for Intel-compatible Linuxes, but compatibility with
+  older and very new versions of Linux can sometimes be tricky as
+  compatibility libraries may be needed -- not always easy to do. It may be
   better to use your Linux distribution's versions of Python and
   packages (typically done with a software tool such as apt or yum.)
-  You may possibly need to use pip as well. Adapt from the detailed
-  example for how to do for the 32-bit Raspberry Pi OS:
-  https://subversion.xray.aps.anl.gov/trac/pyGSAS/wiki/InstallPiLinux.  
+  You may possibly need to use pip as well. For an example on how that
+  is done see the 32-bit Raspberry Pi OS instructions:
+  https://subversion.xray.aps.anl.gov/trac/pyGSAS/wiki/InstallPiLinux.
 
+  Will GSAS-II run on Linux with other types of CPUs? That will mostly
+  depend on support for Python and wxPython on that CPU. If those run,
+  you can likely build the GSAS-II binaries with gcc &
+  gfortran. Expect to modify the SConstruct file. 
+  
 * **Raspberry Pi** (ARM) Linux: GSAS-II has been installed on both 32-bit
   and the 64-bit version of the Raspberry Pi OS (formerly
   called Raspbian) and compiled binaries are provided.
@@ -232,23 +237,80 @@ such as
 
 Note that at present we are not suppling binaries for Python 3.11, but
 we are not aware of any reason why GSAS-II will not run fine with
-this. 
+this.
+
+To find out what packages have been directly installed in a conda
+environment this command can be used::
   
-Scripting  Requirements
+  conda env export --from-history -n <env>
+
+I'm using this to create my latest development environment::
+  
+  source /Users/toby/mamba310/bin/activate
+  conda create -n py311 python=3.11 ipython conda scipy spyder-kernels pyopengl scons imageio h5py numpy pillow requests sphinx matplotlib jupyter wxpython  
+
+  
+
+
+.. _ScriptingRequirements:
+
+  
+Scripting Requirements
 -----------------------
 
-When using the GSAS-II scripting interface (:mod:`GSASIIscriptable`),
-only the two commonly-used Python extension packages are required:
+The GSAS-II scripting interface (:mod:`GSASIIscriptable`) will not
+run without two Python extension packages:
 
 * NumPy (http://docs.scipy.org/doc/numpy/reference/), 
 * SciPy (http://docs.scipy.org/doc/scipy/reference/).
 
-Note that a few sections of the code optionally require matplotlib
-(http://matplotlib.org/contents.html), Pillow 
-(https://pillow.readthedocs.org) (or PIL,
-http://www.pythonware.com/products/pil/), or h5py + hdf5, but none of
-these are required to run scripts and the vast
+These fortunately are common and are easy to install. There are
+further scripting capabilities that will only run when a few
+additional packages are installed:
+  
+* matplotlib (http://matplotlib.org/contents.html),
+* Pillow (https://pillow.readthedocs.org) and/or
+* h5py and hdf5 
+
+but none of these are required to run scripts and the vast
 majority of scripts will not need these packages.
+
+**Installing a minimal Python configuration**:
+
+There are many ways to install a minimal Python configuration.
+Below, I show some example commands used to install using the 
+the free miniconda installer from Anaconda, Inc., but I now tend to
+use the Conda-Forge miniforge and mambaforge distributions instead. 
+However, there are also plenty of  other ways to install Python, Numpy
+and Scipy, depending on if they will be used on Linux, Windows and MacOS.
+For Linux, the standard Linux distributions provide these using
+``yum`` or ``apt-get`` etc., but these often supply package versions
+that are so new that they probably have not been tested with GSAS-II.
+
+.. code-block::  bash
+
+    bash ~/Downloads/Miniconda3-latest-<platform>-x86_64.sh -b -p /loc/pyg2script
+    source /loc/pyg2script/bin/activate
+    conda install numpy scipy matplotlib pillow h5py hdf5 svn
+
+Some discussion on these commands follows:
+
+* the 1st command (bash) assumes that the appropriate version of Miniconda has been downloaded from https://docs.conda.io/en/latest/miniconda.html and ``/loc/pyg2script`` is where I have selected for python to be installed. You might want to use something like ``~/pyg2script``.
+* the 2nd command (source) is needed to access Python with miniconda. 
+* the 3rd command (conda) installs all possible packages that might be used by scripting, but matplotlib, pillow, and hdf5 are not commonly needed and could be omitted. The svn package is not needed (for example on Linux) where this has been installed in another way.
+
+Once svn and Python has been installed and is in the path, use these commands to install GSAS-II:
+
+.. code-block::  bash
+
+    svn co https://subversion.xray.aps.anl.gov/pyGSAS/trunk /loc/GSASII
+    python /loc/GSASII/GSASIIscriptable.py
+
+Notes on these commands:
+
+* the 1st command (svn) is used to download the GSAS-II software. ``/loc/GSASII`` is the location where I decided to install the software. You can select something different. 
+* the 2nd command (python) is used to invoke GSAS-II scriptable for the first time, which is needed to load the binary files from the server.
+
 
 Optional Python Packages
 ---------------------------
@@ -296,6 +358,7 @@ and MacOS:
 https://subversion.xray.aps.anl.gov/trac/pyGSAS/wiki/InstallMacHardWay,
 but these may be out of date or require adaptation. 
 
+
 Supported Externally-Developed Software
 ----------------------------------------------------
 
@@ -329,6 +392,11 @@ beyond a standard installation are needed to access their functionality.
     between unit cells. An API has been written and this will be
     integrated into the GSAS-II GUI. 
 
+  **pybaselines**
+   Determines a background for a powder pattern in the "autobackground"
+   option. See https://pybaselines.readthedocs.io for more
+   information. 
+    
 The following web services can also be accessed from computers that
 have internet access. All software needed for this access is included
 with GSAS-II.
@@ -374,13 +442,11 @@ as part of the GSAS-II distribution and must be installed separately:
   **PDFfit2**
     For small-box fitting of PDFs; see
     https://github.com/diffpy/diffpy.pdffit2#pdffit2. This code is no 
-    longer supported by the authors, but is still quite useful. It can
-    only be run with older Python versions. It is supplied within
-    GSAS-II for Windows with Python 3.7-3.9 and for MacOS only with Python 3.7.
-    When running GSAS-II with later versions of Python, as is strongly
-    encouraged, it is best to install a separate older Python
+    longer being updated by the authors, but is still quite useful.
+    It is supplied within GSAS-II for Python 3.7.
+    It is likely best to install a separate Python
     interpreter specifically for PDFfit2. When GSAS-II is run from a
     Python installation that includes the conda package manager (the
     usual installation practice), the GUI will offer an option to
-    install PDFfit2 via a separate Python 3.7 environment when the
+    install PDFfit2 via a separate environment when the
     PDFfit2 option is selected on the Phase/RMC tab. 

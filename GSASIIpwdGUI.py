@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
 #GSASIIpwdGUI - powder data display routines
 ########### SVN repository information ###################
-# $Date: 2023-03-23 17:55:18 -0500 (Thu, 23 Mar 2023) $
-# $Author: toby $
-# $Revision: 5521 $
+# $Date: 2023-08-07 09:23:55 -0500 (Mon, 07 Aug 2023) $
+# $Author: vondreele $
+# $Revision: 5642 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpwdGUI.py $
-# $Id: GSASIIpwdGUI.py 5521 2023-03-23 22:55:18Z toby $
+# $Id: GSASIIpwdGUI.py 5642 2023-08-07 14:23:55Z vondreele $
 ########### SVN repository information ###################
-'''
-*GSASIIpwdGUI: Powder Pattern GUI routines*
--------------------------------------------
-
-Used to define GUI controls for the routines that interact
-with the powder histogram (PWDR) data tree items.
-
+'''GUI routines for PWDR datadree subitems follow.
 '''
 from __future__ import division, print_function
 import platform
@@ -37,7 +31,7 @@ else:
     import pickle as cPickle
 import scipy.interpolate as si
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5521 $")
+GSASIIpath.SetVersionNumber("$Revision: 5642 $")
 import GSASIImath as G2mth
 import GSASIIpwd as G2pwd
 import GSASIIfiles as G2fil
@@ -232,7 +226,7 @@ class RDFDialog(wx.Dialog):
         mainSizer.Add(wx.StaticText(self.panel,label='Background RDF controls:'),0)
         plotType = wx.BoxSizer(wx.HORIZONTAL)
         plotType.Add(wx.StaticText(self.panel,label=' Select plot type:'),0,WACV)
-        Choices = ['obs-back','calc-back','obs-calc']
+        Choices = ['obs-back','calc-back','obs-calc','auto-back']
         useOC = wx.ComboBox(self.panel,value=Choices[2],choices=Choices,
                 style=wx.CB_READONLY|wx.CB_DROPDOWN)
         useOC.SetValue(self.result['UseObsCalc'])
@@ -942,8 +936,11 @@ def UpdatePeakGrid(G2frame, data):
             wave = G2mth.getWave(inst)
             overallInfo = {'ncell':peaks['LaueFringe']['ncell'],
                             'clat': peaks['LaueFringe']['clat'],
-                            'clat-ref': peaks['LaueFringe']['clat-ref']
-                               } # add overall info
+                            'clat-ref': peaks['LaueFringe']['clat-ref'],
+                            'fitRange': peaks['LaueFringe'].get('fitRange',8.0),
+                            'fitPowerM': peaks['LaueFringe'].get('fitPowerM',2.0),
+                            'fitPowerP': peaks['LaueFringe'].get('fitPowerP',2.0),
+                               } # add overall info here
             if lines:
                 for i in peaks['peaks']:
                     pks = list(range(-lines,0)) + list(range(1,lines+1))
@@ -1126,7 +1123,6 @@ def UpdatePeakGrid(G2frame, data):
                 data['peaks'][i][2:] = data['LFpeaks'][i]
             wx.CallAfter(UpdatePeakGrid,G2frame,data)
         if data['peaks']:
-            print('NB: refreshing peaks')
             OnPeakFit(noFit=True)
         
     def OnSetPeakWidMode(event):
@@ -1253,40 +1249,72 @@ def UpdatePeakGrid(G2frame, data):
     if 'LF' in Inst['Type'][0]:
         mainSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Laue Fringe fitting'))
         topSizer = wx.BoxSizer(wx.HORIZONTAL)
-        topSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Overall parms: c='),0,WACV)
+        topSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Overall parms: '),0,WACV)
         data['LaueFringe'] = data.get('LaueFringe',{})
         data['LaueFringe']['ncell'] = data['LaueFringe'].get('ncell',20)
         data['LaueFringe']['clat'] =  data['LaueFringe'].get('clat',9.0)
         data['LaueFringe']['lmin'] =  data['LaueFringe'].get('lmin',1)
         data['LaueFringe']['clat-ref'] =  data['LaueFringe'].get('clat-ref',False)
         data['LaueFringe']['Show'] =  data['LaueFringe'].get('Show',0)
+        data['LaueFringe']['fitRange'] =  data['LaueFringe'].get('fitRange',8.0)
+        data['LaueFringe']['fitPowerM'] =  data['LaueFringe'].get('fitPowerM',2.0)
+        data['LaueFringe']['fitPowerP'] =  data['LaueFringe'].get('fitPowerP',2.0)
+        prmVSizer = wx.BoxSizer(wx.VERTICAL)
+        prmSizer = wx.BoxSizer(wx.HORIZONTAL)
+        prmSizer.Add(wx.StaticText(G2frame.dataWindow,label=' c='),0,WACV)
         cVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,data['LaueFringe'],'clat',
                                     typeHint=float,nDig=(10,4),size=(80,-1),
                                     OnLeave=lambda *arg,**kw:RefreshPeakGrid(None))
-        topSizer.Add(cVal,0,WACV)
+        prmSizer.Add(cVal,0,WACV)
         cellSpin = wx.SpinButton(G2frame.dataWindow,style=wx.SP_VERTICAL,size=wx.Size(20,20))
         cellSpin.SetValue(0)
         cellSpin.SetRange(-1,1)
         cellSpin.Bind(wx.EVT_SPIN, ShiftLFc)
-        topSizer.Add(cellSpin,0,WACV)
+        prmSizer.Add(cellSpin,0,WACV)
         cRef = G2G.G2CheckBox(G2frame.dataWindow,'ref',data['LaueFringe'],'clat-ref')
-        topSizer.Add(cRef,0,WACV)
-        topSizer.Add((15,-1))
+        prmSizer.Add(cRef,0,WACV)
+        prmSizer.Add((15,-1))
         siz = G2G.G2SpinWidget(G2frame.dataWindow,data['LaueFringe'] ,'lmin',
                                        'l min')
-        topSizer.Add(siz,0,WACV)
-        topSizer.Add((15,-1))
+        prmSizer.Add(siz,0,WACV)
+        prmSizer.Add((15,-1))
         siz = G2G.G2SpinWidget(G2frame.dataWindow,data['LaueFringe'] ,'ncell',
                                        'Laue ncell',
                                        onChange=RefreshPeakGrid,onChangeArgs=[None])
-        topSizer.Add(siz,0,WACV)
-        topSizer.Add((15,-1))
-        topSizer.Add(wx.StaticText(G2frame.dataWindow,label='  Show '),0,WACV)
+        prmSizer.Add(siz,0,WACV)
+        # prmSizer.Add((15,-1))
+        # prmSizer.Add(wx.StaticText(G2frame.dataWindow,label='  Show '),0,WACV)
+        # ch = G2G.EnumSelector(G2frame.dataWindow,data['LaueFringe'],'Show',
+        #                             ['None','1','2','3','4','5','6'],list(range(7)),
+        #                             OnChange=RefreshPeakGrid)
+        # prmSizer.Add(ch,0,WACV)
+        # prmSizer.Add(wx.StaticText(G2frame.dataWindow,label=' satellites'),0,WACV)
+        prmVSizer.Add(prmSizer)
+
+        prmSizer = wx.BoxSizer(wx.HORIZONTAL)
+        prmSizer.Add(wx.StaticText(G2frame.dataWindow,label=' fit width'),0,WACV)
+        cVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,data['LaueFringe'],'fitRange',typeHint=float,
+            nDig=(6,1),size=(60,-1),xmin=1., xmax=20.,OnLeave=lambda *arg,**kw:RefreshPeakGrid(None))
+        prmSizer.Add(cVal,0,WACV)
+        prmSizer.Add((15,-1))
+        prmSizer.Add(wx.StaticText(G2frame.dataWindow,label=' fit exponent, minus side'),0,WACV)
+        cVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,data['LaueFringe'],'fitPowerM',typeHint=float,
+            nDig=(6,1),size=(60,-1),xmin=0.5, xmax=10.,OnLeave=lambda *arg,**kw:RefreshPeakGrid(None))
+        prmSizer.Add(cVal,0,WACV)
+        prmSizer.Add(wx.StaticText(G2frame.dataWindow,label=' plus side'),0,WACV)
+        cVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,data['LaueFringe'],'fitPowerP',typeHint=float,
+            nDig=(6,1),size=(60,-1),xmin=0.5, xmax=10.,OnLeave=lambda *arg,**kw:RefreshPeakGrid(None))
+        prmSizer.Add(cVal,0,WACV)
+        prmVSizer.Add(prmSizer)
+
+        prmSizer = wx.BoxSizer(wx.HORIZONTAL)
+        prmSizer.Add(wx.StaticText(G2frame.dataWindow,label='  Show '),0,WACV)
         ch = G2G.EnumSelector(G2frame.dataWindow,data['LaueFringe'],'Show',
-                                    ['None','1','2','3','4','5','6'],list(range(7)),
-                                    OnChange=RefreshPeakGrid)
-        topSizer.Add(ch,0,WACV)
-        topSizer.Add(wx.StaticText(G2frame.dataWindow,label=' satellites'),0,WACV)
+            ['None','1','2','3','4','5','6'],list(range(7)),OnChange=RefreshPeakGrid)
+        prmSizer.Add(ch,0,WACV)
+        prmSizer.Add(wx.StaticText(G2frame.dataWindow,label=' satellites'),0,WACV)
+        prmVSizer.Add(prmSizer)
+        topSizer.Add(prmVSizer,0,WACV)
         mainSizer.Add(topSizer)
     mainSizer.Add(reflGrid,0,wx.ALL,10)
     G2frame.dataWindow.SetSizer(mainSizer)
@@ -1796,6 +1824,25 @@ def UpdateBackground(G2frame,data):
             data[1]['background PWDR'][2] = not data[1]['background PWDR'][2]            
 
         fileSizer = wx.BoxSizer(wx.VERTICAL)
+        fileSizer.Add((-1,5))
+        backSizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn = wx.Button(G2frame.dataWindow, wx.ID_ANY,'Fit to fixed bkg')
+        backSizer.Add(btn,0,wx.RIGHT,3)
+        btn.Enable(len(data[1].get('FixedPoints',[])) > 5)
+        btn.Bind(wx.EVT_BUTTON,OnBkgFit)
+        
+        btn = wx.Button(G2frame.dataWindow, wx.ID_ANY,'Compute auto background')
+        backSizer.Add(btn,0,wx.RIGHT,3)
+        btn.Bind(wx.EVT_BUTTON,onAutoBack)
+
+        btn = wx.Button(G2frame.dataWindow, wx.ID_ANY,'Copy auto background')
+        backSizer.Add(btn,0,wx.RIGHT,3)
+        data[1]['autoPrms'] = data[1].get('autoPrms',{})
+        btn.Enable(bool(data[1]['autoPrms'].get('Mode')))
+        btn.Bind(wx.EVT_BUTTON,copyAutoBack)
+        fileSizer.Add(backSizer)
+        fileSizer.Add((-1,5))
+        
         fileSizer.Add(wx.StaticText(G2frame.dataWindow,-1,' Fixed background histogram (for point-by-point subtraction):'),0)
         if 'background PWDR' not in data[1]:
             data[1]['background PWDR'] = ['',-1.,False]
@@ -1817,7 +1864,79 @@ def UpdateBackground(G2frame,data):
             backSizer.Add(backFit,0,WACV)
         fileSizer.Add(backSizer)
         return fileSizer
-    
+
+    def onAutoBack(event):
+        '''Open a window for auto background computation
+        '''
+        bkgdict = data[1]
+        xydata = G2frame.GPXtree.GetItemPyData(G2frame.PatternId)[1]
+        autoBackground(G2frame)
+        if bkgdict['autoPrms']['Mode'] == 'fixed':
+            xydata[4] = G2pwd.autoBkgCalc(bkgdict,xydata[1])
+            addAutoBack(G2frame,data,xydata)
+            wx.CallAfter(UpdateBackground,G2frame,data)
+            G2plt.PlotPatterns(G2frame,plotType='PWDR')
+        elif bkgdict['autoPrms']['Mode'] == 'fit':
+            xydata[4] = G2pwd.autoBkgCalc(bkgdict,xydata[1])
+            npts = len(xydata[0])
+            bkgdict['FixedPoints'] = [i for i in zip(
+                xydata[0].data[::npts//100],
+                xydata[4].data[::npts//100])]
+            OnBkgFit(event)
+        else:
+            wx.CallAfter(UpdateBackground,G2frame,data)
+            G2plt.PlotPatterns(G2frame,plotType='PWDR')
+
+    def copyAutoBack(event):
+        '''reproduce the auto background computation on selected 
+        other histograms
+        '''
+        savePatternId = G2frame.PatternId
+        hst = G2frame.GPXtree.GetItemText(G2frame.PatternId)
+        autoBkgDict = data[1].get('autoPrms')
+        if not autoBkgDict.get('Mode'):
+            G2frame.ErrorDialog('No auto bkg setting','This is unexpected, no auto bkg parms for histogram '+hst,G2frame)
+            return
+        elif autoBkgDict['Mode'] == 'fit':
+            txt = 'set fixed points from auto bkg calc'
+        else:
+            txt = 'use auto bkg calc to define Fixed Bkg histogram'
+        histList = [i for i in GetHistsLikeSelected(G2frame)
+                        if 'Autobkg for' not in i]
+        if not histList:
+            G2frame.ErrorDialog('No match','No histograms match '+hst,G2frame)
+            return
+        dlg = G2G.G2MultiChoiceDialog(G2frame,
+                        f'Select histogram(s) to {txt} based on {hst}',
+                        'Compute auto bkg for...', histList)
+        try:
+            copyList = []
+            if dlg.ShowModal() == wx.ID_OK:
+                for i in dlg.GetSelections(): 
+                    copyList.append(histList[i])
+        finally:
+            dlg.Destroy()
+        for item in copyList:
+            Id = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,item)
+            G2frame.PatternId = Id
+            xydata = G2frame.GPXtree.GetItemPyData(Id)[1]
+            G2frame.GPXtree.SetItemPyData
+            bkgId = G2gd.GetGPXtreeItemId(G2frame,Id,'Background')
+            G2frame.GPXtree.SetItemPyData(bkgId,copy.deepcopy(data))
+            itemData = G2frame.GPXtree.GetItemPyData(bkgId)
+            if autoBkgDict['Mode'] == 'fixed':
+                xydata[4] = G2pwd.autoBkgCalc(itemData[1],xydata[1])
+                addAutoBack(G2frame,itemData,xydata)
+            elif autoBkgDict['Mode'] == 'fit':
+                xydata[4] = G2pwd.autoBkgCalc(itemData[1],xydata[1])
+                npts = len(xydata[0])
+                itemData[1]['FixedPoints'] = [i for i in zip(
+                xydata[0].data[::npts//100],
+                xydata[4].data[::npts//100])]
+                OnBkgFit(event)
+        G2frame.PatternId = savePatternId
+        wx.CallAfter(UpdateBackground,G2frame,data)
+
     def CalcBack(PatternId=G2frame.PatternId):
         limits = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,PatternId, 'Limits'))[1]
         inst,inst2 = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,PatternId, 'Instrument Parameters'))
@@ -1873,11 +1992,152 @@ def UpdateBackground(G2frame,data):
     mainSizer.Add(BackFileSizer())
     G2frame.dataWindow.SetSizer(mainSizer)
     G2frame.dataWindow.SetDataSize()
+
+def addAutoBack(G2frame,data,xydata):
+    '''Create a new histogram for the computed auto background and place
+    as the fixed background histogram
+    '''    
+    bkgHistName = 'PWDR Autobkg for '+G2frame.GPXtree.GetItemText(G2frame.PatternId)[5:]
+    # if histogram exists we should probably reuse it, but for now, just create a new one
+    bkgHistName = G2obj.MakeUniqueLabel(bkgHistName,G2frame.GetHistogramNames('PWDR'))
+
+    Ymin = min(xydata[4])
+    Ymax = max(xydata[4])
+    d = copy.deepcopy(G2frame.GPXtree.GetItemPyData(G2frame.PatternId))
+    d[0] = {'wtFactor': 1.0, 'Dummy': False,
+                  'ranId': ran.randint(0, sys.maxsize),
+                  'Offset': [0.0, 0.0], 'delOffset': 0.02*Ymax,
+                  'refOffset': -0.1*Ymax, 'refDelt': 0.1*Ymax,
+                  'Yminmax': [Ymin, Ymax]}
+    d[1][1] = xydata[4]
+    d[1][2] = np.ones_like(xydata[4])
+    d[1][3] = np.zeros_like(xydata[4])
+    d[1][4] = np.zeros_like(xydata[4])
+    d[1][5] = np.zeros_like(xydata[4])
+    NewId = G2frame.GPXtree.AppendItem(parent=G2frame.root,text=bkgHistName)
+    G2frame.GPXtree.SetItemPyData(NewId,d)
+                  
+    item, cookie = G2frame.GPXtree.GetFirstChild(G2frame.PatternId)
+    while item:
+        nam = G2frame.GPXtree.GetItemText(item)
+        if nam == 'Comments':
+            d = [' # background generated with Autobkg'] 
+        elif nam == 'Background':
+            d = [['chebyschev-1',True,3,1.0,0.0,0.0],
+                     {'nDebye':0,'debyeTerms':[],'nPeaks':0,'peaksList':[],
+                          'background PWDR':['',1.0,False],'FixedPoints':[]}]
+        elif nam == 'Peak List':
+            d = {'sigDict':{},'peaks':[]}
+        elif nam == 'Index Peak List':
+            d = [[], []]
+        elif nam == 'Unit Cells List':
+            d = []
+        elif nam == 'Reflection Lists':
+            d = {}                
+        else:
+            d = copy.deepcopy(G2frame.GPXtree.GetItemPyData(item))
+        G2frame.GPXtree.SetItemPyData(
+                    G2frame.GPXtree.AppendItem(parent=NewId,text=nam),d)
+        item, cookie = G2frame.GPXtree.GetNextChild(G2frame.PatternId, cookie)
+
+
+    bId = G2gd.GetGPXtreeItemId(G2frame,G2frame.PatternId,'Background')
+    data = G2frame.GPXtree.GetItemPyData(bId)
+    # set fixed bkg & turn off computed background
+    data[1]['background PWDR'] = [bkgHistName, 1.0, False]
+    data[0][1] = False
+    data[0][3:] = data[0][2]*[0.]
+    for p in data[1]['peaksList']:
+        p[2] = 0.
+        p[1::2] = 4*[False]
+    for p in data[1]['debyeTerms']:
+        p[0] = 0
+        p[1::2] = 3*[False]
+    G2frame.GetUsedHistogramsAndPhasesfromTree() # reindex
+
+# Autobackground Dialog
+class autoBackground(wx.Dialog):
+    '''Create a file selection widget for setting background with 
+    pybaselines, as requested by James Feng. 
+
+    :param wx.Frame G2frame: reference to the main GSAS-II frame.
+
+    '''
+    def __init__(self,G2frame,*args,**kwargs):
+        self.G2frame = G2frame
+        bId = G2gd.GetGPXtreeItemId(G2frame,G2frame.PatternId,'Background')
+        data = G2frame.GPXtree.GetItemPyData(bId)
+        self.bkgdict = data[1]
+        self.xydata = G2frame.GPXtree.GetItemPyData(G2frame.PatternId)[1]
+        npts = len(self.xydata[0])
+        # add auto bkg to background prms dict 
+        self.bkgdict['autoPrms'] = self.bkgdict.get('autoPrms',{})
+        self.bkgdict['autoPrms']['opt'] = self.bkgdict['autoPrms'].get('opt',0)
+        logLam =  min(10,float(int(10*np.log10(npts)**1.5)-9.5)/10.)
+        self.bkgdict['autoPrms']['logLam'] = self.bkgdict['autoPrms'].get('logLam',logLam)
+        self.bkgdict['autoPrms']['Mode'] = None
+        maxLam = min(15.,1.*int(3*self.bkgdict['autoPrms']['logLam']+0.9))
+        # save starting point info
+        self.startingBackground = copy.deepcopy(self.xydata[4])
+        # start process
+        wx.Dialog.__init__(self, parent=G2frame, 
+                                 style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        self.CenterOnParent()
         
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        mainSizer.Add(wx.StaticText(self,label=' Compute autobackground'),0)
+        choices = ['arpls','iarpls']
+        subSiz = wx.BoxSizer(wx.HORIZONTAL)
+        subSiz.Add(wx.StaticText(self,label='Computation option'))
+        for w in G2G.G2RadioButtons(self,self.bkgdict['autoPrms'],'opt',choices,
+                                    OnChange=self._calcBkg):
+            subSiz.Add(w,0,wx.ALIGN_CENTER_VERTICAL,0)
+        mainSizer.Add(subSiz)
+        siz = G2G.G2SliderWidget(self,self.bkgdict['autoPrms'],
+                                'logLam','log(Lambda)',
+                                1.,maxLam,100,self._calcBkg)
+        mainSizer.Add(siz)
+        
+        subSiz = wx.BoxSizer(wx.HORIZONTAL)
+        subSiz.Add((-1,-1),1,wx.EXPAND,1)
+        btn = wx.Button(self, wx.ID_CLOSE, label='Set Fixed\nPoints && Fit')
+        btn.Bind(wx.EVT_BUTTON,lambda event: self.EndModal(wx.ID_CLOSE))
+        subSiz.Add(btn)
+        subSiz.Add((5,-1))
+        btn = wx.Button(self, wx.ID_OK, label='Define Fixed\nBkg histogram')
+        btn.Bind(wx.EVT_BUTTON,lambda event: self.EndModal(wx.ID_OK))
+        subSiz.Add(btn)
+        btn = wx.Button(self, wx.ID_CANCEL)
+        subSiz.Add((5,-1))
+        subSiz.Add(btn,0,wx.CENTER)
+        subSiz.Add((-1,-1),1,wx.EXPAND,1)
+        mainSizer.Add((-1,5))
+        mainSizer.Add(subSiz,0,wx.EXPAND)
+        mainSizer.Add((-1,5))
+        self.SetSizer(mainSizer)
+        mainSizer.Fit(self)
+        self._calcBkg()
+        res = self.ShowModal()
+        if res == wx.ID_CLOSE:
+            self.bkgdict['autoPrms']['Mode'] = 'fit'
+        elif res == wx.ID_OK:
+            self.bkgdict['autoPrms']['Mode'] = 'fixed'
+        else:
+            # restore the background to the starting values
+            self.xydata[4] = self.startingBackground
+            self.bkgdict['autoPrms']['Mode'] = None
+        
+    def _calcBkg(self,event=None):
+        '''respond to a change in the background parameters by recomputing 
+        the auto background
+        '''
+        self.xydata[4] = G2pwd.autoBkgCalc(self.bkgdict,self.xydata[1].data)
+        import GSASIIplot as G2plt
+        G2plt.PlotPatterns(self.G2frame,plotType='PWDR')
+    
 ################################################################################
 #####  Limits
-################################################################################           
-       
+################################################################################       
 def UpdateLimitsGrid(G2frame, data,datatype):
     '''respond to selection of PWDR Limits data tree item.
     Allows setting of limits and excluded regions in a PWDR data set
@@ -2080,7 +2340,7 @@ def UpdateInstrumentGrid(G2frame,data):
                 res = G2G.BlockSelector(choices,ParentFrame=G2frame,title=head,
                     header='Select default inst parms',useCancel=True)
                 if res is None: return None
-                if 'Generic' in choices[res]:
+                if 'Generic TOF' in choices[res]:
                     dlg = G2G.MultiDataDialog(G2frame,title='Generic TOF detector bank',
                         prompts=['Total FP','2-theta',],values=[25.0,150.,],
                             limits=[[6.,200.],[5.,175.],],formats=['%6.2f','%6.1f',])
@@ -2426,7 +2686,7 @@ def UpdateInstrumentGrid(G2frame,data):
                     waveSizer.Add(wx.StaticText(G2frame.dataWindow,-1,'  Source type: '),0,WACV)
                     # PATCH?: for now at least, Source is not saved anywhere before here
                     if 'Source' not in data: data['Source'] = ['CuKa','?']
-                    choice = ['TiKa','CrKa','FeKa','CoKa','CuKa','MoKa','AgKa']
+                    choice = ['TiKa','CrKa','FeKa','CoKa','CuKa','GaKa','MoKa','AgKa','InKa']
                     lamPick = wx.ComboBox(G2frame.dataWindow,value=data['Source'][1],choices=choice,style=wx.CB_READONLY|wx.CB_DROPDOWN)
                     lamPick.Bind(wx.EVT_COMBOBOX, OnLamPick)
                     waveSizer.Add(lamPick,0)
@@ -2517,7 +2777,7 @@ def UpdateInstrumentGrid(G2frame,data):
                     instSizer.Add(RefineBox(item),0,WACV)
             elif 'E' in insVal['Type']:
                 key = '2-theta'
-                instSizer.Add(wx.StaticText(G2frame.dataWindow,-1,u' 2-theta): (%10.6f)'%(insDef[key])),0,WACV)
+                instSizer.Add(wx.StaticText(G2frame.dataWindow,-1,u' 2-theta (%10.6f):'%(insDef[key])),0,WACV)
                 tthVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,insVal,key,nDig=(10,6),typeHint=float,OnLeave=AfterChange)
                 labelLst.append(u'2-theta')
                 elemKeysLst.append([key,1])
@@ -2525,7 +2785,7 @@ def UpdateInstrumentGrid(G2frame,data):
                 instSizer.Add(tthVal,0,WACV)
                 refFlgElem.append([key,2])                   
                 instSizer.Add(RefineBox(key),0,WACV)
-                for item in ['XE','YE','ZE','A','B','C']:
+                for item in ['XE','YE','ZE','A','B','C','X','Y','Z']:
                     nDig = (10,6,'g')
                     labelLst.append(item)
                     elemKeysLst.append([item,1])
@@ -2747,12 +3007,10 @@ def UpdateInstrumentGrid(G2frame,data):
         fgs.Add(wx.StaticText(sdlg,wx.ID_ANY,'Histogram  '),0,WACV|wx.LEFT,14)
         for i,h in enumerate(histnames):
             if len(h[:5].strip()) > 20:
-                fgs.Add(G2G.ScrolledStaticText(sdlg,label=h[5:],
-                                               dots=False,lbllen=20)
-                            ,0,WACV|wx.LEFT|wx.RIGHT,5)
+                fgs.Add(G2G.ScrolledStaticText(sdlg,label=h[5:],dots=False,lbllen=20),
+                    0,WACV|wx.LEFT|wx.RIGHT,5)
             else:
                 fgs.Add(wx.StaticText(sdlg,wx.ID_ANY,h[5:]),0,WACV|wx.LEFT|wx.RIGHT,5)
-
         firstRadio = wx.RB_GROUP
         # put non-editable values at top of table (plot as x but not y)
         keylist = ['num']
@@ -2793,7 +3051,7 @@ def UpdateInstrumentGrid(G2frame,data):
         elif 'B' in data['Type'][1]:
             Items = ['Azimuth','Lam','Zero','Polariz.','U','V','W','X','Y','Z','alpha-0','alpha-1','beta-0','beta-1']
         elif 'E' in data['Type'][1]:
-            Items = ['2-theta','XE','YE','ZE','A','B','C']
+            Items = ['2-theta','XE','YE','ZE','A','B','C','X','Y','Z']
         elif 'T' in data['Type'][1]:            # TOF
             Items = ['difC','difA','difB','Zero','alpha','beta-0','beta-1','beta-q','sig-0','sig-1','sig-2','sig-q','X','Y','Z']
         # display the items in the table
@@ -2866,11 +3124,11 @@ def UpdateInstrumentGrid(G2frame,data):
     RefObj = {}
     #These from Intl. Tables C, Table 4.2.2.1, p. 177-179
     waves = {'CuKa':[1.54051,1.54433],'TiKa':[2.74841,2.75207],'CrKa':[2.28962,2.29351],
-        'FeKa':[1.93597,1.93991],'CoKa':[1.78892,1.79278],'MoKa':[0.70926,0.713543],
-        'AgKa':[0.559363,0.563775]}
+        'FeKa':[1.93597,1.93991],'CoKa':[1.78892,1.79278],'GaKa':[1.34003,1.34394],
+        'MoKa':[0.70926,0.713543],'AgKa':[0.559363,0.563775],'InKa':[0.512094,0.516525]}
     # meanwaves computed as (2*Ka1+Ka2)/3
     meanwaves = {'CuKa':1.54178,'TiKa':2.74963,'CrKa':2.29092,'FeKa':1.93728,
-        'CoKa':1.79021,'MoKa':0.71069,'AgKa':0.56083}
+        'CoKa':1.79021,'MoKa':0.71069,'AgKa':0.56083,'GaKa':1.34134,'Inka':0.51357}
     Inst2 = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,
             G2frame.PatternId,'Instrument Parameters'))[1]        
     G2gd.SetDataMenuBar(G2frame)
@@ -2881,11 +3139,12 @@ def UpdateInstrumentGrid(G2frame,data):
                 insVal['Azimuth'] = 0.0
                 insDef['Azimuth'] = 0.0
                 insRef['Azimuth'] = False
-#        if 'T' in insVal['Type']:
-#            if 'difB' not in insVal:
-#                insVal['difB'] = 0.0
-#                insDef['difB'] = 0.0
-#                insRef['difB'] = False
+        elif 'E' in insVal['Type']:
+            if 'X' not in insVal:
+                for item in ['X','Y','Z']:
+                    insVal[item] = 0.0
+                    insDef[item] = 0.0
+                    insRef[item] = False
     #end of patch
     if 'P' in insVal['Type']:                   #powder data menu commands
         G2gd.SetDataMenuBar(G2frame,G2frame.dataWindow.LimitMenu)
@@ -6027,8 +6286,7 @@ def UpdateSubstanceGrid(G2frame,data):
         
         Indx = {}
         substSizer = wx.BoxSizer(wx.VERTICAL)
-        substSizer.Add(wx.StaticText(parent=G2frame.dataWindow,label=' Substance list: wavelength: %.5fA'%(wave)),
-            0,WACV)
+        substSizer.Add(wx.StaticText(parent=G2frame.dataWindow,label=' Substance list: wavelength: %.5fA'%(wave)))
         for name in data['Substances']:
             G2G.HorizontalLine(substSizer,G2frame.dataWindow)    
             substSizer.Add(wx.StaticText(parent=G2frame.dataWindow,label=' Data for '+name+':'),0)
@@ -7662,12 +7920,15 @@ def computePDF(G2frame,data):
     Xlimits = [limits[1][0],limits[0][1]]       #use lower limit but ignore upper limit 
     inst = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,powId,'Instrument Parameters'))[0]
     auxPlot = G2pwd.CalcPDF(data,inst,Xlimits,xydata)
-    data['I(Q)'] = xydata['IofQ']
-    data['S(Q)'] = xydata['SofQ']
-    data['F(Q)'] = xydata['FofQ']
-    data['G(R)'] = xydata['GofR']
-    data['g(r)'] = xydata['gofr']
-    return auxPlot
+    try:
+        data['I(Q)'] = xydata['IofQ']
+        data['S(Q)'] = xydata['SofQ']
+        data['F(Q)'] = xydata['FofQ']
+        data['G(R)'] = xydata['GofR']
+        data['g(r)'] = xydata['gofr']
+        return auxPlot
+    except:   # PDF Calc aborted
+        pass
 
 def OptimizePDF(G2frame,data,showFit=True,maxCycles=5):
     '''Optimize the PDF to minimize the difference between G(r) and the expected value for

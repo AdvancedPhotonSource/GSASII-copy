@@ -1,17 +1,13 @@
 ########### SVN repository information ###################
-# $Date: 2017-11-29 22:38:49 -0600 (Wed, 29 Nov 2017) $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 3166 $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/unit_tests.py $
-# $Id: unit_tests.py 3166 2017-11-30 04:38:49Z toby $
+# $Id: unit_tests.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
-'''
-*unit_tests: Self-test Module*
-------------------------------
-
-A script that can be run to test a series of self-tests in GSAS-II. At present,
-only modules ``GSASIIspc`` and ``GSASIIlattice`` have self-tests. 
-
+'''At present,
+only modules :mod:`GSASIIspc` and :mod:`GSASIIlattice` have self-tests
+and these have not been tested or updated in many, many years. 
 '''
 
 import GSASIIspc

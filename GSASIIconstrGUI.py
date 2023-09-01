@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
 #GSASIIconstrGUI - constraint GUI routines
 ########### SVN repository information ###################
-# $Date: 2023-03-30 15:08:28 -0500 (Thu, 30 Mar 2023) $
+# $Date: 2023-05-20 13:24:42 -0500 (Sat, 20 May 2023) $
 # $Author: vondreele $
-# $Revision: 5526 $
+# $Revision: 5586 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIconstrGUI.py $
-# $Id: GSASIIconstrGUI.py 5526 2023-03-30 20:08:28Z vondreele $
+# $Id: GSASIIconstrGUI.py 5586 2023-05-20 18:24:42Z vondreele $
 ########### SVN repository information ###################
 '''
-*GSASIIconstrGUI: Constraint GUI routines*
-------------------------------------------
-
-Used to define constraints and rigid bodies.
+Constraints and rigid bodies GUI routines follow.
 
 '''
 from __future__ import division, print_function
@@ -28,7 +25,7 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as nl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5526 $")
+GSASIIpath.SetVersionNumber("$Revision: 5586 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 import GSASIIstrIO as G2stIO
@@ -41,7 +38,6 @@ import GSASIIfiles as G2fl
 import GSASIIplot as G2plt
 import GSASIIobj as G2obj
 import GSASIIspc as G2spc
-import GSASIIpy3 as G2py3
 import GSASIIphsGUI as G2phG
 import GSASIIIO as G2IO
 import GSASIIscriptable as G2sc
@@ -3401,6 +3397,18 @@ in the plane defined by B to A and C to A. A,B,C must not be collinear.
                     data['Spin'][Indx[ObjId]]['atType'] = El
                     data['Spin'][Indx[ObjId]]['Color'] = G2elem.GetAtomInfo(El)['Color']
                     Obj.ChangeValue(El)
+                    if 'Q' in El:
+                        wx.CallAfter(UpdateSpinRB)
+                    
+        def OnElSel(event):
+            Obj = event.GetEventObject()
+            ObjId = event.GetId()
+            PE = G2elemGUI.PickElement(G2frame,oneOnly=False,ifOrbs=True)
+            if PE.ShowModal() == wx.ID_OK:
+                if PE.Elem != 'None':
+                    El = PE.Elem.strip().lower().capitalize()
+                    data['Spin'][Indx[ObjId]]['elType'] = El
+                    Obj.ChangeValue(El)
                    
         def OnSymSel(event):
             ObjId = event.GetId()
@@ -3427,26 +3435,43 @@ in the plane defined by B to A and C to A. A,B,C must not be collinear.
         else:
             SpinRBSizer = wx.BoxSizer(wx.VERTICAL)
         Indx = {}
-        SpinRBSizer.Add(wx.StaticText(SpinRBDisplay,label=' Spinning rigid body shells/nonspherical atoms (radius=0):'),0,WACV)
-        bodSizer = wx.FlexGridSizer(0,5,5,5)
+        SpinRBSizer.Add(wx.StaticText(SpinRBDisplay,label=' Spinning rigid body shells/nonspherical atoms (Atom=Q & select Orbitals):'))
+        nQ = 0
+        for spinID in data['Spin']:
+            if 'Q' in data['Spin'][spinID]['atType']:
+                nQ += 1
+        if nQ:
+            bodSizer = wx.FlexGridSizer(0,6,5,5)
+        else:
+            bodSizer = wx.FlexGridSizer(0,5,5,5)
         for item in ['Name','Type','RB sym','Atom','Number']:
             bodSizer.Add(wx.StaticText(SpinRBDisplay,label=item))
         for ibod,spinID in enumerate(data['Spin']):
+            if nQ:
+                bodSizer.Add(wx.StaticText(SpinRBDisplay,label='Orbitals from'))
             bodSizer.Add(G2G.ValidatedTxtCtrl(SpinRBDisplay,data['Spin'][spinID],'RBname'))
             bodSizer.Add(wx.StaticText(SpinRBDisplay,label='Q'),0)
             data['Spin'][spinID]['rbType'] = 'Q'    #patch
-            symchoice = ['53m','m3m','-43m','6/mmm','-6m2','-3m','4/mmm','-42m','mmm','2/m','-1','1']
+            symchoice = ['53m','m3m','-43m','6/mmm','-6m2','-3m','3m','32','4/mmm','-42m','mmm','2/m','-1','1']
             data['Spin'][spinID]['RBsym'] = data['Spin'][spinID].get('RBsym','53m')
             simsel = wx.ComboBox(SpinRBDisplay,choices=symchoice,value=data['Spin'][spinID]['RBsym'],
                 style=wx.CB_READONLY|wx.CB_DROPDOWN)
             Indx[simsel.GetId()] = spinID
             simsel.Bind(wx.EVT_COMBOBOX,OnSymSel)
             bodSizer.Add(simsel)
-            atSel = wx.TextCtrl(SpinRBDisplay,value=data['Spin'][spinID]['atType'])
-            atSel.Bind(wx.EVT_TEXT,OnAtSel)
+            atSel = wx.TextCtrl(SpinRBDisplay,value=data['Spin'][spinID]['atType'],style=wx.TE_PROCESS_ENTER)
+            atSel.Bind(wx.EVT_TEXT_ENTER,OnAtSel)
             Indx[atSel.GetId()] = spinID
             bodSizer.Add(atSel,0)
             bodSizer.Add(G2G.ValidatedTxtCtrl(SpinRBDisplay,data['Spin'][spinID],'Natoms'))
+            if 'Q' in data['Spin'][spinID]['atType']:
+                data['Spin'][spinID]['elType'] = data['Spin'][spinID].get('elType','C')
+                elSel = wx.TextCtrl(SpinRBDisplay,value=data['Spin'][spinID]['elType'],style=wx.TE_PROCESS_ENTER)
+                elSel.Bind(wx.EVT_TEXT_ENTER,OnElSel)
+                Indx[elSel.GetId()] = spinID
+                bodSizer.Add(elSel,0)
+            elif nQ:
+                bodSizer.Add((5,5))
         
         SpinRBSizer.Add(bodSizer)
         SpinRBSizer.Add((5,25),)
@@ -3512,8 +3537,7 @@ in the plane defined by B to A and C to A. A,B,C must not be collinear.
             # start of rbNameSizer
             nameSizer = wx.BoxSizer(wx.HORIZONTAL)
             nameSizer.Add(wx.StaticText(ResidueRBDisplay,-1,'Residue name: '),0,WACV)
-            RBname = wx.TextCtrl(ResidueRBDisplay,-1,rbData['RBname'],
-                                     style=wx.TE_PROCESS_ENTER)
+            RBname = wx.TextCtrl(ResidueRBDisplay,-1,rbData['RBname'],style=wx.TE_PROCESS_ENTER)
             RBname.Bind(wx.EVT_LEAVE_WINDOW, OnRBName)
             RBname.Bind(wx.EVT_TEXT_ENTER,OnRBName)
             RBname.Bind(wx.EVT_KILL_FOCUS,OnRBName)
@@ -4067,14 +4091,14 @@ def ShowIsoDistortCalc(G2frame,phase=None):
                 subSizer2.Add((-1,-1))
             subSizer1.Add(wx.StaticText(panel1,wx.ID_ANY,str(lbl)))
             try:
-                value = G2py3.FormatSigFigs(delocc)
+                value = G2fl.FormatSigFigs(delocc)
             except TypeError:
                 value = str(delocc)
             subSizer1.Add(wx.StaticText(panel1,wx.ID_ANY,value),0,wx.ALIGN_RIGHT)
             #subSizer.Add((10,-1))
             subSizer2.Add(wx.StaticText(panel2,wx.ID_ANY,str(var)))
             try:
-                value = G2py3.FormatSigFigs(val/norm)
+                value = G2fl.FormatSigFigs(val/norm)
                 if 'varyList' in covdata:
                     if str(G2mode) in covdata['varyList']:
                         sig = covdata['sig'][covdata['varyList'].index(str(G2mode))]

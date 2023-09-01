@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
 #GSASIIrestr - restraint GUI routines
 ########### SVN repository information ###################
-# $Date: 2022-12-25 14:51:17 -0600 (Sun, 25 Dec 2022) $
+# $Date: 2023-08-31 16:58:38 -0500 (Thu, 31 Aug 2023) $
 # $Author: toby $
-# $Revision: 5446 $
+# $Revision: 5655 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIrestrGUI.py $
-# $Id: GSASIIrestrGUI.py 5446 2022-12-25 20:51:17Z toby $
+# $Id: GSASIIrestrGUI.py 5655 2023-08-31 21:58:38Z toby $
 ########### SVN repository information ###################
-'''
-*GSASIIrestrGUI: Restraint GUI routines*
-----------------------------------------
-
-Used to define restraints.
-
+'''Restraint GUI routines follow.
 '''
 from __future__ import division, print_function
 import wx
@@ -21,7 +16,7 @@ import numpy as np
 import numpy.ma as ma
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5446 $")
+GSASIIpath.SetVersionNumber("$Revision: 5655 $")
 import GSASIImath as G2mth
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -213,6 +208,8 @@ def UpdateRestraints(G2frame,data,phaseName):
             AddChemCompRestraint(restrData['ChemComp'])
         elif 'Texture' in G2frame.restrBook.GetPageText(page):
             AddTextureRestraint(restrData['Texture'])
+        elif 'Moments' in G2frame.restrBook.GetPageText(page):
+            AddMomentRestraint(restrData['Moments'])
         elif 'General' in G2frame.restrBook.GetPageText(page):
             parmDict = SetupParmDict(G2frame)
             dlg = G2exG.ExpressionDialog(G2frame,parmDict,
@@ -279,7 +276,7 @@ def UpdateRestraints(G2frame,data,phaseName):
                     else:
                         Lists[listName].append([Ids[x],Types[x],Coords[x],])
             else:
-                break
+                return
         if len(Lists['origin']) and len(Lists['target']):
             bond = 1.54
             dlg = G2G.SingleFloatDialog(G2frame,'Distance','Enter restraint distance for bond',bond,[0.01,4.],'%.4f')
@@ -287,38 +284,16 @@ def UpdateRestraints(G2frame,data,phaseName):
                 bond = dlg.GetValue()
             dlg.Destroy()
         Factor = bondRestData['Range']
-        indices = (-2,-1,0,1,2)
-        Units = np.array([[h,k,l] for h in indices for k in indices for l in indices])
-        origAtoms = Lists['origin']
-        targAtoms = Lists['target']
-        dlg = wx.ProgressDialog("Generating bond restraints","Processed origin atoms",len(origAtoms), 
+        dlg = wx.ProgressDialog("Generating bond restraints","Processed origin atoms",len(Lists['origin']), 
             style = wx.PD_ELAPSED_TIME|wx.PD_AUTO_HIDE|wx.PD_REMAINING_TIME)
         try:
-            Norig = 0
-            for Oid,Otype,Ocoord in origAtoms:
-                Norig += 1
-                dlg.Update(Norig)
-                for Tid,Ttype,Tcoord in targAtoms:
-                    if 'macro' in General['Type']:
-                        result = [[Tcoord,1,[0,0,0],[]],]
-                    else:
-                        result = G2spc.GenAtom(Tcoord,SGData,False,Move=False)
-                    for Txyz,Top,Tunit,Spn in result:
-                        Dx = (Txyz-np.array(Ocoord))+Units
-                        dx = np.inner(Amat,Dx)
-                        dist = ma.masked_less(np.sqrt(np.sum(dx**2,axis=0)),bond/Factor)
-                        IndB = ma.nonzero(ma.masked_greater(dist,bond*Factor))
-                        if np.any(IndB):
-                            for indb in IndB:
-                                for i in range(len(indb)):
-                                    unit = Units[indb][i]+Tunit
-                                    if np.any(unit):
-                                        Topstr = '%d+%d,%d,%d'%(Top,unit[0],unit[1],unit[2])
-                                    else:
-                                        Topstr = str(Top)
-                                    newBond = [[Oid,Tid],['1',Topstr],bond,0.01]
-                                    if newBond not in bondRestData['Bonds']:
-                                        bondRestData['Bonds'].append(newBond)
+            bondlst = G2mth.searchBondRestr(Lists['origin'],Lists['target'],
+                                            bond,Factor,General['Type'],
+                                            SGData,Amat,0.01,dlg)
+            for newBond in bondlst:
+                if newBond not in bondRestData['Bonds']:
+                    bondRestData['Bonds'].append(newBond)
+                
         finally:
             dlg.Destroy()
         UpdateBondRestr(bondRestData)                
@@ -412,7 +387,7 @@ def UpdateRestraints(G2frame,data,phaseName):
                         else:
                             Lists[listName].append([Ids[x],Types[x],Coords[x],])
             else:
-                break
+                return
             targAtoms = [[Ids[x+iBeg],Types[x+iBeg],Coords[x+iBeg]] for x in range(len(Names[iBeg:]))]
         if len(Lists['B-atom']):
             value = 109.54
@@ -862,6 +837,23 @@ def UpdateRestraints(G2frame,data,phaseName):
                 UpdateChemcompRestr(chemcompRestData)
             else:
                 print ('**** ERROR - not enough atoms for a composition restraint - try again ****')
+                
+    def AddMomentRestraint(momentRestData):
+        ids = []
+        dlg = G2G.G2MultiChoiceDialog(G2frame,'Select 2 or more atoms for average moment restraint in '+General['Name'],
+                'Select 2+ atoms',Names[iBeg:])
+        if dlg.ShowModal() == wx.ID_OK:
+            sel = dlg.GetSelections()
+            if len(sel) > 1:
+                for x in sel:
+                    ids.append(Ids[x+iBeg])
+                moment = [ids,0.0,0.01]
+                if moment not in momentRestData['Moments']:
+                    momentRestData['Moments'].append(moment)
+            else:
+                print ('**** ERROR - not enough atoms for a average moment restraint - try again ****')
+        UpdateMomentRestr(momentRestData)                
+
         
     def AddTextureRestraint(textureRestData):
         dlg = wx.TextEntryDialog(G2frame,'Enter h k l for pole figure restraint','Enter HKL','')
@@ -1056,9 +1048,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                 G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
                 G2frame.Bind(wx.EVT_MENU, OnChangeValue, id=G2G.wxID_RESRCHANGEVAL)
                 G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
-                mainSizer.Add(wx.StaticText(BondRestr,-1,
-                    'Bond restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                    %(chisq,chisq/len(bondList))),0)
+                frac = '?'
+                if 'chisq' in Rvals:
+                    frac = f"{100 * chisq / Rvals['chisq']:.1f}"
+                mainSizer.Add(wx.StaticText(BondRestr,wx.ID_ANY,
+                    f'Bond restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(bondList):.2f}'
+                                        ),0)
                 Bonds.SetScrollRate(10,10)
                 Bonds.SetMinSize((-1,300))
                 mainSizer.Add(Bonds,1,wx.EXPAND,1)
@@ -1197,9 +1192,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                 G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
                 G2frame.Bind(wx.EVT_MENU, OnChangeValue, id=G2G.wxID_RESRCHANGEVAL)
                 G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
-                mainSizer.Add(wx.StaticText(AngleRestr,-1,
-                    'Angle restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                    %(chisq,chisq/len(angleList))),0)
+                frac = '?'
+                if 'chisq' in Rvals:
+                    frac = f"{100 * chisq / Rvals['chisq']:.1f}"
+                mainSizer.Add(wx.StaticText(AngleRestr,wx.ID_ANY,
+                    f'Angle restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(angleList):.2f}'
+                                        ),0)
                 Angles.SetScrollRate(10,10)
                 Angles.SetMinSize((-1,300))
                 mainSizer.Add(Angles,1,wx.EXPAND,1)
@@ -1331,9 +1329,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                     G2frame.dataWindow.RestraintEdit.Enable(id=i,enable=True)
                 G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
                 G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
+                frac = '?'
+                if 'chisq' in Rvals:
+                    frac = f"{100 * chisq / Rvals['chisq']:.1f}"
                 mainSizer.Add(wx.StaticText(PlaneRestr,-1,
-                    'Plane restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                    %(chisq,chisq/len(planeList))),0)
+                    f'Plane restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(planeList):.2f}'
+                                        ),0)
                 Planes.SetScrollRate(10,10)
                 Planes.SetMinSize((-1,300))
                 mainSizer.Add(Planes,1,wx.EXPAND,1)
@@ -1469,9 +1470,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                 G2frame.Bind(wx.EVT_MENU, OnChangeValue, id=G2G.wxID_RESRCHANGEVAL)
                 G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
                 G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
+                frac = '?'
+                if 'chisq' in Rvals:
+                    frac = f"{100 * chisq / Rvals['chisq']:.1f}"
                 mainSizer.Add(wx.StaticText(ChiralRestr,-1,
-                    'Chiral volume restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                    %(chisq,chisq/len(volumeList))),0)
+                    f'Chiral volume restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(volumeList):.2f}'
+                                        ),0)
                 Volumes.SetScrollRate(10,10)
                 Volumes.SetMinSize((-1,300))
                 mainSizer.Add(Volumes,1,wx.EXPAND,1)
@@ -1603,9 +1607,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                 G2frame.dataWindow.RestraintEdit.Enable(id=i,enable=True)
             G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
             G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
+            frac = '?'
+            if 'chisq' in Rvals:
+                frac = f"{100 * chisq / Rvals['chisq']:.1f}"
             mainSizer.Add(wx.StaticText(TorsionRestr,-1,
-                'Torsion restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                %(chisq,chisq/len(torsionList))),0)
+                f'Torsion restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(torsionList):.2f}'
+                                        ),0)
             TorsionRestr.Torsions.SetScrollRate(10,10)
             TorsionRestr.Torsions.SetMinSize((-1,300))
             mainSizer.Add(TorsionRestr.Torsions,1,wx.EXPAND,1)
@@ -1736,9 +1743,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                     G2frame.dataWindow.RestraintEdit.Enable(id=i,enable=True)
                 G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
                 G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
+                frac = '?'
+                if 'chisq' in Rvals:
+                    frac = f"{100 * chisq / Rvals['chisq']:.1f}"
                 mainSizer.Add(wx.StaticText(RamaRestr,-1,
-                    'Ramachandran restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                    %(chisq,chisq/len(ramaList))),0)
+                    f'Ramachandran restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(ramaList):.2f}'
+                                                ),0)
                 RamaRestr.Ramas.SetScrollRate(10,10)
                 RamaRestr.Ramas.SetMinSize((-1,300))
                 mainSizer.Add(RamaRestr.Ramas,1,wx.EXPAND,1)
@@ -1879,9 +1889,12 @@ def UpdateRestraints(G2frame,data,phaseName):
                 G2frame.dataWindow.RestraintEdit.Enable(id=G2G.wxID_RESTDELETE,enable=True)
                 G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
                 #G2frame.Bind(wx.EVT_MENU, OnChangeValue, id=G2G.wxID_RESRCHANGEVAL)
+                frac = '?'
+                if 'chisq' in Rvals:
+                    frac = f"{100 * chisq / Rvals['chisq']:.1f}"
                 mainSizer.Add(wx.StaticText(ChemCompRestr,-1,
-                    'Chemical composition restraints: sum(wt*(delt/sig)^2) =    %.2f, mean(wt*(delt/sig)^2) =    %.2f'    \
-                    %(chisq,chisq/len(chemcompList))))
+                    f'Chemical composition restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(chemcompList):.2f}'
+                                        ),0)
                 mainSizer.Add(ChemComps)
             else:
                 mainSizer.Add(wx.StaticText(ChemCompRestr,-1,'No chemical composition restraints for this phase'),0,)
@@ -1890,6 +1903,106 @@ def UpdateRestraints(G2frame,data,phaseName):
 
         G2phsGUI.SetPhaseWindow(ChemCompRestr,mainSizer,Scroll=0)
             
+    def UpdateMomentRestr(momentRestData):
+            
+        def OnChangeEsd(event):
+            rows = GetSelectedRows(Moments)
+            if not rows:
+                return
+            Moments.ClearSelection()
+            val = momentList[rows[0]][-1]
+            dlg = G2G.SingleFloatDialog(G2frame,'New value','Enter new esd for moments',val,[0.,5.],'%.3f')
+            if dlg.ShowModal() == wx.ID_OK:
+                parm = dlg.GetValue()
+                for r in rows:
+                    momentRestData['Moments'][r][-1] = parm
+            dlg.Destroy()
+            UpdateMomentRestr(momentRestData)                
+                                            
+        def OnDeleteRestraint(event):
+            rows = GetSelectedRows(Moments,'delete',G2frame)
+            G2frame.GetStatusBar().SetStatusText('',1)
+            if not rows:
+                G2frame.GetStatusBar().SetStatusText('First select restraints to be deleted',1)
+                return
+            rows.sort()
+            rows.reverse()
+            for row in rows:
+                momentList.remove(momentList[row])
+            UpdateMomentRestr(momentRestData)
+                
+        try:
+            if MomentRestr.GetSizer(): MomentRestr.GetSizer().Clear(True)
+        except:
+            pass
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        mainSizer.Add((5,5),0)
+        mainSizer.Add(WtBox(MomentRestr,momentRestData),0)
+        mainSizer.Add((5,5),0)
+
+        for i in (G2G.wxID_RESTDELETE,G2G.wxID_RESRCHANGEVAL,G2G.wxID_RESTCHANGEESD):
+            G2frame.dataWindow.RestraintEdit.Enable(id=i,enable=False)
+            
+        momentList = momentRestData['Moments']
+        if len(momentList):
+            table = []
+            rowLabels = []
+            bad = []
+            chisq = 0.
+            maxno = 0
+            for item in momentList:
+                maxno = max(maxno,len(item[0]))
+            colLabels = maxno*['atom','calc']+['target','esd']
+            Types = maxno*[wg.GRID_VALUE_STRING,wg.GRID_VALUE_FLOAT+':10,3']+2*[wg.GRID_VALUE_FLOAT+':10,3',]
+            for i,[indx,obs,esd] in enumerate(momentList):
+                try:
+                    sum = 0.
+                    atoms = G2mth.GetAtomItemsById(Atoms,AtLookUp,indx,ct-1)
+                    Mom = np.array(G2mth.GetAtomItemsById(Atoms,AtLookUp,indx,cx+4,3))
+                    line = []
+                    for a,atom in enumerate(atoms):
+                        calc = G2mth.GetMag(Mom[a],Cell)
+                        sum += calc
+                        line += [atom,calc]
+                    line += (maxno-len(atoms))*['','']
+                    obs = sum/len(atoms)
+                    line += [obs,esd]
+                    for a,atom in enumerate(atoms):
+                        chisq += momentRestData['wtFactor']*((obs-calc)/esd)**2
+                    table.append(line)
+                    rowLabels.append(str(i))
+                except KeyError:
+                    print ('**** WARNING - missing atom - restraint deleted ****')
+                    bad.append(i)
+            momentTable = G2G.Table(table,rowLabels=rowLabels,colLabels=colLabels,types=Types)
+            Moments = G2G.GSGrid(MomentRestr)
+            Moments.SetTable(momentTable, True)
+            Moments.AutoSizeColumns(False)
+            Moments.AutoSizeRows(False)
+            for r in range(len(momentList)):
+                for c in range(maxno*2+1):
+                    Moments.SetReadOnly(r,c,True)
+                    Moments.SetCellStyle(r,c,VERY_LIGHT_GREY,True)
+                    if not c%2 and not Moments.GetCellValue(r,c):
+                        Moments.SetCellTextColour(r,c+1,VERY_LIGHT_GREY)
+            Moments.Bind(wg.EVT_GRID_LABEL_LEFT_CLICK,OnRowSelect)
+            for i in (G2G.wxID_RESTDELETE,G2G.wxID_RESTCHANGEESD):
+                G2frame.dataWindow.RestraintEdit.Enable(id=i,enable=True)
+            G2frame.Bind(wx.EVT_MENU, OnDeleteRestraint, id=G2G.wxID_RESTDELETE)
+            G2frame.Bind(wx.EVT_MENU, OnChangeEsd, id=G2G.wxID_RESTCHANGEESD)
+            frac = '?'
+            if 'chisq' in Rvals:
+                frac = f"{100 * chisq / Rvals['chisq']:.1f}"
+            mainSizer.Add(wx.StaticText(MomentRestr,-1,
+                f'Moment restraints: sum(wt*(delt/sig)^2) = {chisq:.2f} ({frac}% of total), mean(wt*(delt/sig)^2) = {chisq/len(momentList):.2f}'
+                                        ),0)
+            Moments.SetScrollRate(10,10)
+            Moments.SetMinSize((-1,300))
+            mainSizer.Add(Moments,1,wx.EXPAND,1)
+        else:
+            mainSizer.Add(wx.StaticText(MomentRestr,-1,'No magnetic moment restraints for this phase'),0,)
+        G2phsGUI.SetPhaseWindow(MomentRestr,mainSizer,Scroll=0)
+
     def UpdateTextureRestr(textureRestData):
             
         def OnDeleteRestraint(event):
@@ -1968,7 +2081,8 @@ def UpdateRestraints(G2frame,data,phaseName):
         else:
             mainSizer.Add(wx.StaticText(TextureRestr,-1,'No texture restraints for this phase'),0,)
         G2phsGUI.SetPhaseWindow(TextureRestr,mainSizer,Scroll=0)
-            
+        
+
     def UpdateGeneralRestr(generalRestData):
         '''Display any generalized restraint expressions'''
         
@@ -2134,6 +2248,12 @@ def UpdateRestraints(G2frame,data,phaseName):
             G2frame.dataWindow.RestraintEdit.Enable(G2G.wxID_RESRCHANGEVAL,True)
             textureRestData = restrData['Texture']
             UpdateTextureRestr(textureRestData)
+        elif text == 'Moments':
+            G2gd.SetDataMenuBar(G2frame,G2frame.dataWindow.RestraintMenu)
+            G2frame.dataWindow.RestraintEdit.Enable(G2G.wxID_RESTRAINTADD,True)
+            G2frame.dataWindow.RestraintEdit.Enable(G2G.wxID_RESRCHANGEVAL,True)
+            momentRestData = restrData['Moments']
+            UpdateMomentRestr(momentRestData)
         elif text == 'General':
             G2gd.SetDataMenuBar(G2frame,G2frame.dataWindow.RestraintMenu)
             G2frame.dataWindow.RestraintEdit.Enable(G2G.wxID_RESTRAINTADD,True)
@@ -2171,6 +2291,13 @@ def UpdateRestraints(G2frame,data,phaseName):
             print ("Warning: tab "+tabname+" was not found")
 
     #### UpdateRestraints execution starts here
+    covdata = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,G2frame.root,'Covariance'))
+    Nvars = 0
+    Rvals = {}
+    if 'Rvals' in covdata:
+        Nvars = len(covdata['varyList'])
+        Rvals = covdata['Rvals']
+        
     try:
         phasedata = G2frame.GetPhaseData()[phaseName]
     except KeyError:        #delete unknown or previously deleted phases from Restraints
@@ -2202,6 +2329,8 @@ def UpdateRestraints(G2frame,data,phaseName):
     if 'General' not in restrData:
         restrData['General'] = {'wtFactor':1.0,'General':[], 'Use':True}
     General = phasedata['General']
+    if General['Type'] == 'magnetic' and 'Moments' not in restrData:
+        restrData['Moments'] = {'wtFactor':1.0,'Moments':[],'Use':True}
     Cell = General['Cell'][1:7]          #skip flag & volume    
     Amat,Bmat = G2lat.cell2AB(Cell)
     SGData = General['SGData']
@@ -2276,6 +2405,12 @@ def UpdateRestraints(G2frame,data,phaseName):
     ChemCompRestr = wx.ScrolledWindow(G2frame.restrBook)
     G2frame.restrBook.AddPage(ChemCompRestr,txt)
     Pages.append(txt)
+    
+    if 'magnetic' in General['Type']:
+        txt = 'Moments'
+        MomentRestr = wx.ScrolledWindow(G2frame.restrBook)
+        G2frame.restrBook.AddPage(MomentRestr,txt)
+        Pages.append(txt)
     
     txt = 'General'
     GeneralRestr = wx.ScrolledWindow(G2frame.restrBook)

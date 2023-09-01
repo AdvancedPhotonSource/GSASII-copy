@@ -1,43 +1,14 @@
 # -*- coding: utf-8 -*-
-'''
-*GSASIIlattice: Unit cells*
----------------------------
-
-Perform lattice-related computations
-
-Note that *G* is the reciprocal lattice tensor, and *g* is its inverse,
-:math:`G = g^{-1}`, where 
-
-  .. math::
-
-   g = \\left( \\begin{matrix}
-   a^2 & a b\\cos\\gamma & a c\\cos\\beta \\\\
-   a b\\cos\\gamma & b^2 & b c \\cos\\alpha \\\\
-   a c\\cos\\beta &  b c \\cos\\alpha & c^2
-   \\end{matrix}\\right)
-
-The "*A* tensor" terms are defined as
-:math:`A = (\\begin{matrix} G_{11} & G_{22} & G_{33} & 2G_{12} & 2G_{13} & 2G_{23}\\end{matrix})` and *A* can be used in this fashion:
-:math:`d^* = \\sqrt {A_0 h^2 + A_1 k^2 + A_2 l^2 + A_3 hk + A_4 hl + A_5 kl}`, where
-*d* is the d-spacing, and :math:`d^*` is the reciprocal lattice spacing, 
-:math:`Q = 2 \\pi d^* = 2 \\pi / d`. 
-Note that GSAS-II variables ``p::Ai`` (i = 0, 1,... 5) and ``p`` is a phase number are 
-used for the *Ai* values. See :func:`A2cell`, :func:`cell2A` for interconversion between A and 
-unit cell parameters; :func:`cell2Gmat` :func:`Gmat2cell` for G and cell parameters. 
-
-When the hydrostatic/elastic strain coefficients (*Dij*, :math:`D_{ij}`) are used, they are added to the 
-*A* tensor terms (Ai, :math:`A_{i}`) so that A is redefined 
-:math:`A = (\\begin{matrix} A_{0} + D_{11} & A_{1} + D_{22} & A_{2} + D_{33} & A_{3} + D_{12} & A_{4} + D_{13} & A_{5} + D_{23}\\end{matrix})`. See :func:`cellDijFill`. 
-Note that GSAS-II variables ``p:h:Dij`` (i,j = 1, 2, 3) and ``p`` is a phase number 
-and ``h`` a histogram number are used for the *Dij* values.
-'''
 ########### SVN repository information ###################
-# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
+# $Date: 2023-06-22 15:47:18 -0500 (Thu, 22 Jun 2023) $
 # $Author: vondreele $
-# $Revision: 5520 $
+# $Revision: 5620 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIlattice.py $
-# $Id: GSASIIlattice.py 5520 2023-03-23 18:03:34Z vondreele $
+# $Id: GSASIIlattice.py 5620 2023-06-22 20:47:18Z vondreele $
 ########### SVN repository information ###################
+'''
+:mod:`GSASIIlattice` Classes & routines follow
+'''
 from __future__ import division, print_function
 import math
 import time
@@ -51,7 +22,7 @@ import GSASIIpath
 import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
-GSASIIpath.SetVersionNumber("$Revision: 5520 $")
+GSASIIpath.SetVersionNumber("$Revision: 5620 $")
 # trig functions in degrees
 sind = lambda x: np.sin(x*np.pi/180.)
 asind = lambda x: 180.*np.arcsin(x)/np.pi
@@ -785,7 +756,8 @@ def makeBilbaoPhase(result,uvec,trans,ifMag=False):
     if ifMag:
         BNSlatt = phase['SGData']['SGLatt']
         if not result[1]:
-            phase['SGData']['SGSpin'] = G2spc.GetSGSpin(phase['SGData'],result[0])
+            MSpGrp = G2spc.SplitMagSpSG(result[0])
+            phase['SGData']['SGSpin'] = G2spc.GetSGSpin(phase['SGData'],MSpGrp)
         phase['SGData']['GenSym'],phase['SGData']['GenFlg'],BNSsym = G2spc.GetGenSym(phase['SGData'])
         if result[1]:
             BNSlatt += '_'+result[1]
@@ -940,6 +912,7 @@ def cell2AB(cell,alt=False):
     :returns: tuple of two 3x3 numpy arrays (A,B)
        A for crystal to Cartesian transformations A*x = np.inner(A,x) = X 
        B (= inverse of A) for Cartesian to crystal transformation B*X = np.inner(B,X) = x
+       both rounded to 12 places (typically zero terms = +/-10e-6 otherwise)
     """
     G,g = cell2Gmat(cell) 
     cellstar = Gmat2cell(G)
@@ -951,6 +924,7 @@ def cell2AB(cell,alt=False):
         A[1][1] = cell[1]*sind(cell[3])
         A[1][2] = cell[1]*cosd(cell[3])
         A[2][2] = cell[2]
+        A = np.around(A,12)
         B = nl.inv(A)
         return A,B
     # from Giacovazzo (Fundamentals 2nd Ed.) p.75
@@ -960,6 +934,7 @@ def cell2AB(cell,alt=False):
     A[1][1] = cell[1]*sind(cell[5])  # b sin(gamma)
     A[1][2] = -cell[2]*cosd(cellstar[3])*sind(cell[4]) # - c cos(alpha*) sin(beta)
     A[2][2] = 1./cellstar[2]         # 1/c*
+    A = np.around(A,12)
     B = nl.inv(A)
     return A,B
     
@@ -977,7 +952,6 @@ def HKL2SpAng(H,cell,SGData):
     phi = acosd(xH[2]/r)
     psi = atan2d(xH[1],xH[0])
     phi = np.where(phi>90.,180.-phi,phi)
-#    GSASIIpath.IPyBreak()
     return r,phi,psi
     
 def U6toUij(U6):
@@ -1413,7 +1387,7 @@ def RBsymCheck(Atoms,ct,cx,cs,AtLookUp,Amat,RBObjIds,SGData):
             if Atoms[AtLookUp[Jd]][ct] == typo:
                 XYZt = Atoms[AtLookUp[Jd]][cx:cx+3]
                 Xeqv = list(G2spc.GenAtom(np.array(XYZt)%1.,SGData,True))
-                close = [np.allclose(np.inner(Amat,XYZo),np.inner(Amat,eqv[0]),atol=0.01) for eqv in Xeqv]
+                close = [np.allclose(np.inner(Amat,XYZo),np.inner(Amat,eqv[0]),atol=0.1) for eqv in Xeqv]
                 if True in close:
                     Atoms[AtLookUp[Jd]][cx+3] = 0.0
         Sytsym,Mult = G2spc.SytSym(Atoms[AtLookUp[Id]][cx:cx+3],SGData)[:2]
@@ -2189,11 +2163,11 @@ def RBChk(sytsym,L,M):
             if not M%3: return True,1.0     #P?
         elif sytsym == '-3' or sytsym == '-3(111)':
             if not L%2 and not M%3: return True,1.0    #P?
-        elif sytsym == '32(100)' or sytsym == '32(111)':
+        elif sytsym in ['32','32(100)','32(111)']:
             if not M%3: return True,-1.0**L
         elif sytsym == '32(120)':
             if not M%3: return True,-1.0**(L-M)
-        elif sytsym in ['3m(100)','3m(111)']:
+        elif sytsym in ['3m','3m(100)','3m(111)']:
             if not M%3: return True,-1.0**M
         elif sytsym == '3m(120)':
             if not M%3: return True,1.0
@@ -2682,24 +2656,23 @@ def H2ThPh(H,Bmat,Q):
     :returns array Th: HKL azimuth angles
     :returns array Ph: HKL polar angles
     '''
-    A,V = G2mth.Q2AVdeg(Q)
-    QR,R = G2mth.make2Quat(V,np.array([0.,0.,1.0]))
-    QA = G2mth.AVdeg2Q(A,np.array([0.,0.,1.0]))
-    Q2 = G2mth.prodQQ(QA,QR)
-    Qmat = G2mth.Q2Mat(Q2)
-    CH = np.inner(H,Bmat.T)
-    CH = np.inner(CH,Qmat)
+    # A,V = G2mth.Q2AVdeg(Q)
+    # QR,R = G2mth.make2Quat(V,np.array([0.,0.,1.0]))
+    # QA = G2mth.AVdeg2Q(A,np.array([0.,0.,1.0]))
+    # Q2 = G2mth.prodQQ(QR,QA)
+    Qmat = G2mth.Q2Mat(Q)
+    CH1 = np.inner(H,Bmat.T)
+    CH = np.inner(CH1,Qmat.T)
     N = nl.norm(CH,axis=1)
-    N = np.where(N,N,1.)
     CH /= N[:,nxs]
     H3 = np.array([0,0,1.])
     DHR = np.inner(CH,H3)
-    Ph = np.where(DHR <= 1.0,acosd(DHR),0.0)    #polar angle 0<=Ph<=180.
+    Ph = np.where(DHR <= 1.0,acosd(DHR),0.0)    #polar angle 0<=Ph<=180.; correct
     TH = CH*np.array([1.,1.,0.])[nxs,:]     #projection of CH onto xy plane
     N = nl.norm(TH,axis=1)
-    N = np.where(N,N,1.)
+    N = np.where(N > 1.e-5,N,1.)
     TH /= N[:,nxs]
-    Th = atan2d(TH[:,0],TH[:,1])                #azimuth angle 0<=Th<360<
+    Th = atan2d(TH[:,1],TH[:,0])                #azimuth angle 0<=Th<360<
     Th = np.where(Th<0.,Th+360.,Th)
     return Th,Ph        #azimuth,polar angles
 

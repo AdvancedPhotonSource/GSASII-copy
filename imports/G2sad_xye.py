@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-12-21 08:53:00 -0600 (Tue, 21 Dec 2021) $
-# $Author: vondreele $
-# $Revision: 5114 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2sad_xye.py $
-# $Id: G2sad_xye.py 5114 2021-12-21 14:53:00Z vondreele $
+# $Id: G2sad_xye.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2sad_xye: read small angle data*
-------------------------------------------------
-
-Routines to read in small angle data from an .xye type file, with
-two-theta or Q steps. 
-
 '''
 
 from __future__ import division, print_function
@@ -20,7 +14,7 @@ import os.path as ospath
 import numpy as np
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5114 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 npasind = lambda x: 180.*np.arcsin(x)/np.pi
 
 class txt_XRayReaderClass(G2obj.ImportSmallAngleData):

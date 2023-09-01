@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 #GSAS-II Data/Model Comparison
 ########### SVN repository information ###################
-# $Date: 2021-06-26 13:05:17 -0500 (Sat, 26 Jun 2021) $
-# $Author: vondreele $
-# $Revision: 4979 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/G2compare.py $
-# $Id: G2compare.py 4979 2021-06-26 18:05:17Z vondreele $
+# $Id: G2compare.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-.. _G2compare:
-
-*G2compare: Tool for project comparison*
----------------------------------------------
 '''
 
 #TODO:
@@ -44,7 +40,7 @@ except ImportError:
 import scipy as sp
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4979 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 import GSASIIfiles as G2fil
 import GSASIIplot as G2plt
 import GSASIIdataGUI as G2gd

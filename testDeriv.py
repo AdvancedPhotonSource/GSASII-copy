@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 #testDeriv.py
+########### SVN repository information ###################
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
+# $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/testDeriv.py $
+# $Id: testDeriv.py 5577 2023-05-11 23:08:12Z toby $
+########### SVN repository information ###################
 '''
-*testDeriv: Check derivative computation*
-=========================================
-
-Use this to check derivatives used in structure least squares
-refinement against numerical values computed in this script.
-
 To use set ``DEBUG=True`` in GSASIIstrMain.py (line 40, as of version
 2546); run the least squares - zero cycles is sufficient.  Do the "Save
 Results"; this will write the file testDeriv.dat in the local

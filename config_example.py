@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
 #config.py - Variables used to set optional configuration options
 ########### SVN repository information ###################
-# $Date: 2022-12-22 13:58:26 -0600 (Thu, 22 Dec 2022) $
-# $Author: vondreele $
-# $Revision: 5443 $
+# $Date: 2023-08-14 17:41:31 -0500 (Mon, 14 Aug 2023) $
+# $Author: toby $
+# $Revision: 5647 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/config_example.py $
-# $Id: config_example.py 5443 2022-12-22 19:58:26Z vondreele $
+# $Id: config_example.py 5647 2023-08-14 22:41:31Z toby $
 ########### SVN repository information ###################
 '''
-*config_example.py: Configuration options*
--------------------------------------------
-
 This file contains optional configuration options for GSAS-II. The variables
 in this file can be copied to file config.py, which is imported if present.
 Access these variables using :func:`GSASIIpath.GetConfigValue`, which returns
@@ -249,9 +246,10 @@ when the GPX file is opened. Default is False.
 fullrmc_exec = None
 '''Defines the full path to a Python executable that has been configured 
 with the fullrmc package. If None (the default), GSAS-II will see if fullrmc
-can be imported into the current Python and if not a executable named fullrmc* 
-(or fullrmc*.exe on Windows) can be found in the GSAS-II binary directory 
-or in the system path.
+can be imported into the current Python (which is unlikely to ever work). 
+If that does not work, GSAS-II will search for an executable named fullrmc* 
+(or fullrmc*.exe on Windows) in the Python ``sys.path`` search path,
+which includes the GSAS-II binary directory.
 '''
 
 pdffit2_exec = None

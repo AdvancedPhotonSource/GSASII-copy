@@ -1,28 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2018-01-17 08:53:06 -0600 (Wed, 17 Jan 2018) $
-# $Author: vondreele $
-# $Revision: 3229 $
+# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5576 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_map.py $
-# $Id: G2export_map.py 3229 2018-01-17 14:53:06Z vondreele $
+# $Id: G2export_map.py 5576 2023-05-11 19:22:54Z toby $
 ########### SVN repository information ###################
-'''
-*Module G2export_map: Map export*
--------------------------------------------
-
-Code to write Fourier/Charge-Flip atomic density maps out in formats that
-can be read by external programs. At present a GSAS format
-that is supported by FOX and DrawXTL 
-(:class:`ExportMapASCII`) and the CCP4 format that
-is used by COOT (:class:`ExportMapCCP4`) are implemented.
+'''Classes in :mod:`G2export_map` follow:
 '''
 from __future__ import division, print_function
 import platform
 import os
 import GSASIIpath
 import numpy as np
-GSASIIpath.SetVersionNumber("$Revision: 3229 $")
+GSASIIpath.SetVersionNumber("$Revision: 5576 $")
 import GSASIIIO as G2IO
 
 class ExportMapASCII(G2IO.ExportBaseclass):

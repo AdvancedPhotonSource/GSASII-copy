@@ -1,31 +1,29 @@
 # -*- coding: utf-8 -*-
-#GSASII image calculations: ellipse fitting & image integration        
+#GSASII image calculations: Image calibration, masking & integration routines.
 ########### SVN repository information ###################
-# $Date: 2023-04-02 14:20:32 -0500 (Sun, 02 Apr 2023) $
+# $Date: 2023-06-23 14:12:24 -0500 (Fri, 23 Jun 2023) $
 # $Author: toby $
-# $Revision: 5529 $
+# $Revision: 5622 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIimage.py $
-# $Id: GSASIIimage.py 5529 2023-04-02 19:20:32Z toby $
+# $Id: GSASIIimage.py 5622 2023-06-23 19:12:24Z toby $
 ########### SVN repository information ###################
 '''
-*GSASIIimage: Image calc module*
-================================
-
-Ellipse fitting & image integration
-
+Classes and routines defined in :mod:`GSASIIimage` follow. 
 '''
+
 from __future__ import division, print_function
 import math
 import time
+import copy
+import sys
 import numpy as np
 import numpy.linalg as nl
 import numpy.ma as ma
 from scipy.optimize import leastsq
 import scipy.interpolate as scint
 import scipy.special as sc
-import copy
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5529 $")
+GSASIIpath.SetVersionNumber("$Revision: 5622 $")
 try:
     import GSASIIplot as G2plt
 except ImportError: # expected in scriptable w/o matplotlib and/or wx
@@ -809,6 +807,16 @@ def EdgeFinder(image,data):
     return zip(tax,tay)
     
 def MakeFrameMask(data,frame):
+    '''Assemble a Frame mask for a image, according to the input supplied.
+    Note that this requires use of the Fortran polymask routine that is limited
+    to 1024x1024 arrays, so this computation is done in blocks (fixed at 512) 
+    and the master image is assembled from that. 
+
+    :param dict data: Controls for an image. Used to find the image size
+      and the pixel dimensions. 
+    :param list frame: Frame parameters, typically taken from ``Masks['Frames']``.
+    :returns: a mask array with dimensions matching the image Controls.
+    '''
     import polymask as pm
     pixelSize = data['pixelSize']
     scalex = pixelSize[0]/1000.
@@ -894,7 +902,9 @@ def CalcRings(G2frame,ImageZ,data,masks):
    
 def ImageRecalibrate(G2frame,ImageZ,data,masks,getRingsOnly=False):
     '''Called to repeat the calibration on an image, usually called after
-    calibration is done initially to improve the fit.
+    calibration is done initially to improve the fit, but also 
+    can be used after reading approximate calibration parameters, 
+    if they are close enough that the first ring can be found.
 
     :param G2frame: The top-level GSAS-II frame or None, to skip plotting
     :param np.Array ImageZ: the image to calibrate
@@ -1211,11 +1221,22 @@ def ImageCalibrate(G2frame,data):
     return True
     
 def Make2ThetaAzimuthMap(data,iLim,jLim): #most expensive part of integration!
-    '''transforms 2D image from x,y space to 2-theta,azimuth space based on detector orientation
-    param: dict data: GSAS-II image data object
-    param: list iLim: boundary along x-pixels
-    param: list jLim: boundary along y-pixels
-    returns: array[4,nI,nJ] TA: 2-theta,azimuth, 2 geometric corrections
+    '''Makes a set of matrices that provide the 2-theta, azimuth and geometric
+    correction values for each pixel in an image taking into account the 
+    detector orientation. Can be used for the entire image or a rectangular 
+    section of an image (determined by iLim and jLim). 
+
+    This is used in two ways. For image integration, the computation is done
+    over blocks of fixed size (typically 128 or 256 pixels) but for pixel mask
+    generation, the two-theta matrix for all pixels is computed. Note that
+    for integration, this routine will be called to generate sections as needed 
+    or may be called by :func:`MakeUseTA`, which creates all sections at 
+    once, so they can be reused multiple times. 
+
+    :param dict data: GSAS-II image data object (describes the image)
+    :param list iLim: boundary along x-pixels
+    :param list jLim: boundary along y-pixels
+    :returns: TA, array[4,nI,nJ]: 2-theta, azimuth, 2 geometric corrections
     '''
     pixelSize = data['pixelSize']
     scalex = pixelSize[0]/1000.
@@ -1235,6 +1256,19 @@ def Make2ThetaAzimuthMap(data,iLim,jLim): #most expensive part of integration!
     return TA           #2-theta, azimuth & geom. corr. arrays
 
 def MakeMaskMap(data,masks,iLim,jLim,tamp):
+    '''Makes a mask array from masking parameters that are not determined by 
+    image calibration parameters or the image intensities. Thus this uses 
+    mask Frames, Polygons and Lines settings (but not Thresholds, Rings or
+    Arcs). Used on a rectangular section of an image (must be 1024x1024 or 
+    smaller, as dictated by module polymask) where the size is determined 
+    by iLim and jLim. 
+
+    :param dict data: GSAS-II image data object (describes the image)
+    :param list iLim: boundary along x-pixels
+    :param list jLim: boundary along y-pixels
+    :param np.array tamp: all-zero pixel mask array used in Polymask
+    :returns: array[nI,nJ] TA: 2-theta, azimuth, 2 geometric corrections
+    '''
     import polymask as pm
     pixelSize = data['pixelSize']
     scalex = pixelSize[0]/1000.
@@ -1270,31 +1304,75 @@ def MakeMaskMap(data,masks,iLim,jLim,tamp):
             tam[:,yline-jLim[0]] = True            
     return tam           #position mask
 
-def Fill2ThetaAzimuthMap(masks,TA,tam,image):
-    'Needs a doc string'
+def Fill2ThetaAzimuthMap(masks,TAr,tam,image):
+    '''Makes masked intensity correction arrays that depend on image 
+    intensity, 2theta and azimuth. Masking is generated from the 
+    combination of the following: 
+    an array previously generated by :func:`MakeMaskMap` combined with 
+    Thresholds, Rings and Arcs mask input. 
+
+    These correction arrays are generated for a rectangular section
+    of an image (must be 1024x1024 or smaller) where the size is 
+    determined the input arrays.
+
+    Note that older, less optimized, code has been left commented out below 
+    in case there are future problems or questions. 
+
+    :param dict masks: GSAS-II mask settings
+    :param np.array TAr: 2theta/azimuth/correction arrays, reshaped
+    :param np.array tam: mask array from :func:`MakeMaskMap`
+    :param np.array image: image array
+    :returns: a list of 4 masked arrays with values for: azimuth, 2-theta, 
+       intensity/polarization, dist**2/d0**2
+    '''
+    tax,tay,tad,pol = TAr    #azimuth, 2-theta, dist**2/d0**2, pol
+    if ma.is_masked(image):
+        # get prev. masks
+        mask = ma.getmask(image)  # Pixel mask   (N.B. mask is True if pixel is masked)
+        mask |= tam.reshape(image.shape)
+        image = image.data
+    else:
+        mask = tam.reshape(image.shape)
+        
+    # apply Ring & Arc masks. Note that this could be done in advance
+    # and be cached (like tam & TAr) but it is not clear this is needed
+    # often or that a lot of time is saved.
+    for tth,thick in masks['Rings']:
+        #tam = ma.mask_or(tam.flatten(),ma.getmask(ma.masked_inside(tay.flatten(),max(0.01,tth-thick/2.),tth+thick/2.)))
+        mask |= ((tay > max(0.01,tth-thick/2.)) & (tay < (tth+thick/2.)))
+    for tth,azm,thick in masks['Arcs']:
+        # tamt = ma.getmask(ma.masked_inside(tay.flatten(),max(0.01,tth-thick/2.),tth+thick/2.))
+        # tama = ma.getmask(ma.masked_inside(tax.flatten(),azm[0],azm[1]))
+        # tam = ma.mask_or(tam.flatten(),tamt*tama)
+        mask |= ((tay > max(0.01,tth-thick/2.)) & (tay < (tth+thick/2.))
+                     & (tax > azm[0]) & (tax < azm[1]))
+    # apply threshold masks
     Zlim = masks['Thresholds'][1]
-    rings = masks['Rings']
-    arcs = masks['Arcs']
-    TA = np.dstack((ma.getdata(TA[1]),ma.getdata(TA[0]),ma.getdata(TA[2]),ma.getdata(TA[3])))    #azimuth, 2-theta, dist, pol
-    tax,tay,tad,pol = np.dsplit(TA,4)    #azimuth, 2-theta, dist**2/d0**2, pol
-    for tth,thick in rings:
-        tam = ma.mask_or(tam.flatten(),ma.getmask(ma.masked_inside(tay.flatten(),max(0.01,tth-thick/2.),tth+thick/2.)))
-    for tth,azm,thick in arcs:
-        tamt = ma.getmask(ma.masked_inside(tay.flatten(),max(0.01,tth-thick/2.),tth+thick/2.))
-        tama = ma.getmask(ma.masked_inside(tax.flatten(),azm[0],azm[1]))
-        tam = ma.mask_or(tam.flatten(),tamt*tama)
-    taz = ma.masked_outside(image.flatten(),int(Zlim[0]),Zlim[1])
-    tabs = np.ones_like(taz)
-    tam = ma.mask_or(tam.flatten(),ma.getmask(taz))
-    tax = ma.compressed(ma.array(tax.flatten(),mask=tam))   #azimuth
-    tay = ma.compressed(ma.array(tay.flatten(),mask=tam))   #2-theta
-    taz = ma.compressed(ma.array(taz.flatten(),mask=tam))   #intensity
-    tad = ma.compressed(ma.array(tad.flatten(),mask=tam))   #dist**2/d0**2
-    tabs = ma.compressed(ma.array(tabs.flatten(),mask=tam)) #ones - later used for absorption corr.
-    pol = ma.compressed(ma.array(pol.flatten(),mask=tam))   #polarization
-    return tax,tay,taz/pol,tad,tabs
+    #taz = ma.masked_outside(image.flatten(),int(Zlim[0]),Zlim[1])
+    mask |= (image < Zlim[0]) | (image > Zlim[1])
+    
+    #tam = ma.mask_or(tam.flatten(),ma.getmask(taz))
+    #tax = ma.compressed(ma.array(tax.flatten(),mask=tam))   #azimuth
+    #tay = ma.compressed(ma.array(tay.flatten(),mask=tam))   #2-theta
+    #taz = ma.compressed(ma.array(taz.flatten(),mask=tam))   #intensity
+    #tad = ma.compressed(ma.array(tad.flatten(),mask=tam))   #dist**2/d0**2
+    #tabs = ma.compressed(ma.array(tabs.flatten(),mask=tam)) #ones - later used for absorption corr.
+    #pol = ma.compressed(ma.array(pol.flatten(),mask=tam))   #polarization
+    #return tax,tay,taz/pol,tad,tabs
+    mask = ~mask
+    return tax[mask],tay[mask],image[mask]/pol[mask],tad[mask]
 
 def MakeUseTA(data,blkSize=128):
+    '''Precomputes the set of blocked arrays for 2theta-azimuth mapping from 
+    the controls settings of the current image for image integration.
+    This computation is done optionally, but provides speed as the results
+    from this can be cached to avoid recomputation for a series of images
+    with the same calibration parameters.
+
+    :param np.array data: specifies parameters for an image
+    :param int blkSize: a blocksize that is selected for speed
+    :returns: a list of TA blocks
+    ''' 
     Nx,Ny = data['size']
     nXBlks = (Nx-1)//blkSize+1
     nYBlks = (Ny-1)//blkSize+1
@@ -1307,11 +1385,23 @@ def MakeUseTA(data,blkSize=128):
             jBeg = jBlk*blkSize
             jFin = min(jBeg+blkSize,Nx)
             TA = Make2ThetaAzimuthMap(data,(iBeg,iFin),(jBeg,jFin))          #2-theta & azimuth arrays & create position mask
-            useTAj.append(TA)
+            TA = np.dstack((ma.getdata(TA[1]),ma.getdata(TA[0]),ma.getdata(TA[2]),ma.getdata(TA[3])))    #azimuth, 2-theta, dist, pol
+            TAr = [i.squeeze() for i in np.dsplit(TA,4)]    #azimuth, 2-theta, dist**2/d0**2, pol
+            useTAj.append(TAr)
         useTA.append(useTAj)
     return useTA
 
 def MakeUseMask(data,masks,blkSize=128):
+    '''Precomputes a set of blocked mask arrays for the mask elements
+    that do not depend on the instrument controls (see :func:`MakeMaskMap`).
+    This computation is done optionally, but provides speed as the results
+    from this can be cached to avoid recomputation for a series of images
+    with the same mask parameters.
+
+    :param np.array data: specifies mask parameters for an image
+    :param int blkSize: a blocksize that is selected for speed
+    :returns: a list of TA blocks
+    ''' 
     Masks = copy.deepcopy(masks)
     Masks['Points'] = np.array(Masks['Points']).T           #get spots as X,Y,R arrays
     if np.any(masks['Points']):
@@ -1320,7 +1410,7 @@ def MakeUseMask(data,masks,blkSize=128):
     nXBlks = (Nx-1)//blkSize+1
     nYBlks = (Ny-1)//blkSize+1
     useMask = []
-    tamp = ma.make_mask_none((1024*1024))       #NB: this array size used in the fortran histogram2d
+    tamp = ma.make_mask_none((1024*1024))       #NB: this array size used in the fortran polymask module
     for iBlk in range(nYBlks):
         iBeg = iBlk*blkSize
         iFin = min(iBeg+blkSize,Ny)
@@ -1360,9 +1450,35 @@ def MakeGainMap(image,Ix,Iy,data,blkSize=128):
     return 1./GainMap
 
 def ImageIntegrate(image,data,masks,blkSize=128,returnN=False,useTA=None,useMask=None):
-    'Integrate an image; called from OnIntegrateAll and OnIntegrate in G2imgGUI'    #for q, log(q) bins need data['binType']
+    '''Integrate an image; called from ``OnIntegrate()`` and 
+    ``OnIntegrateAll()`` inside :func:`GSASIIimgGUI.UpdateImageControls` 
+    as well as :meth:`GSASIIscriptable.G2Image.Integrate`.
+
+    :param np.array image: contains the 2-D image
+    :param np.array data: specifies controls/calibration parameters for an image
+    :param np.array masks: specifies masks parameters for an image
+    :param int blkSize: a blocksize that is selected for speed
+    :param bool returnN: If True, causes an extra matrix (NST) to be 
+      returned. The default is False. 
+    :param np.array useTA: contains a cached set of blocked 
+      2theta/azimuth/correction matrices (see :func:`MakeUseTA`) for the 
+      current image. 
+      The default, None, causes this to be computed as needed.
+    :param np.array useMask: contains a cached set of blocked masks (see 
+      :func:`MakeUseMask`) for the current image. 
+      The default, None, causes this to be computed as needed.
+
+    :returns: list ints, azms, Xvals, cancel (or ints, azms, Xvals, 
+      NST, cancel if returnN is True), where azms is a list of ``M`` azimuth 
+      values that were requested for integration, ints is a list ``M`` arrays
+      of diffraction intensities (where each array of diffraction data is 
+      length ``N``), Xvals is an array of "x" values, 2theta, Q, log(q) 
+      (determined by data['binType']), also of length ``N``. Variable cancel 
+      will always be False, since a status window is no longer supported.      
+    '''
+    #for q, log(q) bins need data['binType']
     import histogram2d as h2d
-    G2fil.G2Print ('Begin image integration; image range: %d %d'%(np.min(image),np.max(image)))
+    G2fil.G2Print ('Beginning image integration; image range: %d %d'%(np.min(image),np.max(image)))
     CancelPressed = False
     LUtth = np.array(data['IOtth'])
     LRazm = np.array(data['LRazimuth'],dtype=np.float64)
@@ -1404,9 +1520,11 @@ def ImageIntegrate(image,data,masks,blkSize=128,returnN=False,useTA=None,useMask
 
             t0 = time.time()
             if useTA:
-                TA = useTA[iBlk][jBlk]
+                TAr = useTA[iBlk][jBlk]
             else:
                 TA = Make2ThetaAzimuthMap(data,(iBeg,iFin),(jBeg,jFin))           #2-theta & azimuth arrays & create position mask
+                TA = np.dstack((ma.getdata(TA[1]),ma.getdata(TA[0]),ma.getdata(TA[2]),ma.getdata(TA[3])))    #azimuth, 2-theta, dist, pol
+                TAr = [i.squeeze() for i in np.dsplit(TA,4)]    #azimuth, 2-theta, dist**2/d0**2, pol
             times[1] += time.time()-t0      #xy->th,azm
 
             t0 = time.time()
@@ -1414,10 +1532,10 @@ def ImageIntegrate(image,data,masks,blkSize=128,returnN=False,useTA=None,useMask
                 tam = useMask[iBlk][jBlk]
             else:
                 tam = MakeMaskMap(data,Masks,(iBeg,iFin),(jBeg,jFin),tamp)
-            times[0] += time.time()-t0      #apply masks
+            Block = image[iBeg:iFin,jBeg:jFin]          # image Pixel mask has been applied here
+            tax,tay,taz,tad = Fill2ThetaAzimuthMap(Masks,TAr,tam,Block)    #applies remaining masks
+            times[0] += time.time()-t0      # time mask application
             t0 = time.time()
-            Block = image[iBeg:iFin,jBeg:jFin]          #apply image spotmask here
-            tax,tay,taz,tad,tabs = Fill2ThetaAzimuthMap(Masks,TA,tam,Block)    #and apply masks
             tax = np.where(tax > LRazm[1],tax-360.,tax)                 #put azm inside limits if possible
             tax = np.where(tax < LRazm[0],tax+360.,tax)
             if data.get('SampleAbs',[0.0,''])[1]:
@@ -1426,6 +1544,10 @@ def ImageIntegrate(image,data,masks,blkSize=128,returnN=False,useTA=None,useMask
                     tabs = G2pwd.Absorb(data['SampleShape'],muR,tay)
                 elif 'Fixed' in data['SampleShape']:    #assumes flat plate sample normal to beam
                     tabs = G2pwd.Absorb('Fixed',muT,tay)
+                else:
+                    tabs = np.ones_like(taz)
+            else:
+                tabs = np.ones_like(taz)                
             if 'log(q)' in data.get('binType',''):
                 tay = np.log(4.*np.pi*npsind(tay/2.)/data['wavelength'])
             elif 'q' == data.get('binType','').lower():
@@ -1478,8 +1600,7 @@ def ImageIntegrate(image,data,masks,blkSize=128,returnN=False,useTA=None,useMask
 
     G2fil.G2Print ('Step times: \n apply masks  %8.3fs xy->th,azm   %8.3fs fill map     %8.3fs \
         \n binning      %8.3fs cleanup      %8.3fs'%(times[0],times[1],times[2],times[3],times[4]))
-    G2fil.G2Print ("Elapsed time:","%8.3fs"%(time.time()-tbeg))
-    G2fil.G2Print ('Integration complete')
+    G2fil.G2Print ("Integration complete. Elapsed time:","%8.3fs"%(time.time()-tbeg))
     if problemEntries:
         msg = ""
         for i in problemEntries:
@@ -1613,7 +1734,7 @@ def calcFij(omg,phi,azm,th):
     return -Fij
 
 def FitStrain(rings,p0,dset,wave,phi,StaType):
-    'Needs a doc string'
+    'Fits external strain tensor from distortion of Bragg rings in images'
     def StrainPrint(ValSig,dset):
         print ('Strain tensor for Dset: %.6f'%(dset))
         ptlbls = 'names :'
@@ -1654,7 +1775,8 @@ def FitStrain(rings,p0,dset,wave,phi,StaType):
     return vals,sig,covMatrix
 
 def FitImageSpots(Image,ImMax,ind,pixSize,nxy,spotSize=1.0):
-    
+    '''Used with "s" key in image plots to search for spot masks
+    '''
     def calcMean(nxy,pixSize,img):
         gdx,gdy = np.mgrid[0:nxy,0:nxy]
         gdx = ma.array((gdx-nxy//2)*pixSize[0]/1000.,mask=~ma.getmaskarray(ImBox))
@@ -1742,15 +1864,85 @@ def FitImageSpots(Image,ImMax,ind,pixSize,nxy,spotSize=1.0):
 #                 break
 #     return mask
 
+def TestFastPixelMask():
+    '''Test if the fast (C) version of Auto Pixel Masking is available.
+
+    :returns: True if the airxd.mask package can be imported; False otherwise.
+    '''
+    try:
+        import fmask
+    except ModuleNotFoundError:
+        if GSASIIpath.GetConfigValue('debug'): print('fmask not found')
+        return False
+    return True
+
+def FastAutoPixelMask(Image, Masks, Controls, numChans, dlg=None):
+    '''Find "bad" regions on an image and create a pixel mask to remove them.
+    This works by masking pixels that are m*sigma outside the range of the
+    median at that radial distance using the using the fmask C module (based on the 
+    AIRXD C++ code https://github.com/AdvancedPhotonSource/AIRXD-ML-PUB, developed 
+    by Howard Yanxon, Wenqian Xu and James Weng.)
+
+    This is much faster than  AutoPixelMask, which does pretty much the 
+    same computation, but uses pure Python/numpy code.
+
+    Called from GSASIIimgGUI.UpdateMasks.OnFindPixelMask (single image) 
+    and GSASIIimgGUI.UpdateMasks.OnAutoFindPixelMask (multiple images) 
+    [see :func:`GSASIIimgGUI.UpdateMasks`]
+
+    :param np.array Image: 2D data structure describing a diffaction image
+    :param dict Masks: contents of Masks data tree 
+    :param dict Controls: diffraction & calibration parameters for image from
+      IMG data tree entry
+    :param int numChans: number of channels in eventual 2theta pattern 
+      after integration
+    :returns: a bool mask array with the same shape as Image 
+    '''
+
+    try:
+        import fmask
+        if GSASIIpath.GetConfigValue('debug'): print('Loaded fmask from',fmask.__file__)
+    except:
+        return None
+    frame = Masks['Frames']
+    tam = ma.make_mask_none(Image.shape)
+    if frame:
+        tam = ma.mask_or(tam,MakeFrameMask(Controls,frame))
+    ttmin = float(Masks['SpotMask'].get('SearchMin',0.0))
+    ttmax = float(Masks['SpotMask'].get('SearchMax',180.0))
+    esdMul = float(Masks['SpotMask']['esdMul'])
+    TA = Make2ThetaAzimuthMap(Controls, (0, Image.shape[0]), (0, Image.shape[1]))[0]
+    LUtth = np.array(Controls['IOtth'])
+    TThs = np.linspace(LUtth[0], LUtth[1], numChans, False)
+
+    # fp = open('/tmp/maskdump.pickle','wb')   # make external test file 
+    # import pickle
+    # pickle.dump(tam,fp) # frame mask
+    # pickle.dump(TA,fp)  # 2theta values
+    # pickle.dump(Image,fp)  # image values 
+    # pickle.dump(TThs,fp)  # 2theta bins
+    # fp.close()
+        
+    print(' Fast mask: Spots greater or less than %.1f of median abs deviation are masked'%esdMul)
+    outMask = np.zeros_like(tam,dtype=bool).ravel()
+    
+    if dlg: dlg.Update(10,"Fast scan in progress")
+    try:
+        masked = fmask.mask(esdMul, tam.ravel(), TA.ravel(), Image.ravel(), TThs, outMask, ttmin, ttmax)
+    except Exception as msg:
+        print('Exception in fmask.mask\n\t',msg)
+    return outMask.reshape(Image.shape)
+    
 def AutoPixelMask(Image, Masks, Controls, numChans, dlg=None):
-    '''Find "bad" regions on an image and remove them with a pixel mask.
+    '''Find "bad" regions on an image and creata a pixel mask to remove them.
     This works by masking pixels that are well outside the range of the
     median at that radial distance.
     This is ~4x faster than the original version from RBVD.
     Developed by Howard Yanxon, Wenqian Xu and James Weng. 
 
-    Called from OnFindPixelMask (single image) and OnAutoFindPixelMask 
-    (multiple images) in :func:`GSASIIimgGUI.UpdateMasks`
+    Called from GSASIIimgGUI.UpdateMasks.OnFindPixelMask (single image) 
+    and GSASIIimgGUI.UpdateMasks.OnAutoFindPixelMask (multiple images) 
+    [see :func:`GSASIIimgGUI.UpdateMasks`]
 
     :param np.array Image: 2D data structure describing a diffaction image
     :param dict Masks: contents of Masks data tree 
@@ -1766,10 +1958,15 @@ def AutoPixelMask(Image, Masks, Controls, numChans, dlg=None):
     '''
     #if GSASIIpath.GetConfigValue('debug'): print('faster all-Python AutoPixelMask')
     try:
-        from scipy.stats import median_absolute_deviation as MAD
+        from scipy.stats import median_abs_deviation as newMAD # new in 1.5.0
+        def MAD(args,**kwargs):
+            kwargs['scale'] = 1.4826
+            return newMAD(args,**kwargs)
     except ImportError:
         try:
-            from scipy.stats import median_abs_deviation as MAD
+            from scipy.stats import median_absolute_deviation as MAD
+            if GSASIIpath.GetConfigValue('debug'): 
+                print('Using deprecated scipy.stats.median_absolute_deviation routine')
         except:
             print('Unable to load scipy.stats.median_abs_deviation')
             return None
@@ -1798,8 +1995,8 @@ def AutoPixelMask(Image, Masks, Controls, numChans, dlg=None):
             continue
         if bin.size < 1:
             continue
-        median = np.nanmedian(bin)  
-        mad = MAD(bin, nan_policy='omit')       
+        median = np.nanmedian(bin)
+        mad = MAD(bin, nan_policy='omit')
         anom = np.abs(band-median)/mad <= esdMul
         mask |= (anom & masker)
         #print(TThs[it],sum(sum(masker))- sum(sum(anom & masker)))

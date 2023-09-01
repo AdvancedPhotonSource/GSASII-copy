@@ -1,21 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-06-02 20:49:00 -0500 (Wed, 02 Jun 2021) $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 4918 $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2img_PILTIF.py $
-# $Id: G2img_PILTIF.py 4918 2021-06-03 01:49:00Z toby $
+# $Id: G2img_PILTIF.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2img_PILTIF: Std Tagged-image File images*
------------------------------------------------------
-
-Routine to read an image in Tagged-image file (TIF) format using a standard
-image library function. This means that parameters such as the pixel size
-(which is in the TIFF header but is almost never correct) 
-and distance to sample, etc. are not correct unless specified in a 
-separate metadata file.
-
 The metadata can be specified in a file with the same name and path as 
 the TIFF file except that the the extension is .metadata.
 
@@ -27,10 +18,6 @@ Note that capitalization of keywords is ignored. Defined keywords are in table b
 without one of these keywords will be ignored. 
 
 .. Next command allows \\AA to be used in HTML
-
-.. only:: html
-
-   :math:`\\require{mediawiki-texvc}`
 
 .. tabularcolumns:: |l|p{4.5in}|
 
@@ -58,7 +45,7 @@ import GSASIIpath
 import GSASIIfiles as G2fil
 import G2img_1TIF
 DEBUG = False
-GSASIIpath.SetVersionNumber("$Revision: 4918 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 class TIF_LibraryReader(G2obj.ImportImage):
     '''Reads TIF files using a standard library routine. Metadata (such as pixel 

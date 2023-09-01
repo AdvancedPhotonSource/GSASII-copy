@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
+########### SVN repository information ###################
+# $Date: 2023-07-10 09:25:23 -0500 (Mon, 10 Jul 2023) $
+# $Author: vondreele $
+# $Revision: 5625 $
+# $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIImpsubs.py $
+# $Id: GSASIImpsubs.py 5625 2023-07-10 14:25:23Z vondreele $
+########### SVN repository information ###################
 '''
-*GSASIImpsubs: routines used in multiprocessing*
--------------------------------------------------
-
 The routines here are called either directly when GSAS-II is used without multiprocessing
 or in separate cores when multiprocessing is used.
 
@@ -17,19 +21,12 @@ These routines are designed to be used in one of two ways:
 Note that :func:`GSASIImpsubs.InitMP` should be called before any of the other routines
 in this module are used. 
 '''
-########### SVN repository information ###################
-# $Date: 2021-12-21 08:53:00 -0600 (Tue, 21 Dec 2021) $
-# $Author: vondreele $
-# $Revision: 5114 $
-# $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIImpsubs.py $
-# $Id: GSASIImpsubs.py 5114 2021-12-21 14:53:00Z vondreele $
-########### SVN repository information ###################
 from __future__ import division, print_function
 import multiprocessing as mp
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5114 $")
+GSASIIpath.SetVersionNumber("$Revision: 5625 $")
 import GSASIIpwd as G2pwd
 import GSASIIfiles as G2fil
 
@@ -213,7 +210,7 @@ def ComputeFobsSqPink(refl,iref):
 def ComputeFobsSqED(refl,iref):
     yp = np.zeros(len(x)) # not masked
     refl8im = 0
-    Wd,fmin,fmax = G2pwd.getWidthsED(refl[5+im],refl[6+im])
+    Wd,fmin,fmax = G2pwd.getWidthsED(refl[5+im],refl[6+im],refl[7+im])
     iBeg = max(xB,np.searchsorted(x,refl[5+im]-fmin))
     iFin = max(xB,min(np.searchsorted(x,refl[5+im]+fmax),xF))
     if not iBeg+iFin:       #peak below low limit - skip peak
@@ -223,7 +220,7 @@ def ComputeFobsSqED(refl,iref):
     elif not iBeg-iFin:     #peak above high limit - done
         return -2
     if iBeg < iFin:
-        fp,sumfp = G2pwd.getPsVoigt(refl[5+im],refl[6+im]*1.e4,0.001,x[iBeg:iFin])
+        fp,sumfp = G2pwd.getPsVoigt(refl[5+im],refl[6+im]*1.e4,refl[6+im]*100.,x[iBeg:iFin])
         yp[iBeg:iFin] = 100.*refl[9+im]*fp*cw[iBeg:iFin]/sumfp
     refl8im = np.sum(np.where(ratio[iBeg:iFin]>0.,yp[iBeg:iFin]*ratio[iBeg:iFin],0.0))
     return refl8im,refl[9+im]

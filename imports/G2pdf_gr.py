@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2022-03-03 20:10:33 -0600 (Thu, 03 Mar 2022) $
-# $Author: vondreele $
-# $Revision: 5200 $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pdf_gr.py $
-# $Id: G2pdf_gr.py 5200 2022-03-04 02:10:33Z vondreele $
+# $Id: G2pdf_gr.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2pdf_gr: read PDF G(R) data*
-------------------------------------------------
-
-Routines to read in G(R) data from an .gr type file, with
-Angstrom steps. 
-
 '''
 
 from __future__ import division, print_function
@@ -20,7 +14,7 @@ import os.path as ospath
 import numpy as np
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5200 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 class txt_FSQReaderClass(G2obj.ImportPDFData):
     'Routines to import S(Q) data from a .fq file'

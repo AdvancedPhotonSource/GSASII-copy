@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 '''
-*ElementTable: Periodic Table Data*
------------------------------------
-
 Element table data for building periodic table with valences & JMOL colors.
 Need these in case we go back to this periodic table coloring scheme.
 
@@ -121,10 +118,6 @@ ElTable = [
     (["Cf",],                 11.5,7.5, "Californium", REcolor,          1.764,(161,54,212)),
     (["Va",],                 13.5,7.5, "Vacancy",     White,            0.000,(255,255,255)),
     (["Q",],                  14.5,7.5, "Special form factor", REcolor,  0.000,(161,54,212)),
-    # (["Qa",],                    -1,-1, "Special form factor", REcolor,  0.000,(161,54,212)),
-    # (["Qb",],                    -1,-1, "Special form factor", REcolor,  0.000,(161,54,212)),
-    # (["Qc",],                    -1,-1, "Special form factor", REcolor,  0.000,(161,54,212)),
-    # (["Qd",],                    -1,-1, "Special form factor", REcolor,  0.000,(161,54,212)),
     (["None",],                  15.5,7.5, "No element choice",REcolor,     0.000,(161,54,212)),
     ]
 
@@ -161,14 +154,49 @@ MagElTable = [
     (["Yb","Yb+2","Yb+3"],                              15.5,6.5, "Ytterbium",   REcolor,          0.750,(0,191,56)),
     (["Hf","Hf+2","Hf+3"],                                   3,5, "Hafnium",     Metcolor,         0.804,(77,194,255)),
     (["Ta","Ta+2","Ta+3","Ta+4"],                            4,5, "Tantalum",    Metcolor,         0.834,(77,166,255)),
-    (["W","W+1","W+2","W+3","W+4","W+5"],               5,5, "Tungsten",    Metcolor,         0.864,(33,148,214)),
-    (["Re","Re+1","Re+2","Re+3","Re+4","Re+5","Re+6"],  6,5, "Rhenium",     Metcolor,         0.900,(38,125,171)),
-    (["Os","Os+1","Os+2","Os+3","Os+4","Os+5","Os+6","Os+7"],  7,5, "Osmium",      Metcolor,         0.919,(38,102,150)),
-    (["Ir","Ir+1","Ir+2","Ir+3","Ir+4","Ir+5","Ir+6"],  8,5, "Iridium",     Metcolor,         0.948,(23,84,135)),
+    (["W","W+1","W+2","W+3","W+4","W+5"],                    5,5, "Tungsten",    Metcolor,         0.864,(33,148,214)),
+    (["Re","Re+1","Re+2","Re+3","Re+4","Re+5","Re+6"],       6,5, "Rhenium",     Metcolor,         0.900,(38,125,171)),
+    (["Os","Os+1","Os+2","Os+3","Os+4","Os+5","Os+6","Os+7"],  7,5, "Osmium",    Metcolor,         0.919,(38,102,150)),
+    (["Ir","Ir+1","Ir+2","Ir+3","Ir+4","Ir+5","Ir+6"],       8,5, "Iridium",     Metcolor,         0.948,(23,84,135)),
     (["Pt","Pt+1","Pt+2","Pt+3","Pt+4","Pt+5","Pt+6"],       9,5, "Platinium",   Metcolor,         0.984,(208,208,224)),
     (["Au","Au+1","Au+2","Au+3","Au+4","Au+5"],             10,5, "Gold",        Metcolor,         1.014,(255,209,35)),
-    (["U","U+3","U+4","U+5"],                           5.5,7.5, "Uranium",     REcolor,          1.470,(0,143,255)),
+    (["U","U+3","U+4","U+5"],                            5.5,7.5, "Uranium",     REcolor,          1.470,(0,143,255)),
     (["Np","Np+3","Np+4","Np+5","Np+6"],                 6.5,7.5, "Neptunium",   REcolor,       1.536,(0,128,255)),
     (["Pu","Pu+3","Pu+4","Pu+5","Pu+6"],                 7.5,7.5, "Plutonium",   REcolor,       1.584,(0,107,255)),
     (["Am","Am+2","Am+3","Am+4","Am+5","Am+6","Am+7"],   8.5,7.5, "Americium",   REcolor,          1.626,(84,92,242)),
     ]
+
+OrbsElTable = [
+    (["B",],                      12,1, "Boron",       NonMetcolor,     0.0012,(255,181,181)),
+    (["C",],                      13,1, "Carbon",      NonMetcolor,     0.0018,(144,144,144)),
+    (["N",],                      14,1, "Nitrogen",    NonMetcolor,     0.0030,(48,80,248)),
+    (["O",],                      15,1, "Oxygen",      NonMetcolor,     0.0042,(255,13,13)),
+    (["F",],                       16,1, "Fluorine",    NonMetcolor,     0.0054,(144,224,80)),
+    (["Al"],                      12,2, "Aluminum",    SemMetcolor,     0.0125,(191,166,166)),
+    (["Si"],                      13,2, "Silicon",     NonMetcolor,     0.0158,(240,200,160)),
+    (["P",],                      14,2, "Phosphorus",  NonMetcolor,     0.0180,(255,128,0)),
+    (["S",],                      15,2, "Sulphur",     NonMetcolor,     0.0210,(255,255,48)),
+    (["Cl"],                      16,2, "Chlorine",    NonMetcolor,     0.0250,(31,240,31)),
+    (["Sc"],                       2,3, "Scandium",    Metcolor,        0.0410,(230,230,230)),
+    (["Ti","Ti+3"],                3,3, "Titanium",    Metcolor,        0.0460,(191,194,199)),
+    (["V","V+2","V+3"],            4,3, "Vanadium",    Metcolor,        0.0510,(166,166,171)),
+    (["Cr","Cr+2","Cr+3"],         5,3, "Chromium",    Metcolor,        0.0560,(138,153,199)),
+    (["Mn","Mn+2","Mn+3","Mn+4"],  6,3, "Manganese",   Metcolor,        0.0616,(156,122,199)),
+    (["Fe","Fe+2","Fe+3"],         7,3, "Iron",        Metcolor,        0.0680,(224,102,51)),
+    (["Co","Co+2","Co+3"],         8,3, "Cobalt",      Metcolor,        0.0740,(240,144,160)),
+    (["Ni","Ni+2","Ni+3"],         9,3, "Nickel",      Metcolor,        0.0815,(80,208,80)),
+    (["Cu+2"],                    10,3, "Copper",      Metcolor,        0.0878,(200,128,51)),
+    (["Ga",],                     12,3, "Gallium",     SemMetcolor,      0.104,(194,143,143)),
+    (["Ge",],                     13,3, "Germanium",   SemMetcolor,      0.114,(102,143,143)),
+    (["As",],                     14,3, "Arsenic",     NonMetcolor,      0.120,(255,0,255)),
+    (["Se",],                     15,3, "Selenium",    NonMetcolor,      0.132,(255,161,0)),
+    (["Br",],                     16,3, "Bromine",     NonMetcolor,      0.141,(166,41,41)),
+    (["Y",],                       2,4, "Yittrium",    Metcolor,         0.180,(148,255,255)),
+    (["Zr",],                      3,4, "Zirconium",   Metcolor,         0.192,(148,224,224)),
+    (["Nb","Nb+3",],               4,4, "Niobium",     Metcolor,         0.204,(115,194,201)),
+    (["Mo","Mo+3","Mo+5",],        5,4, "Molybdenium", Metcolor,         0.216,(84,181,181)),
+    (["Tc",],                      6,4, "Technetium",  Metcolor,         0.228,(59,158,158)),
+    (["Ru","Ru+3","Ru+4"],         7,4, "Ruthenium",   Metcolor,         0.246,(36,143,143)),
+    (["Rh","Rh+3","Rh+4"],         8,4, "Rhodium",     Metcolor,         0.258,(10,125,140)),
+    (["Pd+2","Pd+4"],              9,4, "Palladium",   Metcolor,         0.270,(0,105,133)),
+]

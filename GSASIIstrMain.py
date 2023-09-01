@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
-'''
-*GSASIIstrMain: main structure routine*
----------------------------------------
-
-'''
 ########### SVN repository information ###################
-# $Date: 2023-03-23 13:03:34 -0500 (Thu, 23 Mar 2023) $
-# $Author: vondreele $
-# $Revision: 5520 $
+# $Date: 2023-08-31 16:58:38 -0500 (Thu, 31 Aug 2023) $
+# $Author: toby $
+# $Revision: 5655 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrMain.py $
-# $Id: GSASIIstrMain.py 5520 2023-03-23 18:03:34Z vondreele $
+# $Id: GSASIIstrMain.py 5655 2023-08-31 21:58:38Z toby $
 ########### SVN repository information ###################
+'''
+:mod:`GSASIIstrMain` routines, used for refinement are found below.
+'''
 from __future__ import division, print_function
 import platform
 import sys
@@ -27,7 +25,7 @@ import numpy.linalg as nl
 import scipy.optimize as so
 import GSASIIpath
 GSASIIpath.SetBinaryPath()
-GSASIIpath.SetVersionNumber("$Revision: 5520 $")
+GSASIIpath.SetVersionNumber("$Revision: 5655 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIImapvars as G2mv
@@ -231,8 +229,10 @@ def RefineCore(Controls,Histograms,Phases,restraintDict,rigidbodyDict,parmDict,v
         G2mv.Dict2Map(parmDict)
         Rvals['Nobs'] = Histograms['Nobs']
         Rvals['Nvars'] = len(varyList)
+        Rvals['RestraintSum'] = Histograms.get('RestraintSum',0.)
+        Rvals['RestraintTerms'] = Histograms.get('RestraintTerms',0)
         Rvals['Rwp'] = np.sqrt(Rvals['chisq']/Histograms['sumwYo'])*100.      #to %
-        Rvals['GOF'] = np.sqrt(Rvals['chisq']/(Histograms['Nobs']-len(varyList)))
+        Rvals['GOF'] = np.sqrt(Rvals['chisq']/(Histograms['Nobs']+Rvals['RestraintTerms']-len(varyList)))
         printFile.write(' Number of function calls: %d No. of observations: %d No. of parameters: %d User rejected: %d Sp. gp. extinct: %d\n'%  \
             (result[2]['nfev'],Histograms['Nobs'],len(varyList),Histograms['Nrej'],Histograms['Next']))
         if ncyc:

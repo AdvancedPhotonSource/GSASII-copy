@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-03-30 15:08:28 -0500 (Thu, 30 Mar 2023) $
+# $Date: 2023-07-31 10:49:24 -0500 (Mon, 31 Jul 2023) $
 # $Author: vondreele $
-# $Revision: 5526 $
+# $Revision: 5639 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrIO.py $
-# $Id: GSASIIstrIO.py 5526 2023-03-30 20:08:28Z vondreele $
+# $Id: GSASIIstrIO.py 5639 2023-07-31 15:49:24Z vondreele $
 ########### SVN repository information ###################
 '''
-*GSASIIstrIO: structure I/O routines*
--------------------------------------
-
-Contains routines for reading from GPX files and printing to the .LST file. 
+:mod:`GSASIIstrIO` routines, used for refinement to 
+read from GPX files and print to the .LST file. 
 Used for refinements and in G2scriptable. 
 
-Should not contain any wxpython references as this should be able to be used
-in non-GUI settings. 
-
+This file should not contain any wxpython references as this 
+must be used in non-GUI settings. 
 '''
 from __future__ import division, print_function
 import platform
@@ -24,6 +21,7 @@ import os
 import os.path as ospath
 import time
 import math
+import random as rand
 import copy
 if '2' in platform.python_version_tuple()[0]:
     import cPickle
@@ -32,7 +30,7 @@ else:
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5526 $")
+GSASIIpath.SetVersionNumber("$Revision: 5639 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -41,7 +39,6 @@ import GSASIImapvars as G2mv
 import GSASIImath as G2mth
 import GSASIIstrMath as G2stMth
 import GSASIIfiles as G2fil
-import GSASIIpy3 as G2py3
 
 sind = lambda x: np.sin(x*np.pi/180.)
 cosd = lambda x: np.cos(x*np.pi/180.)
@@ -294,9 +291,10 @@ def PrintFprime(FFtables,pfx,pFile):
     FPstr = " f'     :"
     FPPstr = ' f"     :'
     for El in FFtables:
-        Elstr += ' %8s'%(El)
-        FPstr += ' %8.3f'%(FFtables[El][pfx+'FP'])
-        FPPstr += ' %8.3f'%(FFtables[El][pfx+'FPP'])
+        if 'Q' not in El:
+            Elstr += ' %8s'%(El)
+            FPstr += ' %8.3f'%(FFtables[El][pfx+'FP'])
+            FPPstr += ' %8.3f'%(FFtables[El][pfx+'FPP'])
     pFile.write(Elstr+'\n')
     pFile.write(FPstr+'\n')
     pFile.write(FPPstr+'\n')
@@ -307,10 +305,11 @@ def PrintBlength(BLtables,wave,pFile):
     FPstr = " b'     :"
     FPPstr = ' b"     :'
     for El in BLtables:
-        BP,BPP = G2el.BlenResCW([El,],BLtables,wave)
-        Elstr += ' %8s'%(El)
-        FPstr += ' %8.3f'%(BP)
-        FPPstr += ' %8.3f'%(BPP)
+        if 'Q' not in El:
+            BP,BPP = G2el.BlenResCW([El,],BLtables,wave)
+            Elstr += ' %8s'%(El)
+            FPstr += ' %8.3f'%(BP)
+            FPPstr += ' %8.3f'%(BPP)
     pFile.write(Elstr+'\n')
     pFile.write(FPstr+'\n')
     pFile.write(FPPstr+'\n')
@@ -404,7 +403,7 @@ def PrintISOmodes(pFile,Phases,parmDict,sigDict):
             for var,val,norm,G2mode in zip(
                     ISO['OccModeList'],modeOccVals,ISO['OccNormList'],ISO['G2OccModeList'] ):
                 try:
-                    value = G2py3.FormatSigFigs(val/norm)
+                    value = G2fil.FormatSigFigs(val/norm)
                     if str(G2mode) in sigDict:
                         value = G2mth.ValEsd(val/norm,sigDict[str(G2mode)]/norm)
                 except TypeError:
@@ -1175,22 +1174,24 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
         pFile.write('   Symbol     fa                                      fb                                      fc\n')
         pFile.write(99*'-'+'\n')
         for Ename in FFtable:
-            ffdata = FFtable[Ename]
-            fa = ffdata['fa']
-            fb = ffdata['fb']
-            pFile.write(' %8s %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f\n'%
-                (Ename.ljust(8),fa[0],fa[1],fa[2],fa[3],fb[0],fb[1],fb[2],fb[3],ffdata['fc']))
+            if 'Q' not in Ename:
+                ffdata = FFtable[Ename]
+                fa = ffdata['fa']
+                fb = ffdata['fb']
+                pFile.write(' %8s %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f\n'%
+                    (Ename.ljust(8),fa[0],fa[1],fa[2],fa[3],fb[0],fb[1],fb[2],fb[3],ffdata['fc']))
                 
     def PrintEFtable(EFtable):
         pFile.write('\n Electron scattering factors:\n')
         pFile.write('   Symbol     fa                                                fb\n')
         pFile.write(99*'-'+'\n')
         for Ename in EFtable:
-            efdata = EFtable[Ename]
-            fa = efdata['fa']
-            fb = efdata['fb']
-            pFile.write(' %8s %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f\n'%
-                (Ename.ljust(8),fa[0],fa[1],fa[2],fa[3],fa[4],fb[0],fb[1],fb[2],fb[3],fb[4]))
+            if 'Q' not in Ename:
+                efdata = EFtable[Ename]
+                fa = efdata['fa']
+                fb = efdata['fb']
+                pFile.write(' %8s %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f\n'%
+                    (Ename.ljust(8),fa[0],fa[1],fa[2],fa[3],fa[4],fb[0],fb[1],fb[2],fb[3],fb[4]))
                 
     def PrintMFtable(MFtable):
         pFile.write('\n <j0> Magnetic scattering factors:\n')
@@ -1217,19 +1218,20 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
         pFile.write('   Symbol   isotope       mass       b       resonant terms\n')
         pFile.write(99*'-'+'\n')
         for Ename in BLtable:
-            bldata = BLtable[Ename]
-            isotope = bldata[0]
-            mass = bldata[1]['Mass']
-            if 'BW-LS' in bldata[1]:
-                bres = bldata[1]['BW-LS']
-                blen = 0
-            else:
-                blen = bldata[1]['SL'][0]
-                bres = []
-            line = ' %8s%11s %10.3f %8.3f'%(Ename.ljust(8),isotope.center(11),mass,blen)
-            for item in bres:
-                line += '%10.5g'%(item)
-            pFile.write(line+'\n')
+            if 'Q' not in Ename:
+                bldata = BLtable[Ename]
+                isotope = bldata[0]
+                mass = bldata[1]['Mass']
+                if 'BW-LS' in bldata[1]:
+                    bres = bldata[1]['BW-LS']
+                    blen = 0
+                else:
+                    blen = bldata[1]['SL'][0]
+                    bres = []
+                line = ' %8s%11s %10.3f %8.3f'%(Ename.ljust(8),isotope.center(11),mass,blen)
+                for item in bres:
+                    line += '%10.5g'%(item)
+                pFile.write(line+'\n')
             
     def PrintRBObjects(resRBData,vecRBData,spnRBData):
                 
@@ -1310,7 +1312,7 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
                         iBeg = 0
                         iFin = min(iBeg+6,nCoeff)
                         for block in range(nBlock):
-                            if not block:
+                            if not block and 'Q' not in RB['atType']:
                                 ptlbls = ' names :%12s'%'Radius'
                                 ptstr =  ' values:%12.4f'%RB['Radius'][ish][0]
                                 ptref =  ' refine:%12s'%RB['Radius'][ish][1]                               
@@ -1443,7 +1445,7 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
             iFin = min(iBeg+10,nCoeff)
         
     def MakeRBParms(rbKey,phaseVary,phaseDict):
-        #### patch 2/24/21 BHT: new param, AtomFrac in RB
+        # patch 2/24/21 BHT: new param, AtomFrac in RB
         if 'AtomFrac' not in RB and rbKey != 'S': raise Exception('out of date RB: edit in RB Models')
         # end patch
         if rbKey == 'S':
@@ -1486,7 +1488,7 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
             XYZ = Atom[cx:cx+3]
         pfxRB = pfx+'RB'+rbKey+'O'        
         A,V = G2mth.Q2AV(RB['Orient'][0])
-        fixAxis = [0, np.abs(V).argmax()+1]
+#        fixAxis = [0, np.abs(V).argmax()+1]
         for i in range(4):
             name = pfxRB+ostr[i]+':'+sfx
             phaseDict[name] = RB['Orient'][0][i]
@@ -1564,10 +1566,11 @@ def GetPhaseData(PhaseData,RestraintDict={},rbIds={},Print=True,pFile=None,
             if not len(Shcof):
                 continue
             rbid = str(rbids.index(RB['RBId'][ish]))
-            name = '%sRBSSh;%d;Radius:%s:%s'%(pfx,ish,iAt,rbid)
-            phaseDict[name] = RB['Radius'][ish][0]
-            if RB['Radius'][ish][1]:
-                phaseVary += [name,]
+            if 'Q' not in RB['atType']:
+                name = '%sRBSSh;%d;Radius:%s:%s'%(pfx,ish,iAt,rbid)
+                phaseDict[name] = RB['Radius'][ish][0]
+                if RB['Radius'][ish][1]:
+                    phaseVary += [name,]
             pfxRB = '%sRBSSh;%d;'%(pfx,ish)
             for i,shcof in enumerate(Shcof):
                 SHcof = Shcof[shcof]
@@ -1968,11 +1971,13 @@ def PrintRestraints(cell,SGData,AtPtrs,Atoms,AtLookup,textureData,phaseRest,pFil
         cx,ct,cs = AtPtrs[:3]
         names = [['Bond','Bonds'],['Angle','Angles'],['Plane','Planes'],
             ['Chiral','Volumes'],['Torsion','Torsions'],['Rama','Ramas'],
-            ['ChemComp','Sites'],['Texture','HKLs']]
+            ['ChemComp','Sites'],['Texture','HKLs'],['Moments','Moments']]
         for name,rest in names:
+            if name not in phaseRest:
+                continue                           
             itemRest = phaseRest[name]
             if rest in itemRest and itemRest[rest] and itemRest['Use']:
-                pFile.write('\n  %s restraint weight factor %10.3f Use: %s\n'%(name,itemRest['wtFactor'],str(itemRest['Use'])))
+                pFile.write('\n %s restraint weight factor %10.3f Use: %s\n'%(name,itemRest['wtFactor'],str(itemRest['Use'])))
                 if name in ['Bond','Angle','Plane','Chiral']:
                     pFile.write('     calc       obs      sig   delt/sig  atoms(symOp): \n')
                     for indx,ops,obs,esd in itemRest[rest]:
@@ -2030,6 +2035,21 @@ def PrintRestraints(cell,SGData,AtPtrs,Atoms,AtLookup,textureData,phaseRest,pFil
                             pFile.write(' Sum:                   calc: %8.3f obs: %8.3f esd: %8.3f\n'%(np.sum(calcs),obs,esd))
                         except KeyError:
                             del itemRest[rest]
+                elif name == 'Moments':
+                    for item in itemRest['Moments']:
+                        nMom = len(item[0])
+                        AtNames = G2mth.GetAtomItemsById(Atoms,AtLookup,item[0],ct-1)
+                        moms = G2mth.GetAtomItemsById(Atoms,AtLookup,item[0],cx+4,3)
+                        obs = 0.
+                        pFile.write(nMom*' Atom       calc'+'     obs    esd\n')
+                        line = ''
+                        for i,mom in enumerate(moms):
+                            Mom = G2mth.GetMag(mom,cell)
+                            line += ' %s  %8.3f'%(AtNames[i],Mom)
+                            obs += Mom
+                        obs /= nMom
+                        line += '%8.3f %6.3f\n'%(obs,item[-1])
+                        pFile.write(line)
                 elif name == 'Texture' and textureData['Order']:
                     SHCoef = textureData['SH Coeff'][1]
                     shModels = ['cylindrical','none','shear - 2/m','rolling - mmm']
@@ -2758,7 +2778,7 @@ def SetISOmodes(parmDict,sigDict,Phases,pFile=None):
             for var,val,norm,G2mode in zip(
                     ISO['OccModeList'],modeOccVals,ISO['OccNormList'],ISO['G2OccModeList'] ):
                 try:
-                    value = G2py3.FormatSigFigs(val/norm)
+                    value = G2fil.FormatSigFigs(val/norm)
                     if str(G2mode) in sigDict:
                         value = G2mth.ValEsd(val/norm,sigDict[str(G2mode)]/norm)
                 except TypeError:
@@ -2895,10 +2915,13 @@ def GetHistogramPhaseData(Phases,Histograms,Controls={},Print=True,pFile=None,re
             except KeyError:                        
                 #skip if histogram not included e.g. in a sequential refinement
                 continue
-            if not HistoPhase[histogram]['Use']:        #remove previously created  & now unused phase reflection list
-                if phase in Histograms[histogram]['Reflection Lists']:
-                    del Histograms[histogram]['Reflection Lists'][phase]
-                continue
+            try:
+                if (not HistoPhase[histogram]['Use']) and 'Reflection Lists' in Histograms[histogram]:        #remove previously created  & now unused phase reflection list
+                    if phase in Histograms[histogram]['Reflection Lists']:
+                        del Histograms[histogram]['Reflection Lists'][phase]
+                    continue
+            except Exception as msg:
+                pass
             hapData = HistoPhase[histogram]
             hId = Histogram['hId']
             if 'PWDR' in histogram:
@@ -2974,35 +2997,35 @@ def GetHistogramPhaseData(Phases,Histograms,Controls={},Print=True,pFile=None,re
                             hapDict[pfx+item] = hapData['Pref.Ori.'][5][item]
                             if hapData['Pref.Ori.'][2]:         # and not hapDict[pfx+'LeBail']:
                                 hapVary.append(pfx+item)
-                    for item in ['Mustrain','Size']:
-                        controlDict[pfx+item+'Type'] = hapData[item][0]
-                        hapDict[pfx+item+';mx'] = hapData[item][1][2]
-                        if hapData[item][2][2]:
-                            hapVary.append(pfx+item+';mx')
-                        if hapData[item][0] in ['isotropic','uniaxial']:
-                            hapDict[pfx+item+';i'] = hapData[item][1][0]
-                            if hapData[item][2][0]:
-                                hapVary.append(pfx+item+';i')
-                            if hapData[item][0] == 'uniaxial':
-                                controlDict[pfx+item+'Axis'] = hapData[item][3]
-                                hapDict[pfx+item+';a'] = hapData[item][1][1]
-                                if hapData[item][2][1]:
-                                    hapVary.append(pfx+item+';a')
-                        else:       #generalized for mustrain or ellipsoidal for size
-                            Nterms = len(hapData[item][4])
-                            if item == 'Mustrain':
-                                names = G2spc.MustrainNames(SGData)
-                                pwrs = []
-                                for name in names:
-                                    h,k,l = name[1:]
-                                    pwrs.append([int(h),int(k),int(l)])
-                                controlDict[pfx+'MuPwrs'] = pwrs
-                            for i in range(Nterms):
-                                sfx = ';'+str(i)
-                                hapDict[pfx+item+sfx] = hapData[item][4][i]
-                                if hapData[item][5][i]:
-                                    hapVary.append(pfx+item+sfx)
-                    if Phases[phase]['General']['Type'] != 'magnetic':
+                for item in ['Mustrain','Size']:
+                    controlDict[pfx+item+'Type'] = hapData[item][0]
+                    hapDict[pfx+item+';mx'] = hapData[item][1][2]
+                    if hapData[item][2][2]:
+                        hapVary.append(pfx+item+';mx')
+                    if hapData[item][0] in ['isotropic','uniaxial']:
+                        hapDict[pfx+item+';i'] = hapData[item][1][0]
+                        if hapData[item][2][0]:
+                            hapVary.append(pfx+item+';i')
+                        if hapData[item][0] == 'uniaxial':
+                            controlDict[pfx+item+'Axis'] = hapData[item][3]
+                            hapDict[pfx+item+';a'] = hapData[item][1][1]
+                            if hapData[item][2][1]:
+                                hapVary.append(pfx+item+';a')
+                    else:       #generalized for mustrain or ellipsoidal for size
+                        Nterms = len(hapData[item][4])
+                        if item == 'Mustrain':
+                            names = G2spc.MustrainNames(SGData)
+                            pwrs = []
+                            for name in names:
+                                h,k,l = name[1:]
+                                pwrs.append([int(h),int(k),int(l)])
+                            controlDict[pfx+'MuPwrs'] = pwrs
+                        for i in range(Nterms):
+                            sfx = ';'+str(i)
+                            hapDict[pfx+item+sfx] = hapData[item][4][i]
+                            if hapData[item][5][i]:
+                                hapVary.append(pfx+item+sfx)
+                    if Phases[phase]['General']['Type'] != 'magnetic' and 'E' not in inst['Type'][0]:
                         for bab in ['BabA','BabU']:
                             hapDict[pfx+bab] = hapData['Babinet'][bab][0]
                             if hapData['Babinet'][bab][1]:      # and not hapDict[pfx+'LeBail']:
@@ -3023,9 +3046,8 @@ def GetHistogramPhaseData(Phases,Histograms,Controls={},Print=True,pFile=None,re
                         else: #'SH' for spherical harmonics
                             PrintSHPO(hapData['Pref.Ori.'])
                             pFile.write(' Penalty hkl list: %s tolerance: %.2f\n'%(controlDict[pfx+'SHhkl'],controlDict[pfx+'SHtoler']))
-                    if 'E' not in inst['Type'][0]:
-                        PrintSize(hapData['Size'])
-                        PrintMuStrain(hapData['Mustrain'],SGData)
+                    PrintSize(hapData['Size'])
+                    PrintMuStrain(hapData['Mustrain'],SGData)
                     PrintHStrain(hapData['HStrain'],SGData)
                     if 'Layer Disp' in hapData:
                         pFile.write(' Layer Displacement: %10.3f Refine? %s\n'%(hapData['Layer Disp'][0],hapData['Layer Disp'][1]))
@@ -3035,6 +3057,7 @@ def GetHistogramPhaseData(Phases,Histograms,Controls={},Print=True,pFile=None,re
                 if resetRefList and (not hapDict.get(pfx+'LeBail') or (hapData.get('LeBail',False) and Controls.get('newLeBail',False))):
                     Scale = Histogram['Sample Parameters']['Scale'][0]      #for initializing reflection structure factors.
                     StartI = hapData['Scale'][0]*Scale
+                    #### TODO: apply random distribution to StartI - optional??
                     refList = []
                     useExt = 'magnetic' in Phases[phase]['General']['Type'] and 'N' in inst['Type'][0]
                     if Phases[phase]['General'].get('Modulated',False):
@@ -3042,31 +3065,33 @@ def GetHistogramPhaseData(Phases,Histograms,Controls={},Print=True,pFile=None,re
                         HKLd = np.array(G2lat.GenSSHLaue(dmin,SGData,SSGData,Vec,maxH,Acorr))
                         HKLd = G2mth.sortArray(HKLd,4,reverse=True)
                         for h,k,l,m,d in HKLd:
+                            randI = rand.uniform(.5,1.5)
                             ext,mul,uniq,phi = G2spc.GenHKLf([h,k,l],SGData)
                             mul *= 2      # for powder overlap of Friedel pairs
                             if m or not ext or useExt:
                                 if 'C' in inst['Type'][0]:
                                     pos = G2lat.Dsp2pos(inst,d)
                                     if limits[0] < pos < limits[1]:
-                                        refList.append([h,k,l,m,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0,1.0,1.0,1.0])
+                                        refList.append([h,k,l,m,mul,d, pos,0.0,0.0,0.0,randI*StartI/mul, 0.0,0.0,1.0,1.0,1.0])
                                         #... sig,gam,fotsq,fctsq, phase,icorr,prfo,abs,ext
                                 elif 'T' in inst['Type'][0]:
                                     pos = G2lat.Dsp2pos(inst,d)
                                     if limits[0] < pos < limits[1]:
                                         wave = inst['difC'][1]*d/(252.816*inst['fltPath'][0])
-                                        refList.append([h,k,l,m,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0,0.0,0.0,wave, 1.0,1.0,1.0])
+                                        refList.append([h,k,l,m,mul,d, pos,0.0,0.0,0.0,randI*StartI/mul, 0.0,0.0,0.0,0.0,wave, 1.0,1.0,1.0])
                                         # ... sig,gam,fotsq,fctsq, phase,icorr,alp,bet,wave, prfo,abs,ext
                                         #TODO - if tabulated put alp & bet in here
                                 elif 'B' in inst['Type'][0]:
                                     pos = G2lat.Dsp2pos(inst,d)
                                     if limits[0] < pos < limits[1]:
-                                        refList.append([h,k,l,m,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0,0.0,0.0, 1.0,1.0,1.0])
+                                        refList.append([h,k,l,m,mul,d, pos,0.0,0.0,0.0,randI*StartI/mul, 0.0,0.0,0.0,0.0, 1.0,1.0,1.0])
                                         # ... sig,gam,fotsq,fctsq, phase,icorr,alp,bet, prfo,abs,ext
                     else:
                         ifSuper = False
                         HKLd = np.array(G2lat.GenHLaue(dmin,SGData,Acorr))
                         HKLd = G2mth.sortArray(HKLd,3,reverse=True)
                         for h,k,l,d in HKLd:
+                            randI = rand.uniform(.5,1.5)
                             ext,mul,uniq,phi = G2spc.GenHKLf([h,k,l],SGData)
                             if ext and 'N' in inst['Type'][0] and  'MagSpGrp' in SGData:
                                 ext = G2spc.checkMagextc([h,k,l],SGData)
@@ -3076,23 +3101,23 @@ def GetHistogramPhaseData(Phases,Histograms,Controls={},Print=True,pFile=None,re
                             if 'C' in inst['Type'][0]:
                                 pos = G2lat.Dsp2pos(inst,d)
                                 if limits[0] < pos < limits[1]:
-                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0,1.0,1.0,1.0])
+                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,randI*StartI/mul, 0.0,0.0,1.0,1.0,1.0])
                                     #... sig,gam,fotsq,fctsq, phase,icorr,prfo,abs,ext
                             elif 'T' in inst['Type'][0]:
                                 pos = G2lat.Dsp2pos(inst,d)
                                 if limits[0] < pos < limits[1]:
                                     wave = inst['difC'][1]*d/(252.816*inst['fltPath'][0])
-                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0,0.0,0.0,wave, 1.0,1.0,1.0])
+                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,randI*StartI/mul, 0.0,0.0,0.0,0.0,wave, 1.0,1.0,1.0])
                                     # ... sig,gam,fotsq,fctsq, phase,icorr,alp,bet,wave, prfo,abs,ext
                             elif 'B' in inst['Type'][0]:
                                 pos = G2lat.Dsp2pos(inst,d)
                                 if limits[0] < pos < limits[1]:
-                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0,0.0,0.0, 1.0,1.0,1.0])
+                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,randI*StartI/mul, 0.0,0.0,0.0,0.0, 1.0,1.0,1.0])
                                     # ... sig,gam,fotsq,fctsq, phase,icorr,alp,bet, prfo,abs,ext
                             elif 'E' in inst['Type'][0]:
                                 pos = G2lat.Dsp2pos(inst,d)
                                 if limits[0] < pos < limits[1]:
-                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,StartI, 0.0,0.0])
+                                    refList.append([h,k,l,mul,d, pos,0.0,0.0,0.0,randI*StartI, 0.0,0.0])
                                     # ... sig,gam,fotsq,fctsq, phase,icorr
                     Histogram['Reflection Lists'][phase] = {'RefList':np.array(refList),'FF':{},'Type':inst['Type'][0],'Super':ifSuper}
             elif 'HKLF' in histogram:
@@ -3409,34 +3434,33 @@ def SetHistogramPhaseData(parmDict,sigDict,Phases,Histograms,calcControls,Print=
                             hapData['Pref.Ori.'][5][item] = parmDict[pfx+item]
                             if pfx+item in sigDict and not parmDict.get(pfx+'LeBail'):
                                 PhFrExtPOSig.update({pfx+item:sigDict[pfx+item],})
-                    SizeMuStrSig.update({pfx+'Mustrain':[[0,0,0],[0 for i in range(len(hapData['Mustrain'][4]))]],
-                        pfx+'Size':[[0,0,0],[0 for i in range(len(hapData['Size'][4]))]],pfx+'HStrain':{}})                  
-                    for item in ['Mustrain','Size']:
-                        hapData[item][1][2] = parmDict[pfx+item+';mx']
-    #                    hapData[item][1][2] = min(1.,max(0.,hapData[item][1][2]))
-                        if pfx+item+';mx' in sigDict:
-                            SizeMuStrSig[pfx+item][0][2] = sigDict[pfx+item+';mx']
-                        if hapData[item][0] in ['isotropic','uniaxial']:                    
-                            hapData[item][1][0] = parmDict[pfx+item+';i']
+                SizeMuStrSig.update({pfx+'Mustrain':[[0,0,0],[0 for i in range(len(hapData['Mustrain'][4]))]],
+                    pfx+'Size':[[0,0,0],[0 for i in range(len(hapData['Size'][4]))]],pfx+'HStrain':{}})                  
+                for item in ['Mustrain','Size']:
+                    hapData[item][1][2] = parmDict[pfx+item+';mx']
+#                    hapData[item][1][2] = min(1.,max(0.,hapData[item][1][2]))
+                    if pfx+item+';mx' in sigDict:
+                        SizeMuStrSig[pfx+item][0][2] = sigDict[pfx+item+';mx']
+                    if hapData[item][0] in ['isotropic','uniaxial']:                    
+                        hapData[item][1][0] = parmDict[pfx+item+';i']
+                        if item == 'Size':
+                            hapData[item][1][0] = min(10.,max(0.001,hapData[item][1][0]))
+                        if pfx+item+';i' in sigDict: 
+                            SizeMuStrSig[pfx+item][0][0] = sigDict[pfx+item+';i']
+                        if hapData[item][0] == 'uniaxial':
+                            hapData[item][1][1] = parmDict[pfx+item+';a']
                             if item == 'Size':
-                                hapData[item][1][0] = min(10.,max(0.001,hapData[item][1][0]))
-                            if pfx+item+';i' in sigDict: 
-                                SizeMuStrSig[pfx+item][0][0] = sigDict[pfx+item+';i']
-                            if hapData[item][0] == 'uniaxial':
-                                hapData[item][1][1] = parmDict[pfx+item+';a']
-                                if item == 'Size':
-                                    hapData[item][1][1] = min(10.,max(0.001,hapData[item][1][1]))                        
-                                if pfx+item+';a' in sigDict:
-                                    SizeMuStrSig[pfx+item][0][1] = sigDict[pfx+item+';a']
-                        else:       #generalized for mustrain or ellipsoidal for size
-                            Nterms = len(hapData[item][4])
-                            for i in range(Nterms):
-                                sfx = ';'+str(i)
-                                hapData[item][4][i] = parmDict[pfx+item+sfx]
-                                if pfx+item+sfx in sigDict:
-                                    SizeMuStrSig[pfx+item][1][i] = sigDict[pfx+item+sfx]
-                else:
-                    SizeMuStrSig.update({pfx+'HStrain':{}})                  
+                                hapData[item][1][1] = min(10.,max(0.001,hapData[item][1][1]))                        
+                            if pfx+item+';a' in sigDict:
+                                SizeMuStrSig[pfx+item][0][1] = sigDict[pfx+item+';a']
+                    else:       #generalized for mustrain or ellipsoidal for size
+                        Nterms = len(hapData[item][4])
+                        for i in range(Nterms):
+                            sfx = ';'+str(i)
+                            hapData[item][4][i] = parmDict[pfx+item+sfx]
+                            if pfx+item+sfx in sigDict:
+                                SizeMuStrSig[pfx+item][1][i] = sigDict[pfx+item+sfx]
+                SizeMuStrSig.update({pfx+'HStrain':{}})                  
                 names = G2spc.HStrainNames(SGData)
                 for i,name in enumerate(names):
                     hapData['HStrain'][0][i] = parmDict[pfx+name]
@@ -3538,9 +3562,8 @@ def SetHistogramPhaseData(parmDict,sigDict,Phases,Histograms,calcControls,Print=
                                 pFile.write(' March-Dollase PO: %10.4f, sig %10.4f\n'%(hapData['Pref.Ori.'][1],PhFrExtPOSig[pfx+'MD']))
                         else:
                             PrintSHPOAndSig(pfx,hapData['Pref.Ori.'],PhFrExtPOSig)
-                    if 'E' not in  Inst['Type'][0]:       
-                        PrintSizeAndSig(hapData['Size'],SizeMuStrSig[pfx+'Size'])
-                        PrintMuStrainAndSig(hapData['Mustrain'],SizeMuStrSig[pfx+'Mustrain'],SGData)
+                    PrintSizeAndSig(hapData['Size'],SizeMuStrSig[pfx+'Size'])
+                    PrintMuStrainAndSig(hapData['Mustrain'],SizeMuStrSig[pfx+'Mustrain'],SGData)
                     PrintHStrainAndSig(hapData['HStrain'],SizeMuStrSig[pfx+'HStrain'],SGData)
                     if pfx+'LayerDisp' in SizeMuStrSig:
                         pFile.write(' Layer displacement : %10.3f, sig %10.3f\n'%(hapData['Layer Disp'][0],SizeMuStrSig[pfx+'LayerDisp']))            
@@ -4192,14 +4215,18 @@ def WriteRBObjSHCAndSig(pfx,rbfx,rbsx,parmDict,sigDict,SHC):
     '''
     out = []
     name = pfx+rbfx+'Radius'+rbsx
-    namstr = '  names :%12s'%'Radius'
-    valstr = '  values:%12.5f'%parmDict[name]
-    sigstr = '  esds  :'
-    if name in sigDict:
-        sigstr += '%12.5f'%sigDict[name]
-        [name]
+    if name in parmDict:
+        namstr = '  names :%12s'%'Radius'
+        valstr = '  values:%12.5f'%parmDict[name]
+        sigstr = '  esds  :'
+        if name in sigDict:
+            sigstr += '%12.5f'%sigDict[name]
+        else:
+            sigstr += 12*' '
     else:
-        sigstr += 12*' '
+        namstr = '  names :'
+        valstr =  '  values:'
+        sigstr =  '  esds  :'
     out.append(' Sp.harm.:\n')
     for item in SHC:
         name = pfx+rbfx+item+rbsx

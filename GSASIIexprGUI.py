@@ -1,26 +1,14 @@
 # -*- coding: utf-8 -*-
 #GSASIIexprGUI - Expression Definition and Evaluation
 ########### SVN repository information ###################
-# $Date: 2022-02-25 11:56:30 -0600 (Fri, 25 Feb 2022) $
+# $Date: 2023-05-10 14:59:50 -0500 (Wed, 10 May 2023) $
 # $Author: toby $
-# $Revision: 5191 $
+# $Revision: 5574 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIexprGUI.py $
-# $Id: GSASIIexprGUI.py 5191 2022-02-25 17:56:30Z toby $
+# $Id: GSASIIexprGUI.py 5574 2023-05-10 19:59:50Z toby $
 ########### SVN repository information ###################
-'''
-*GSASIIexprGUI: Expression Handling*
--------------------------------------
-
-This module defines a class for defining an expression in terms of values
-in a parameter dictionary via a wx.Dialog. The dialog creates a :class:`GSASII.ExpressionObj`
-which is used to evaluate the expression against a supplied parameter dictionary.
-
-The expression is parsed to find variables used in the expression and then
-the user is asked to assign parameters from the dictionary to each variable.
-
-Default expressions are read from file DefaultExpressions.txt using
-:func:`GSASIIpath.LoadConfigFile`.
-
+'''Routines for users to input Python expressions used within 
+GSAS-II computations follow.
 '''
 from __future__ import division, print_function
 import re
@@ -30,11 +18,11 @@ import wx
 import wx.lib.scrolledpanel as wxscroll
 import numpy as np
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5191 $")
+GSASIIpath.SetVersionNumber("$Revision: 5574 $")
 import GSASIIctrlGUI as G2G
-import GSASIIpy3 as G2py3
 import GSASIIobj as G2obj
 import GSASIImath as G2mth
+import GSASIIfiles as G2fil
 
 # Define a short name for convenience
 WACV = wx.ALIGN_CENTER_VERTICAL
@@ -631,7 +619,7 @@ class ExpressionDialog(wx.Dialog):
                 var = self.varName[v]
                 if var in self.parmDict:
                     val = self.parmDict[var]
-                    s = G2py3.FormatSigFigs(val).rstrip('0')
+                    s = G2fil.FormatSigFigs(val).rstrip('0')
                 elif '*' in var:
                     vs = G2obj.LookupWildCard(var,self.parmDict.keys())
                     s = '('+str(len(vs))+' values)'
@@ -676,7 +664,7 @@ class ExpressionDialog(wx.Dialog):
             if not np.isfinite(val):
                 self.setEvalResult("Expression value is infinite or out-of-bounds")
                 return
-            s = G2py3.FormatSigFigs(val).rstrip('0')
+            s = G2fil.FormatSigFigs(val).rstrip('0')
             depVal = ""
             if self.depVarDict:
                 if not self.dependentVar:

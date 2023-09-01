@@ -1,24 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2017-10-23 11:39:16 -0500 (Mon, 23 Oct 2017) $
-# $Author: vondreele $
-# $Revision: 3136 $
+# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
+# $Author: toby $
+# $Revision: 5576 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_image.py $
-# $Id: G2export_image.py 3136 2017-10-23 16:39:16Z vondreele $
+# $Id: G2export_image.py 5576 2023-05-11 19:22:54Z toby $
 ########### SVN repository information ###################
-'''
-*Module G2export_image: 2D Image data export*
-------------------------------------------------------
-
-Demonstrates how an image is retrieved and written. Uses
-a SciPy routine to write a PNG format file. 
+'''Classes in :mod:`G2export_image` follow:
 '''
 from __future__ import division, print_function
 import os.path
 import scipy.misc
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 3136 $")
+GSASIIpath.SetVersionNumber("$Revision: 5576 $")
 import GSASIIIO as G2IO
 
 class ExportImagePNG(G2IO.ExportBaseclass):

@@ -1,24 +1,15 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-02-11 06:12:22 -0600 (Sat, 11 Feb 2023) $
-# $Author: toby $
-# $Revision: 5496 $
+# $Date: 2023-08-24 13:37:20 -0500 (Thu, 24 Aug 2023) $
+# $Author: vondreele $
+# $Revision: 5653 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2img_1TIF.py $
-# $Id: G2img_1TIF.py 5496 2023-02-11 12:12:22Z toby $
+# $Id: G2img_1TIF.py 5653 2023-08-24 18:37:20Z vondreele $
 ########### SVN repository information ###################
 '''
-*Module G2img_1TIF: Tagged-image File images*
---------------------------------------------------
-
-Routine to read an image in Tagged-image file (TIF) format as well as a variety
-of slightly incorrect pseudo-TIF formats used at instruments around the world.
-This uses a custom reader that attempts to determine the instrument and detector
-parameters from various aspects of the file. 
-
 Note that the name ``G2img_1TIF`` is used so that this file will
 sort to the top of the image formats and thus show up first in the menu.
 (It is the most common, alas).
-
 '''
 
 from __future__ import division, print_function
@@ -29,7 +20,7 @@ import GSASIIfiles as G2fil
 import numpy as np
 import time
 DEBUG = False
-GSASIIpath.SetVersionNumber("$Revision: 5496 $")
+GSASIIpath.SetVersionNumber("$Revision: 5653 $")
 class TIF_ReaderClass(G2obj.ImportImage):
     '''Reads TIF files using a routine (:func:`GetTifData`) that looks
     for files that can be identified from known instruments and will
@@ -153,7 +144,12 @@ def GetTifData(filename):
     if 34710 in IFD:
         G2fil.G2Print ('Read MAR CCD tiff file: '+filename)
         marFrame = rmf.marFrame(File,byteOrd,IFD)
-        image = np.flipud(np.array(np.asarray(marFrame.image),dtype=np.int32))
+        image = np.array(np.asarray(marFrame.image),dtype=np.int32)
+        image = np.reshape(image,sizexy)
+        if marFrame.origin:     #not upper left?
+            image = np.flipud(image)
+        if marFrame.viewDirection:  #view through sample to detector instead of TOWARD_SOURCE
+            image = np.fliplr(image)
         tifType = marFrame.filetitle
         pixy = [marFrame.pixelsizeX/1000.0,marFrame.pixelsizeY/1000.0]
         head = marFrame.outputHead()

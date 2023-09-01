@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2020-03-03 15:01:43 -0600 (Tue, 03 Mar 2020) $
+# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
 # $Author: toby $
-# $Revision: 4339 $
+# $Revision: 5577 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2phase_rmc6f.py $
-# $Id: G2phase_rmc6f.py 4339 2020-03-03 21:01:43Z toby $
+# $Id: G2phase_rmc6f.py 5577 2023-05-11 23:08:12Z toby $
 ########### SVN repository information ###################
 '''
-*Module G2phase_rmc6f: Import phase from RMCProfile rmc6f file*
---------------------------------------------------------
-
-Copies a phase from SHELX ins file into the
-current project.
-
 '''
 from __future__ import division, print_function
 import sys
@@ -23,7 +17,7 @@ import GSASIIobj as G2obj
 import GSASIIlattice as G2lat
 import GSASIIctrlGUI as G2G
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4339 $")
+GSASIIpath.SetVersionNumber("$Revision: 5577 $")
 
 class PhaseReaderClass(G2obj.ImportPhase):
     'Opens a .rmc6f file and pulls out the phase'

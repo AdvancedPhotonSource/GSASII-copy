@@ -1,31 +1,14 @@
 # -*- coding: utf-8 -*-
 #GSASIIseqGUI - Sequential Results Display routines
 ########### SVN repository information ###################
-# $Date: 2023-02-23 12:34:07 -0600 (Thu, 23 Feb 2023) $
+# $Date: 2023-08-18 16:36:52 -0500 (Fri, 18 Aug 2023) $
 # $Author: vondreele $
-# $Revision: 5503 $
+# $Revision: 5651 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIseqGUI.py $
-# $Id: GSASIIseqGUI.py 5503 2023-02-23 18:34:07Z vondreele $
+# $Id: GSASIIseqGUI.py 5651 2023-08-18 21:36:52Z vondreele $
 ########### SVN repository information ###################
 '''
-*GSASIIseqGUI: Sequential Results GUI*
-----------------------------------------
-
-Module that defines GUI routines and classes for the various sequential result GUI Frames (window).
-Also defines GUI routines for Cluster Analysis results. 
-
-Note that there are seven types of sequential results that GSAS-II can produce 
-and all are displayed/analyzed with the code in this module. They vary by title so that 
-a project can hold one result of each type without a naming collision:
-
- * Rietveld (Title: Sequential results)
- * PDF (Title: Sequential PDFfit2 results)
- * Peak fit (Title: Sequential peak fit results)
- * Small angle (Title: Sequential SASD fit results) 
- * Reflectometry (Title: Sequential REFD results)
- * Image (strain) (Title: Sequential strain fit results)
- * Image (calibration) (Title: Sequential image calibration results)
-
+Routines for Sequential Results & Cluster Analysis dataframes follow. 
 '''
 from __future__ import division, print_function
 import platform
@@ -41,7 +24,7 @@ try:
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5503 $")
+GSASIIpath.SetVersionNumber("$Revision: 5651 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIdataGUI as G2gd
@@ -1245,7 +1228,7 @@ def UpdateSeqResults(G2frame,data,prevSize=None):
         G2frame.colSigs += [None]
         colLabels += ['Rwp']
         Types += [wg.GRID_VALUE_FLOAT+':10,3',]
-    if histNames[0][:4] not in ['SASD','IMG ','REFD']:
+    if histNames[0][:4] not in ['SASD','IMG ','REFD','PDF ']:
         G2frame.colList += [[data[name]['Rvals']['GOF'] for name in histNames]]
         G2frame.colSigs += [None]
         colLabels += ['GOF']

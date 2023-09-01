@@ -1,24 +1,19 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2021-03-24 18:16:47 -0500 (Wed, 24 Mar 2021) $
+# $Date: 2023-05-20 13:24:42 -0500 (Sat, 20 May 2023) $
 # $Author: vondreele $
-# $Revision: 4866 $
+# $Revision: 5586 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2sfact.py $
-# $Id: G2sfact.py 4866 2021-03-24 23:16:47Z vondreele $
+# $Id: G2sfact.py 5586 2023-05-20 18:24:42Z vondreele $
 ########### SVN repository information ###################
 '''
-*Module G2sfact: simple HKL import*
------------------------------------
-Read structure factors from a simple hkl file. Two routines are
-provided to read from files containing F or F\ :sup:`2` values.
-
 '''
 from __future__ import division, print_function
 import sys
 import numpy as np
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 4866 $")
+GSASIIpath.SetVersionNumber("$Revision: 5586 $")
 
 def ColumnValidator(parent, filepointer,nCol=5):
     'Validate a file to check that it contains columns of numbers'
@@ -66,7 +61,8 @@ class HKLF_ReaderClass(G2obj.ImportStructFactor):
         for line,S in enumerate(fp):
             self.errors = '  Error reading line '+str(line+1)
             if S[0] == '#': continue       #ignore comments, if any
-            h,k,l,Fo,sigFo = S.split()
+            items = S.split()
+            h,k,l,Fo,sigFo = items[:5]
             h,k,l = [int(h),int(k),int(l)]
             if not any([h,k,l]):
                 break
@@ -149,8 +145,8 @@ class SHELX4_ReaderClass(G2obj.ImportStructFactor):
         for line,S in enumerate(fp):
             self.errors = '  Error reading line '+str(line+1)
             if S[0] == '#': continue       #ignore comments, if any
-#           h,k,l,Fo,sigFo = S[:4],S[4:8],S[8:12],S[12:20],S[20:28]
-            h,k,l,Fo,sigFo = S.split()
+            items = S.split()
+            h,k,l,Fo,sigFo = items[:5]
             h,k,l = [int(h),int(k),int(l)]
             if not any([h,k,l]):
                 break

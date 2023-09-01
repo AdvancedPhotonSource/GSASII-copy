@@ -38,6 +38,16 @@ for fil in (glob.glob(os.path.abspath(os.path.join('..', '..','*.py')))+
     except:
         pass
 print('Found highest version as {}'.format(version))
+# put the version into the docs
+print(os.path.split(__file__)[0])
+fp = open(os.path.join(os.path.split(__file__)[0],'version.rst'),'w')
+fp.write(f'This documentation was prepared from GSAS-II version {version}\n')
+fp.close()
+# update to use the most recent variables list
+fil = os.path.normpath(os.path.join(
+    os.path.split(__file__)[0],'..','..','makeVarTbl.py'))
+with open(fil, 'rb') as f:
+    exec(compile(f.read(), fil, 'exec'), {"__file__": fil,"__name__": "__main__"})
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -45,7 +55,11 @@ print('Found highest version as {}'.format(version))
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.mathjax']
+extensions = [
+    'sphinx_rtd_theme',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.mathjax']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -60,7 +74,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'GSAS-II'
-copyright = u'2013-2017, R.B. Von Dreele and B.H. Toby for Argonne National Laboratory'
+copyright = u'2013-2023, R.B. Von Dreele and B.H. Toby for Argonne National Laboratory'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -110,14 +124,20 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+html_theme = 'sphinx_rtd_theme'
+#html_theme = 'default'
 #html_theme = 'agogo'
 #html_theme = 'sphinxdoc'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+html_theme_options = {
+    'collapse_navigation': False,
+#    'navigation_depth': 2,
+#    'includehidden': False,
+#    'titles_only': True
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -143,11 +163,24 @@ html_logo = 'G2_html_logo.png'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-     }
+# to force tables from being too wide in the HTML rendering
+# file trunk/docs/source/_static/theme_overrides.css is added
+# to limit the page width.
+html_css_files = [
+    'theme_overrides.css',
+]
+
+# from https://github.com/spacetelescope/pysynphot/issues/116 (tnx Paul)
+# converts LaTeX Angstrom symbol to Unicode symbol in HTML output
+rst_prolog = u"""\
+
+.. only:: html
+
+  :math:`\\renewcommand\\AA{\\text{Å}}`
+
+"""
+
+
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -237,6 +270,8 @@ latex_logo = 'G2_html_logo.png'
 # If false, no module index is generated.
 #latex_domain_indices = True
 
+#build PDF with Unicode characters
+latex_engine = 'xelatex'
 
 # -- Options for manual page output --------------------------------------------
 
@@ -272,4 +307,4 @@ texinfo_documents = [
 #texinfo_show_urls = 'footnote'
 
 # set up dummy packages for misc imports not on readthedocs
-autodoc_mock_imports = "wx numpy scipy matplotlib pillow OpenGL h5py".split()
+#autodoc_mock_imports = "wx numpy scipy matplotlib pillow OpenGL h5py".split()
