@@ -1,0 +1,15 @@
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - scipy
+  - pyopengl
+  - imageio
+  - h5py
+  - numpy
+#  - sphinx # included by RTD
+#  - pillow # included by RTD
+  - pip
+  - matplotlib
+  - wxpython
