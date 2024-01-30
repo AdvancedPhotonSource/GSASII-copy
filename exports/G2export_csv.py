@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-11 14:22:54 -0500 (Thu, 11 May 2023) $
-# $Author: toby $
-# $Revision: 5576 $
+# $Date: 2023-11-06 12:10:30 -0600 (Mon, 06 Nov 2023) $
+# $Author: vondreele $
+# $Revision: 5699 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_csv.py $
-# $Id: G2export_csv.py 5576 2023-05-11 19:22:54Z toby $
+# $Id: G2export_csv.py 5699 2023-11-06 18:10:30Z vondreele $
 ########### SVN repository information ###################
 '''Classes in :mod:`G2export_csv` follow:
 '''
@@ -15,7 +15,7 @@ from __future__ import division, print_function
 import os.path
 import numpy as np
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5576 $")
+GSASIIpath.SetVersionNumber("$Revision: 5699 $")
 import GSASIIIO as G2IO
 import GSASIIobj as G2obj
 import GSASIImath as G2mth
@@ -416,6 +416,17 @@ class ExportSASDCSV(G2IO.ExportBaseclass):
                     if line: line += ','
                     line += G2fil.FormatValue(val,digits)
                 self.Write(line)            
+            
+        if 'Size Calc' in self.Histograms[TreeName]['Models']:
+            Rbins,Dist = self.Histograms[TreeName]['Models']['Size Calc']
+            
+            for i in range(len(Rbins)):
+                if len(Rbins[i]):
+                    self.Write('Calc size dist for model %d'%i)
+                    WriteList(self,['diam','dist'])
+                    for rbin,dist in zip(Rbins[i],Dist[i]):
+                        self.Write('%13.4g,%13.4g'%(2.*rbin,dist))
+
         self.Write('"Small angle data"')
         Parms = self.Histograms[TreeName]['Instrument Parameters'][0]
         for parm in Parms:
@@ -428,12 +439,8 @@ class ExportSASDCSV(G2IO.ExportBaseclass):
             self.Write(line)
         WriteList(self,("q","y_obs","y_sig","y_calc","y_bkg"))
         digitList = 5*((13,5,'g'),)
-        for vallist in zip(histblk['Data'][0],
-                       histblk['Data'][1],
-                       1./np.sqrt(histblk['Data'][2]),
-                       histblk['Data'][3],
-                       histblk['Data'][4],
-                       ):
+        for vallist in zip(histblk['Data'][0],histblk['Data'][1],
+            1./np.sqrt(histblk['Data'][2]),histblk['Data'][3],histblk['Data'][4],):
             line = ""
             for val,digits in zip(vallist,digitList):
                 if line: line += ','

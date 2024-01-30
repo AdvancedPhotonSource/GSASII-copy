@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIpwdGUI - powder data display routines
 ########### SVN repository information ###################
-# $Date: 2023-08-07 09:23:55 -0500 (Mon, 07 Aug 2023) $
-# $Author: vondreele $
-# $Revision: 5642 $
+# $Date: 2024-01-21 20:39:11 -0600 (Sun, 21 Jan 2024) $
+# $Author: toby $
+# $Revision: 5719 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpwdGUI.py $
-# $Id: GSASIIpwdGUI.py 5642 2023-08-07 14:23:55Z vondreele $
+# $Id: GSASIIpwdGUI.py 5719 2024-01-22 02:39:11Z toby $
 ########### SVN repository information ###################
 '''GUI routines for PWDR datadree subitems follow.
 '''
@@ -31,7 +31,7 @@ else:
     import pickle as cPickle
 import scipy.interpolate as si
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5642 $")
+GSASIIpath.SetVersionNumber("$Revision: 5719 $")
 import GSASIImath as G2mth
 import GSASIIpwd as G2pwd
 import GSASIIfiles as G2fil
@@ -2229,7 +2229,7 @@ def UpdateLimitsGrid(G2frame, data,datatype):
         G2gd.SetDataMenuBar(G2frame,G2frame.dataWindow.LimitMenu)
         G2frame.Bind(wx.EVT_MENU,OnLimitCopy,id=G2G.wxID_LIMITCOPY)
         G2frame.Bind(wx.EVT_MENU,OnAddExcl,id=G2G.wxID_ADDEXCLREGION)
-    elif 'L' in datatype or 'R' in datatype:                   #SASD & REFD data menu commands
+    elif 'A' in datatype or 'R' in datatype:                   #SASD & REFD data menu commands
         G2gd.SetDataMenuBar(G2frame,G2frame.dataWindow.SASDLimitMenu)
         G2frame.Bind(wx.EVT_MENU,OnLimitCopy,id=G2G.wxID_SASDLIMITCOPY)
     Draw() 
@@ -2564,6 +2564,8 @@ def UpdateInstrumentGrid(G2frame,data):
                 instData['Bank'] = [1,1,0]
             if 'Source' not in instData:
                 instData['Source'] = ['','']
+            if 'Z' not in instData:
+                instData['Z'] = [0.,0.,0]
             if len(data) == len(instData) and instType == instData['Type'][0]:  #don't mix data types or lam & lam1/lam2 parms!
                 instData.update(copyData)
             else:
@@ -3424,6 +3426,8 @@ def UpdateSampleGrid(G2frame,data):
         TextTable.update({key:Controls[key] for key in Controls if key.startswith('FreePrm')})
         # add a few extra
         TextTable.update({'Type':'Diffractometer type','InstrName':'Instrument Name',})
+        if 'SASD' in histList[0] or 'REFD' in histList[0]:
+            TextTable.update({'Materials':'Materials',})
         # Assemble a list of dict entries that would be labeled in the Sample
         # params data window (drop ranId and items not used).
         keyList = [i for i in data.keys() if i in TextTable]
@@ -3441,7 +3445,7 @@ def UpdateSampleGrid(G2frame,data):
         if not selectedKeys: return # nothing to copy
         copyDict = {}
         for parm in selectedKeys:
-            copyDict[parm] = data[parm]
+            copyDict[parm] = copy.deepcopy(data[parm])
         dlg = G2G.G2MultiChoiceDialog(G2frame,'Copy sample params from\n'+str(hst[5:])+' to...',
             'Copy sample parameters', histList)
         try:
@@ -3451,7 +3455,7 @@ def UpdateSampleGrid(G2frame,data):
                     item = histList[i]
                     Id = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,item)
                     sampleData = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Id,'Sample Parameters'))
-                    sampleData.update(copy.deepcopy(copyDict))
+                    sampleData.update(copyDict)
         finally:
             dlg.Destroy()            
         G2plt.PlotPatterns(G2frame,plotType=hst[:4],newPlot=False)
@@ -3512,7 +3516,7 @@ def UpdateSampleGrid(G2frame,data):
         
     def OnVolFrac(invalid,value,tc):
         Id = Info[tc.GetId()]
-        data['Materials'][not Id][key] = 1.-value
+        data['Materials'][not Id]['VolFrac'] = 1.-value
         wx.CallAfter(UpdateSampleGrid,G2frame,data)
 
     def OnCopy1Val(event):
@@ -3690,6 +3694,7 @@ def UpdateSampleGrid(G2frame,data):
             subSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Volume fraction: '),0,WACV)
             volfrac = G2G.ValidatedTxtCtrl(G2frame.dataWindow,item,'VolFrac',
                 xmin=0.,xmax=1.,nDig=(10,3),typeHint=float,OnLeave=OnVolFrac)
+            Info[volfrac.GetId()] = Id
             subSizer.Add(volfrac,0,WACV)
             try:
                 material = Substances['Substances'][item['Name']]
@@ -4836,7 +4841,7 @@ def UpdateUnitCellsGrid(G2frame, data):
         wx.CallAfter(UpdateUnitCellsGrid,G2frame,data)
         
     def OnLatSym(event):
-        'Run Bilbao PsuedoLattice cell search'
+        'Run Bilbao PseudoLattice cell search'
         # look up a space group matching Bravais lattice (should not matter which one) 
         bravaisSPG = {'Fm3m':225,'Im3m':229,'Pm3m':221,'R3-H':146,'P6/mmm':191,
                        'I4/mmm':139,'P4/mmm':123,'Fmmm':69,'Immm':71,
@@ -4891,6 +4896,10 @@ def UpdateUnitCellsGrid(G2frame, data):
         sizer.Add((-1,15))
         sizer.Add(wx.StaticText(dlg,label=msg))
         sizer.Add((-1,15))
+        sizer.Add(wx.StaticText(dlg,label=(
+            ('Starting cell: '+3*'{:.3f}, '+3*'{:.2f}, ').format(
+                *controls[6:12]))))
+        sizer.Add((-1,15))
         tableSizer = wx.FlexGridSizer(0,2,0,0)
         tableSizer.Add(wx.StaticText(dlg,label='Cell length tolerance (A) '),
             0,WACV|wx.ALIGN_LEFT)
@@ -4900,10 +4909,14 @@ def UpdateUnitCellsGrid(G2frame, data):
             0,WACV|wx.ALIGN_LEFT)
         w = G2G.ValidatedTxtCtrl(dlg,nistInput,1,nDig=(6,1))
         tableSizer.Add(w)
-        tableSizer.Add(wx.StaticText(dlg,label='Cell volume range (ratio) '),
-            0,WACV|wx.ALIGN_LEFT)
-        w = G2G.ValidatedTxtCtrl(dlg,nistInput,2)
-        tableSizer.Add(w)
+        #
+        # next option makes it too easy to create a really
+        # long-running (infinite?) computation. Removed for now.
+        #
+        #tableSizer.Add(wx.StaticText(dlg,label='Cell volume range (ratio) '),
+        #    0,WACV|wx.ALIGN_LEFT)
+        #w = G2G.ValidatedTxtCtrl(dlg,nistInput,2)
+        #tableSizer.Add(w)
         tableSizer.Add(wx.StaticText(dlg,label='Search mode: Generate '),
             0,WACV|wx.ALIGN_LEFT)
         tableSizer.Add(G2G.EnumSelector(dlg,nistInput,3,
@@ -6419,11 +6432,11 @@ def UpdateModelsGrid(G2frame,data):
                 'Gaussian':{'Volume':[0.05,False],'Mean':[1000.,False],'StdDev':[300.,False],},
                 'LSW':{'Volume':[0.05,False],'Mean':[1000.0,False],},
                 'Schulz-Zimm':{'Volume':[0.05,False],'Mean':[1000.,False],'StdDev':[300.,False],},
-                'Unified':{'G':[1.e3,False],'Rg':[100,False],'B':[1.e-5,False],'P':[4,False],'Cutoff':[1e-5,False],},
-                'Porod':{'B':[1.e-4,False],'P':[4,False],'Cutoff':[1e-5,False],},
-                'Monodisperse':{'Volume':[0.05,False],'Radius':[100,False],},   #OK for spheres
-                'Bragg':{'PkInt':[100,False],'PkPos':[0.2,False],
-                    'PkSig':[10,False],'PkGam':[10,False],},        #reasonable 31A peak
+                'Unified':{'G':[1.e3,False],'Rg':[100.,False],'B':[1.e-5,False],'P':[4.,False],'Cutoff':[1.e-5,False],},
+                'Porod':{'B':[1.e-4,False],'P':[4.,False],'Cutoff':[1.e-5,False],},
+                'Monodisperse':{'Volume':[0.05,False],'Radius':[100.,False],},   #OK for spheres
+                'Bragg':{'PkInt':[100.,False],'PkPos':[0.2,False],
+                    'PkSig':[10.,False],'PkGam':[10.,False],},        #reasonable 31A peak
                 })
             G2sasd.ModelFxn(Profile,ProfDict,Limits,Sample,data)
             RefreshPlots(True)
@@ -6432,6 +6445,7 @@ def UpdateModelsGrid(G2frame,data):
         
     def OnCopyModel(event):
         hst = G2frame.GPXtree.GetItemText(G2frame.PatternId)
+        wtFactor = G2frame.GPXtree.GetItemPyData(G2frame.PatternId)[0]['wtFactor']
         histList = GetHistsLikeSelected(G2frame)
         if not histList:
             G2frame.ErrorDialog('No match','No histograms match '+hst,G2frame)
@@ -6446,7 +6460,9 @@ def UpdateModelsGrid(G2frame,data):
         finally:
             dlg.Destroy()        
         for item in copyList:
-            Id = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,item)
+            Id = G2gd.GetGPXtreeItemId(G2frame,G2frame.root,item)            
+            ProfDict = G2frame.GPXtree.GetItemPyData(Id)[0]
+            ProfDict['wtFactor'] = wtFactor
             newdata = copy.deepcopy(data)
             G2frame.GPXtree.SetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Id,'Models'),newdata)
             if newdata['BackFile']:
@@ -6547,8 +6563,15 @@ def UpdateModelsGrid(G2frame,data):
                     G2frame.GPXtree.SetItemPyData(G2gd.GetGPXtreeItemId(G2frame,sId, 'Models'),copy.deepcopy(IModel))
                 
                 G2sasd.ModelFxn(IProfile,IProfDict,ILimits,ISample,IModel)
+                saveDict = {}
+                for item in parmDict:
+                    if ';' in item:
+                        trm = item.split(';')[1]
+                        if trm in ['FFVolume','StrFact','FormFact']:
+                            continue
+                    saveDict.update({item:parmDict[item]})
                 SeqResult[name] = {'variables':result[0],'varyList':varyList,'sig':sig,'Rvals':Rvals,
-                    'covMatrix':covMatrix,'title':name,'parmDict':parmDict}
+                    'covMatrix':covMatrix,'title':name,'parmDict':saveDict}
             else:
                 dlg.Destroy()
                 print (' ***** Small angle sequential refinement successful *****')
@@ -6969,7 +6992,7 @@ def UpdateModelsGrid(G2frame,data):
             else:
                 logv = np.log10(value)
                 valMinMax = [logv-1,logv+1]
-                sldrObj.SetRange(slMult*valMinMax[0],slMult*valMinMax[1])
+                sldrObj.SetScaledRange(slMult*valMinMax[0],slMult*valMinMax[1])
                 sldrObj.SetValue(slMult*logv)
             G2sasd.ModelFxn(Profile,ProfDict,Limits,Sample,data)
             RefreshPlots(True)
@@ -7149,8 +7172,7 @@ def UpdateModelsGrid(G2frame,data):
         rhoMat = Substances['Substances'][data['Particle']['Matrix']['Name']].get('XAnom density',0.0)        
         topSizer.Add(matsel,0,WACV)
         topSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Volume fraction: '),0,WACV)
-        volfrac = G2G.ValidatedTxtCtrl(G2frame.dataWindow,data['Particle']['Matrix']['VolFrac'],0,
-                typeHint=float)
+        volfrac = G2G.ValidatedTxtCtrl(G2frame.dataWindow,data['Particle']['Matrix']['VolFrac'],0,typeHint=float)
         topSizer.Add(volfrac,0,WACV)
         volVar = wx.CheckBox(G2frame.dataWindow,label=' Refine?')
         volVar.SetValue(data['Particle']['Matrix']['VolFrac'][1])

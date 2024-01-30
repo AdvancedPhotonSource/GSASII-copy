@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIexprGUI - Expression Definition and Evaluation
 ########### SVN repository information ###################
-# $Date: 2023-05-10 14:59:50 -0500 (Wed, 10 May 2023) $
-# $Author: toby $
-# $Revision: 5574 $
+# $Date: 2023-09-29 15:47:55 -0500 (Fri, 29 Sep 2023) $
+# $Author: vondreele $
+# $Revision: 5663 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIexprGUI.py $
-# $Id: GSASIIexprGUI.py 5574 2023-05-10 19:59:50Z toby $
+# $Id: GSASIIexprGUI.py 5663 2023-09-29 20:47:55Z vondreele $
 ########### SVN repository information ###################
 '''Routines for users to input Python expressions used within 
 GSAS-II computations follow.
@@ -18,7 +18,7 @@ import wx
 import wx.lib.scrolledpanel as wxscroll
 import numpy as np
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5574 $")
+GSASIIpath.SetVersionNumber("$Revision: 5663 $")
 import GSASIIctrlGUI as G2G
 import GSASIIobj as G2obj
 import GSASIImath as G2mth
@@ -919,8 +919,7 @@ class AngleDialog(wx.Dialog):
         neigh = []
         bNames = []
         if self.Oatom:
-            neigh = G2mth.FindAllNeighbors(Phase,self.Oatom,aNames,
-                                           searchType='Angle')[0]
+            neigh = G2mth.FindAllNeighbors(Phase,self.Oatom,aNames,searchType='Angle')[0]
         if neigh:
             for iA,aName in enumerate(neigh):
                 for cName in neigh[iA+1:]:

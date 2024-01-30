@@ -1,11 +1,11 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
-# $Author: toby $
-# $Revision: 5572 $
+# $Date: 2023-11-06 09:07:21 -0600 (Mon, 06 Nov 2023) $
+# $Author: vondreele $
+# $Revision: 5698 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIsasd.py $
-# $Id: GSASIIsasd.py 5572 2023-05-10 02:43:48Z toby $
+# $Id: GSASIIsasd.py 5698 2023-11-06 15:07:21Z vondreele $
 ########### SVN repository information ###################
 '''
 Classes and routines defined in :mod:`GSASIIsasd` follow. 
@@ -20,7 +20,7 @@ import scipy.optimize as so
 #import pdb
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5572 $")
+GSASIIpath.SetVersionNumber("$Revision: 5698 $")
 import GSASIIpwd as G2pwd
 
 # trig functions in degrees
@@ -445,8 +445,8 @@ def SchulzZimmCume(x,pos,args):
     '''
     scale = args[0]
     nP = 500
-    xMin = np.fmax([0.,pos-4.*scale])
-    xMax = np.fmin([pos+4.*scale,1.e5])
+    xMin = np.fmax(0.,pos-4.*scale)
+    xMax = np.fmin(pos+4.*scale,1.e5)
     X = np.linspace(xMin,xMax,nP,True)
     fxn = LSWDist(X,pos)
     mat = np.outer(np.ones(nP),fxn)
@@ -1576,7 +1576,7 @@ def ModelFxn(Profile,ProfDict,Limits,Sample,sasdData):
         elif 'Bragg' in distFxn:
             parmDict = level[controls['DistType']]
             Ic[Ibeg:Ifin] += parmDict['PkInt'][0]*G2pwd.getPsVoigt(parmDict['PkPos'][0],
-                parmDict['PkSig'][0],parmDict['PkGam'][0],Q[Ibeg:Ifin])
+                parmDict['PkSig'][0],parmDict['PkGam'][0],Q[Ibeg:Ifin])[0]
             Rbins.append([])
             Dist.append([])
     Ic[Ibeg:Ifin] += Back[0]

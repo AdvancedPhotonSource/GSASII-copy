@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - phase data display routines
 ########### SVN repository information ###################
-# $Date: 2023-08-10 08:53:51 -0500 (Thu, 10 Aug 2023) $
+# $Date: 2023-10-09 08:44:52 -0500 (Mon, 09 Oct 2023) $
 # $Author: vondreele $
-# $Revision: 5645 $
+# $Revision: 5669 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIddataGUI.py $
-# $Id: GSASIIddataGUI.py 5645 2023-08-10 13:53:51Z vondreele $
+# $Id: GSASIIddataGUI.py 5669 2023-10-09 13:44:52Z vondreele $
 ########### SVN repository information ###################
 '''Routines for Data tab in Phase dataframe follows. 
 '''
@@ -14,7 +14,7 @@ import copy
 import numpy as np
 import numpy.linalg as nl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5645 $")
+GSASIIpath.SetVersionNumber("$Revision: 5669 $")
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
 import GSASIIplot as G2plt
@@ -1169,7 +1169,7 @@ def MakeHistPhaseWin(G2frame):
         'display the DData info'
         G2frame.HistPhaseLastSel = phaseList[page]
         data = G2frame.GPXtree.GetItemPyData(phaseIds[page])
-        G2plt.PlotSizeStrainPO(G2frame,data,hist='',Start=True)            
+        G2plt.PlotSizeStrainPO(G2frame,data,hist='')            
         UpdateDData(G2frame,DData[page],data)
         
     #### G2frame.dataWindow.DataMenu/"Edit Phase" menu routines (note similar routines in GSASIIphsGUI.py)

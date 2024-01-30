@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-08-03 22:57:51 -0500 (Thu, 03 Aug 2023) $
+# $Date: 2023-10-02 10:55:35 -0500 (Mon, 02 Oct 2023) $
 # $Author: toby $
-# $Revision: 5641 $
+# $Revision: 5666 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIspc.py $
-# $Id: GSASIIspc.py 5641 2023-08-04 03:57:51Z toby $
+# $Id: GSASIIspc.py 5666 2023-10-02 15:55:35Z toby $
 ########### SVN repository information ###################
 ''':mod:`GSASIIspc` Classes & routines follow
 '''
@@ -17,7 +17,7 @@ import copy
 import os.path as ospath
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5641 $")
+GSASIIpath.SetVersionNumber("$Revision: 5666 $")
 
 npsind = lambda x: np.sin(x*np.pi/180.)
 npcosd = lambda x: np.cos(x*np.pi/180.)
@@ -53,9 +53,9 @@ def SpcGroup(SGSymbol):
              * 'SGPolax': one of ' ', 'x', 'y', 'x y', 'z', 'x z', 'y z',
                'xyz', '111' for arbitrary axes
              * 'SGPtGrp': one of 32 point group symbols (with some permutations), which
-                is filled by SGPtGroup, is external (KE) part of supersymmetry point group
+               is filled by SGPtGroup, is external (KE) part of supersymmetry point group
              * 'SSGKl': default internal (Kl) part of supersymmetry point group; modified 
-                in supersymmetry stuff depending on chosen modulation vector for Mono & Ortho
+               in supersymmetry stuff depending on chosen modulation vector for Mono & Ortho
              * 'BNSlattsym': BNS lattice symbol & cenering op - used for magnetic structures
 
     """
@@ -277,7 +277,7 @@ def SGPtGroup(SGData):
     Determine point group of the space group - done after space group symbol has
     been evaluated by SpcGroup. Only short symbols are allowed
     
-    :param SGData: from :func SpcGroup
+    :param SGData: from :func:`SpcGroup`
     :returns: SSGPtGrp & SSGKl (only defaults for Mono & Ortho)
     '''
     Flds = SGData['SpGrp'].split()
@@ -682,6 +682,7 @@ def GetGenSym(SGData):
     LattSym = ('P','A','B','C','I','F','R')
     
     '''
+    BNSsym = {}
     OprNames = [GetOprPtrName(str(irtx)) for irtx in PackRot(SGData['SGOps'])]
     if SGData['SGInv']:
         OprNames += [GetOprPtrName(str(-irtx)) for irtx in PackRot(SGData['SGOps'])]

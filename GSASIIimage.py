@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII image calculations: Image calibration, masking & integration routines.
 ########### SVN repository information ###################
-# $Date: 2023-06-23 14:12:24 -0500 (Fri, 23 Jun 2023) $
-# $Author: toby $
-# $Revision: 5622 $
+# $Date: 2023-10-28 16:43:36 -0500 (Sat, 28 Oct 2023) $
+# $Author: vondreele $
+# $Revision: 5687 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIimage.py $
-# $Id: GSASIIimage.py 5622 2023-06-23 19:12:24Z toby $
+# $Id: GSASIIimage.py 5687 2023-10-28 21:43:36Z vondreele $
 ########### SVN repository information ###################
 '''
 Classes and routines defined in :mod:`GSASIIimage` follow. 
@@ -23,7 +23,7 @@ from scipy.optimize import leastsq
 import scipy.interpolate as scint
 import scipy.special as sc
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5622 $")
+GSASIIpath.SetVersionNumber("$Revision: 5687 $")
 try:
     import GSASIIplot as G2plt
 except ImportError: # expected in scriptable w/o matplotlib and/or wx
@@ -1537,7 +1537,7 @@ def ImageIntegrate(image,data,masks,blkSize=128,returnN=False,useTA=None,useMask
             times[0] += time.time()-t0      # time mask application
             t0 = time.time()
             tax = np.where(tax > LRazm[1],tax-360.,tax)                 #put azm inside limits if possible
-            tax = np.where(tax < LRazm[0],tax+360.,tax)
+            tax = np.where(tax < LRazm[0],tax+360.,tax)                 #are these really needed?
             if data.get('SampleAbs',[0.0,''])[1]:
                 if 'Cylind' in data['SampleShape']:
                     muR = muT*(1.+npsind(tax)**2/2.)/(npcosd(tay))      #adjust for additional thickness off sample normal

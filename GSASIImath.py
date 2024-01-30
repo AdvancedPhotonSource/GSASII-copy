@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIImath - major mathematics routines
 ########### SVN repository information ###################
-# $Date: 2023-07-31 10:49:24 -0500 (Mon, 31 Jul 2023) $
+# $Date: 2023-10-20 15:25:51 -0500 (Fri, 20 Oct 2023) $
 # $Author: vondreele $
-# $Revision: 5639 $
+# $Revision: 5683 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIImath.py $
-# $Id: GSASIImath.py 5639 2023-07-31 15:49:24Z vondreele $
+# $Id: GSASIImath.py 5683 2023-10-20 20:25:51Z vondreele $
 ########### SVN repository information ###################
 '''
 Routines defined in :mod:`GSASIImath` follow.
@@ -20,7 +20,7 @@ import time
 import math
 import copy
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5639 $")
+GSASIIpath.SetVersionNumber("$Revision: 5683 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -787,6 +787,8 @@ def GetAtomsById(atomData,atomLookUp,IdList):
     '''
     atoms = []
     for Id in IdList:
+        if Id < 0:
+            continue
         atoms.append(atomData[atomLookUp[Id]])
     return atoms
     
@@ -806,6 +808,8 @@ def GetAtomItemsById(atomData,atomLookUp,IdList,itemLoc,numItems=1):
     if not isinstance(IdList,list):
         IdList = [IdList,]
     for Id in IdList:
+        if Id < 0:
+            continue
         if numItems == 1:
             Items.append(atomData[atomLookUp[Id]][itemLoc])
         else:
@@ -931,38 +935,6 @@ def ApplySeqData(data,seqData,PF2=False):
                     drawatom[dci-7] = atuiso
     return drawAtoms
     
-def FindNeighbors(phase,FrstName,AtNames,notName=''):
-    General = phase['General']
-    cx,ct,cs,cia = getAtomPtrs(phase)
-    Atoms = phase['Atoms']
-    atNames = [atom[ct-1] for atom in Atoms]
-    Cell = General['Cell'][1:7]
-    Amat,Bmat = G2lat.cell2AB(Cell)
-    atTypes = General['AtomTypes']
-    Radii = np.array(General['BondRadii'])
-    try:
-        DisAglCtls = General['DisAglCtls']    
-        radiusFactor = DisAglCtls['Factors'][0]
-    except:
-        radiusFactor = 0.85
-    AtInfo = dict(zip(atTypes,Radii)) #or General['BondRadii']
-    Orig = atNames.index(FrstName)
-    OId = Atoms[Orig][cia+8]
-    OType = Atoms[Orig][ct]
-    XYZ = getAtomXYZ(Atoms,cx)        
-    Neigh = []
-    Ids = []
-    Dx = np.inner(Amat,XYZ-XYZ[Orig]).T
-    dist = np.sqrt(np.sum(Dx**2,axis=1))
-    sumR = np.array([AtInfo[OType]+AtInfo[atom[ct]] for atom in Atoms])
-    IndB = ma.nonzero(ma.masked_greater(dist-radiusFactor*sumR,0.))
-    for j in IndB[0]:
-        if j != Orig:
-            if AtNames[j] not in notName:
-                Neigh.append([AtNames[j],dist[j],True])
-                Ids.append(Atoms[j][cia+8])
-    return Neigh,[OId,Ids]
-
 def FindOctahedron(results):
     Octahedron = np.array([[1.,0,0],[0,1.,0],[0,0,1.],[-1.,0,0],[0,-1.,0],[0,0,-1.]])
     Polygon = np.array([result[3] for result in results])
@@ -1019,8 +991,39 @@ def FindTetrahedron(results):
     A,V = Q2AVdeg(QQ)
     return bond,std,meanDisp,stdDisp,A,V,vecDisp
     
-def FindAllNeighbors(phase,FrstName,AtNames,notName='',Orig=None,Short=False,
-                     searchType='Bond'):
+def FindNeighbors(phase,FrstName,AtNames,notName=''):
+    General = phase['General']
+    cx,ct,cs,cia = getAtomPtrs(phase)
+    Atoms = phase['Atoms']
+    atNames = [atom[ct-1] for atom in Atoms]
+    Cell = General['Cell'][1:7]
+    Amat,Bmat = G2lat.cell2AB(Cell)
+    atTypes = General['AtomTypes']
+    Radii = np.array(General['BondRadii'])
+    try:
+        DisAglCtls = General['DisAglCtls']    
+        radiusFactor = DisAglCtls['Factors'][0]
+    except:
+        radiusFactor = 0.85
+    AtInfo = dict(zip(atTypes,Radii)) #or General['BondRadii']
+    Orig = atNames.index(FrstName)
+    OId = Atoms[Orig][cia+8]
+    OType = Atoms[Orig][ct]
+    XYZ = getAtomXYZ(Atoms,cx)        
+    Neigh = []
+    Ids = []
+    Dx = np.inner(Amat,XYZ-XYZ[Orig]).T
+    dist = np.sqrt(np.sum(Dx**2,axis=1))
+    sumR = np.array([AtInfo[OType]+AtInfo[atom[ct]] for atom in Atoms])
+    IndB = ma.nonzero(ma.masked_greater(dist-radiusFactor*sumR,0.))
+    for j in IndB[0]:
+        if j != Orig:
+            if AtNames[j] not in notName:
+                Neigh.append([AtNames[j],dist[j],True])
+                Ids.append(Atoms[j][cia+8])
+    return Neigh,[OId,Ids]
+
+def FindAllNeighbors(phase,FrstName,AtNames,notName='',Orig=None,Short=False,searchType='Bond'):
     '''Find neighboring atoms
     Uses Bond search criteria unless searchType is set to non-default
     '''
@@ -1057,14 +1060,17 @@ def FindAllNeighbors(phase,FrstName,AtNames,notName='',Orig=None,Short=False,
     Oxyz = XYZ[Orig]
     Neigh = []
     Ids = []
-    sumR = np.array([AtInfo[OType]+AtInfo[atom[ct]] for atom in Atoms])
-    sumR = np.reshape(np.tile(sumR,27),(27,-1))
+    try:
+        sumR = np.array([AtInfo[OType]+AtInfo[atom[ct]] for atom in Atoms])
+    except KeyError: #missing atom type in radii table!
+        return Neigh,[OId,Ids]
+    sumR = np.reshape(np.tile(sumR,27),(27,-1))     #27 = 3x3x3 unit cell block
     results = []
     for xyz in XYZ:
         results.append(G2spc.GenAtom(xyz,SGData,False,Move=False))
     for iA,result in enumerate(results):
         for [Txyz,Top,Tunit,Spn] in result:
-            Dx = np.array([Txyz-Oxyz+unit for unit in Units])
+            Dx = (Txyz-np.array(Oxyz))+Units
             dx = np.inner(Dx,Amat)
             dist = np.sqrt(np.sum(dx**2,axis=1))
             IndB = ma.nonzero(ma.masked_greater(dist-radiusFactor*sumR[:,iA],0.))
@@ -5825,7 +5831,7 @@ import scipy.cluster.hierarchy as SCH
 ################################################################################
 
 def Cart2Polar(X,Y,Z):
-    ''' convert Cartesian to polar coordinates
+    ''' convert Cartesian to polar coordinates in deg
     '''
     
     R = np.sqrt(X**2+Y**2+Z**2)
@@ -5834,13 +5840,22 @@ def Cart2Polar(X,Y,Z):
     return R,Az,Pl
     
 def Polar2Cart(R,Az,Pl):
-    '''Convert polar to Cartesian coordinates
+    '''Convert polar angles in deg to Cartesian coordinates
     '''
 
     X = R*sind(Pl)*cosd(Az)
     Y = R*sind(Pl)*sind(Az)
     Z = R*cosd(Pl)
-    return Y,-X,Z
+    return X,Y,Z
+
+def RotPolbyM(R,Az,Pl,M):
+    '''Rotate polar coordinates by rotation matrix
+    '''
+    X,Y,Z = Polar2Cart(R,Az,Pl)
+    XYZ = np.vstack((X,Y,Z)).T
+    nXYZ = np.inner(XYZ,M).T
+    return(Cart2Polar(nXYZ[0],nXYZ[1],nXYZ[2]))
+
 
 def RotPolbyQ(R,Az,Pl,Q):
     '''Rotate polar coordinates by quaternion

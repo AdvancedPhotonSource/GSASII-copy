@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIseqGUI - Sequential Results Display routines
 ########### SVN repository information ###################
-# $Date: 2023-08-18 16:36:52 -0500 (Fri, 18 Aug 2023) $
+# $Date: 2023-11-13 14:28:09 -0600 (Mon, 13 Nov 2023) $
 # $Author: vondreele $
-# $Revision: 5651 $
+# $Revision: 5700 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIseqGUI.py $
-# $Id: GSASIIseqGUI.py 5651 2023-08-18 21:36:52Z vondreele $
+# $Id: GSASIIseqGUI.py 5700 2023-11-13 20:28:09Z vondreele $
 ########### SVN repository information ###################
 '''
 Routines for Sequential Results & Cluster Analysis dataframes follow. 
@@ -24,7 +24,7 @@ try:
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5651 $")
+GSASIIpath.SetVersionNumber("$Revision: 5700 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIdataGUI as G2gd
@@ -1062,9 +1062,11 @@ def UpdateSeqResults(G2frame,data,prevSize=None):
     variableLabels = data.get('variableLabels',{})
     data['variableLabels'] = variableLabels
     Histograms,Phases = G2frame.GetUsedHistogramsAndPhasesfromTree()
-    if not len(Histograms) and not len(Phases):   #PDF or IMG histogrms not PWDR
+    ifPWDR = True
+    if not len(Histograms) and not len(Phases):   #SASD, REFD, PDF or IMG histogrms not PWDR or HKLF
         histNames = [name for name in data['histNames']]
         Controls = {}
+        ifPWDR = False
     else:        
         Controls = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,G2frame.root,'Controls'))
         # create a place to store Pseudo Vars & Parametric Fit functions, if not present
@@ -1479,7 +1481,7 @@ def UpdateSeqResults(G2frame,data,prevSize=None):
     # remove selected columns from table
     saveColLabels = colLabels[:]
     if G2frame.SeqTblHideList is None:      #set default hides
-        G2frame.SeqTblHideList = [item for item in saveColLabels if 'Back' in item]
+        G2frame.SeqTblHideList = [item for item in saveColLabels if 'Back' in item and ifPWDR]
         G2frame.SeqTblHideList += [item for item in saveColLabels if 'dA' in item]
         G2frame.SeqTblHideList += [item for item in saveColLabels if ':*:D' in item]
     #******************************************************************************
@@ -1832,7 +1834,10 @@ def UpdateClusterAnalysis(G2frame,ClusData,shoNum=-1):
     
     def OnPlotSel(event):
         ClusData['plots'] = plotsel.GetValue()
-        G2plt.PlotClusterXYZ(G2frame,YM,XYZ,ClusData,PlotName=ClusData['Method'],Title=ClusData['Method'])
+        if ClusData['plots'] == 'Suprise':
+            G2plt.PlotClusterXYZ(G2frame,None,None,ClusData,PlotName='Suprise')
+        else:
+            G2plt.PlotClusterXYZ(G2frame,YM,XYZ,ClusData,PlotName=ClusData['Method'],Title=ClusData['Method'])
         
     def ScikitSizer():
         
@@ -2012,6 +2017,7 @@ def UpdateClusterAnalysis(G2frame,ClusData,shoNum=-1):
     ClusData['OutMethod'] = ClusData.get('OutMethod','Isolation Forest')
     ClusData['MinkP'] = ClusData.get('MinkP','2')
     #end patch
+    
     G2frame.dataWindow.ClearData()
     bigSizer = wx.BoxSizer(wx.HORIZONTAL)
     mainSizer = wx.BoxSizer(wx.VERTICAL)
@@ -2037,6 +2043,7 @@ def UpdateClusterAnalysis(G2frame,ClusData,shoNum=-1):
             G2G.HorizontalLine(mainSizer,G2frame.dataWindow)
             mainSizer.Add(wx.StaticText(G2frame.dataWindow,label='Distance Cluster Analysis:'))
             mainSizer.Add(MethodSizer())
+            YM = None
             if len(ClusData['ConDistMat']):
                 YM = SSD.squareform(ClusData['ConDistMat'])
                 U,s,VT = nl.svd(YM) #s are the Eigenvalues
@@ -2063,9 +2070,9 @@ def UpdateClusterAnalysis(G2frame,ClusData,shoNum=-1):
             plotSizer = wx.BoxSizer(wx.HORIZONTAL)
             plotSizer.Add(wx.StaticText(G2frame.dataWindow,label='Plot selection: '),0,WACV)
             if ClusData['CLuZ'] is None:
-                choice = ['All','Distances','3D PCA','2D PCA','Diffs']
+                choice = ['All','Distances','3D PCA','2D PCA','Diffs','Suprise']
             else:
-                choice = ['All','Distances','Dendrogram','2D PCA','3D PCA','Diffs']
+                choice = ['All','Distances','Dendrogram','2D PCA','3D PCA','Diffs','Suprise']
             plotsel = wx.ComboBox(G2frame.dataWindow,choices=choice,style=wx.CB_READONLY|wx.CB_DROPDOWN)
             plotsel.SetValue(str(ClusData['plots']))
             plotsel.Bind(wx.EVT_COMBOBOX,OnPlotSel)

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIobj - data objects for GSAS-II
 ########### SVN repository information ###################
-# $Date: 2023-05-11 23:37:57 -0500 (Thu, 11 May 2023) $
-# $Author: toby $
-# $Revision: 5578 $
+# $Date: 2023-09-29 15:47:55 -0500 (Fri, 29 Sep 2023) $
+# $Author: vondreele $
+# $Revision: 5663 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIobj.py $
-# $Id: GSASIIobj.py 5578 2023-05-12 04:37:57Z toby $
+# $Id: GSASIIobj.py 5663 2023-09-29 20:47:55Z vondreele $
 ########### SVN repository information ###################
 
 '''
@@ -29,7 +29,7 @@ import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import numpy as np
 
-GSASIIpath.SetVersionNumber("$Revision: 5578 $")
+GSASIIpath.SetVersionNumber("$Revision: 5663 $")
 
 DefaultControls = {
     'deriv type':'analytic Hessian',
@@ -624,6 +624,11 @@ def CompileVarDesc():
         'Afrac': ('Atomic site fraction parameter',1e-5),
         'Amul': 'Atomic site multiplicity value',
         'AM([xyz])$' : 'Atomic magnetic moment parameter, \\1',
+        # Atom deformation parameters
+        'Akappa([0-6])'  : ' Atomic orbital softness for orbital, \\1',
+        'ANe([01])' : ' Atomic <j0> orbital population for orbital, \\1',
+        'AD\\([0-6],[0-6]\\)([0-6])' : ' Atomic sp. harm. coeff for orbital, \\1',
+        'AD\\([0-6],-[0-6]\\)([0-6])' : ' Atomic sp. harm. coeff for orbital, \\1',     #need both!
         # Hist (:h:<var>) & Phase (HAP) vars (p:h:<var>)
         'Back(.*)': 'Background term #\\1',
         'BkPkint;(.*)':'Background peak #\\1 intensity',
@@ -785,7 +790,10 @@ def getDescr(name):
         m = key.match(name)
         if m:
             reVarDesc[key]
-            return m.expand(reVarDesc[key])
+            try:
+                return m.expand(reVarDesc[key])
+            except:
+                print('Error in key: %s'%key)
     return None
 
 def getVarStep(name,parmDict=None):

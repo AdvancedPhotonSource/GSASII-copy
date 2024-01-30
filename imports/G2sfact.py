@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-20 13:24:42 -0500 (Sat, 20 May 2023) $
+# $Date: 2023-11-02 11:44:46 -0500 (Thu, 02 Nov 2023) $
 # $Author: vondreele $
-# $Revision: 5586 $
+# $Revision: 5696 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2sfact.py $
-# $Id: G2sfact.py 5586 2023-05-20 18:24:42Z vondreele $
+# $Id: G2sfact.py 5696 2023-11-02 16:44:46Z vondreele $
 ########### SVN repository information ###################
 '''
 '''
@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import GSASIIobj as G2obj
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5586 $")
+GSASIIpath.SetVersionNumber("$Revision: 5696 $")
 
 def ColumnValidator(parent, filepointer,nCol=5):
     'Validate a file to check that it contains columns of numbers'
@@ -398,6 +398,9 @@ class M90_ReaderClass(G2obj.ImportStructFactor):
                 if not S:
                     break
                 text = S.split()
+                if not text:
+                    break
+                print(line,text)
                 if text[0] == 'lambda':
                     wave = float(text[1])
                 continue

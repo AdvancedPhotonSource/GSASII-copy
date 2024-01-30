@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #testDeriv.py
 ########### SVN repository information ###################
-# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
-# $Author: toby $
-# $Revision: 5577 $
+# $Date: 2023-12-12 12:48:03 -0600 (Tue, 12 Dec 2023) $
+# $Author: vondreele $
+# $Revision: 5706 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/testDeriv.py $
-# $Id: testDeriv.py 5577 2023-05-11 23:08:12Z toby $
+# $Id: testDeriv.py 5706 2023-12-12 18:48:03Z vondreele $
 ########### SVN repository information ###################
 '''
 To use set ``DEBUG=True`` in GSASIIstrMain.py (line 40, as of version
@@ -257,6 +257,8 @@ class testDeriv(wx.Frame):
                 G2mv.Dict2Map(self.parmDict)
                 first = True
                 for i in self.parmDict:
+                    if 'UVmat' in i:
+                        continue
                     if orig[i] != self.parmDict[i] and i != name:
                         if first:
                             print('Propagated changes from this shift')

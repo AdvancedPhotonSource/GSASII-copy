@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIpath - file location & update routines
 ########### SVN repository information ###################
-# $Date: 2023-07-28 15:55:56 -0500 (Fri, 28 Jul 2023) $
+# $Date: 2023-12-09 09:55:33 -0600 (Sat, 09 Dec 2023) $
 # $Author: toby $
-# $Revision: 5638 $
+# $Revision: 5705 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpath.py $
-# $Id: GSASIIpath.py 5638 2023-07-28 20:55:56Z toby $
+# $Id: GSASIIpath.py 5705 2023-12-09 15:55:33Z toby $
 ########### SVN repository information ###################
 '''
 :mod:`GSASIIpath` Classes & routines follow
@@ -82,10 +82,10 @@ version = -1
 def SetVersionNumber(RevString):
     '''Set the subversion version number
 
-    :param str RevString: something like "$Revision: 5638 $"
+    :param str RevString: something like "$Revision: 5705 $"
       that is set by subversion when the file is retrieved from subversion.
 
-    Place ``GSASIIpath.SetVersionNumber("$Revision: 5638 $")`` in every python
+    Place ``GSASIIpath.SetVersionNumber("$Revision: 5705 $")`` in every python
     file.
     '''
     try:
@@ -962,32 +962,37 @@ def exceptHook(*args):
     
     This routine is only used when debug=True is set in config.py    
     '''
-    import IPython.core
-    if sys.platform.startswith('win'):
-        IPython.core.ultratb.FormattedTB(call_pdb=False,color_scheme='NoColor')(*args)
-    else:
-        IPython.core.ultratb.FormattedTB(call_pdb=False,color_scheme='LightBG')(*args)
 
     try: 
         from IPython.terminal.embed import InteractiveShellEmbed
+        import IPython.core
+        if sys.platform.startswith('win'):
+            IPython.core.ultratb.FormattedTB(call_pdb=False,color_scheme='NoColor')(*args)
+        else:
+            IPython.core.ultratb.FormattedTB(call_pdb=False,color_scheme='LightBG')(*args)
+        from IPython.core import getipython
+        if getipython.get_ipython() is None:
+            ipshell = InteractiveShellEmbed.instance()
+        else:
+            ipshell = InteractiveShellEmbed()
     except ImportError:
-        try:
-            # try the IPython 0.12 approach
-            from IPython.frontend.terminal.embed import InteractiveShellEmbed
-        except ImportError:
-            print ('IPython InteractiveShellEmbed not found')
-            return
+        print ('IPython not installed or is really old')
+        return
+
     import inspect
     frame = inspect.getinnerframes(args[2])[-1][0]
     msg   = 'Entering IPython console at {0.f_code.co_filename} at line {0.f_lineno}\n'.format(frame)
     savehook = sys.excepthook # save the exception hook
-    try: # try IPython 5 call 1st
-        class c(object): pass
-        pseudomod = c() # create something that acts like a module
-        pseudomod.__dict__ = frame.f_locals
-        InteractiveShellEmbed(banner1=msg)(module=pseudomod,global_ns=frame.f_globals)
-    except:
-        InteractiveShellEmbed(banner1=msg)(local_ns=frame.f_locals,global_ns=frame.f_globals)
+    try:
+        ipshell(msg,local_ns=frame.f_locals,global_ns=frame.f_globals) # newest (IPython >= 8)
+    except DeprecationWarning: # IPython <=7
+        try: # IPython >=5
+            class c(object): pass
+            pseudomod = c() # create something that acts like a module
+            pseudomod.__dict__ = frame.f_locals
+            InteractiveShellEmbed(banner1=msg)(module=pseudomod,global_ns=frame.f_globals)
+        except: # 'IPython <5
+            InteractiveShellEmbed(banner1=msg)(local_ns=frame.f_locals,global_ns=frame.f_globals)
     sys.excepthook = savehook # reset IPython's change to the exception hook
 
 def DoNothing():
@@ -1214,26 +1219,30 @@ def MacStartGSASII(g2script,project=''):
       which opens a new project
     '''
     if project and os.path.splitext(project)[1] != '.gpx':
-        print('file {} cannot be used. Not GSAS-II project (.gpx) file'.format(project))
+        print(f'file {project} cannot be used. Not GSAS-II project (.gpx) file')
         return
     if project and not os.path.exists(project):
-        print('file {} cannot be found.'.format(project))
+        print(f'file {project} cannot be found.')
         return 
     elif project:
         project = os.path.abspath(project)
+        if not os.path.exists(project): 
+            print(f'lost project {project} with abspath')
+            raise Exception(f'lost project {project} with abspath')
     g2script = os.path.abspath(g2script)
     pythonapp = sys.executable
     if os.path.exists(pythonapp+'w'): pythonapp += 'w'
-    script = '''
-set python to "{}"
-set appwithpath to "{}"
-set filename to "{}"
+    script = f'''
+set python to "{pythonapp}"
+set appwithpath to "{g2script}"
+set filename to "{project}"
+set filename to the quoted form of the POSIX path of filename
 
 tell application "Terminal"
      activate
      do script python & " " & appwithpath & " " & filename & "; exit"
 end tell
-'''.format(pythonapp,g2script,project)
+'''
     subprocess.Popen(["osascript","-e",script])
 
 def MacRunScript(script):

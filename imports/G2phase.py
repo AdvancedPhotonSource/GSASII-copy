@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
-# $Author: toby $
-# $Revision: 5577 $
+# $Date: 2023-11-02 11:44:46 -0500 (Thu, 02 Nov 2023) $
+# $Author: vondreele $
+# $Revision: 5696 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2phase.py $
-# $Id: G2phase.py 5577 2023-05-11 23:08:12Z toby $
+# $Id: G2phase.py 5696 2023-11-02 16:44:46Z vondreele $
 ########### SVN repository information ###################
 #
 '''
@@ -24,7 +24,7 @@ import GSASIIobj as G2obj
 import GSASIIspc as G2spc
 import GSASIIlattice as G2lat
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5577 $")
+GSASIIpath.SetVersionNumber("$Revision: 5696 $")
 try:  # fails on doc build
     R2pisq = 1./(2.*np.pi**2)
 except TypeError:
@@ -522,24 +522,26 @@ class JANA_ReaderClass(G2obj.ImportPhase):
         self.errors = 'Error reading at line '+str(line)
         nAtoms = int(S.split()[0])
         for i in range(4):
-            S = file2.readline()            
+            S = file2.readline()
         for i in range(nAtoms):
-            S1 = file2.readline()
-            S1N = S1.split()[-3:]   # no. occ, no. pos waves, no. ADP waves
-            S1N = [int(i) for i in S1N]
-            S1T = list(S1[60:63])
-            waveType = waveTypes[int(S1T[1])]
+            S1N = [0,0,0]            
             Spos = []
             Sadp = []
             Sfrac = []
             Smag = []
+            S1 = file2.readline().strip()
+            if len(S1) > 55:
+                S1N = S1.split()[-3:]   # no. occ, no. pos waves, no. ADP waves
+                S1N = [int(i) for i in S1N]
+                S1T = list(S1[60:63])
+                waveType = waveTypes[int(S1T[1])]
             XYZ = [float(S1[27:36]),float(S1[36:45]),float(S1[45:54])]
             SytSym,Mult = G2spc.SytSym(XYZ,SGData)[:2]
             aType = Atypes[int(S1[9:11])-1]
             Name = S1[:8].strip()
             if S1[11:15].strip() == '1':
                 S2 = file2.readline()
-                Uiso = S2[:9]
+                Uiso = float(S2[:9])
                 if version == '2000':
                     Uiso = R2pisq*float(Uiso)/4.      #Biso -> Uiso
                 Uij = [0,0,0,0,0,0]
@@ -567,7 +569,6 @@ class JANA_ReaderClass(G2obj.ImportPhase):
             if sum(S1N):    #if any waves: skip mystery line?
                 file2.readline()
             for i,it in enumerate(Sfrac):
-                print (i,it)
                 if not i:
                     if 'Crenel' in waveType:
                         vals = [float(it),float(Sfrac[-1][:9])]
@@ -579,7 +580,6 @@ class JANA_ReaderClass(G2obj.ImportPhase):
                     del Sfrac[-1]
                     break                
                 Sfrac[i] = [vals,False]
-                print (Sfrac[i])
             for i,it in enumerate(Spos):
                 if waveType in ['Sawtooth',] and not i:
                     vals = [float(it[:9]),float(it[9:18]),float(it[18:27]),float(it[27:36])]
@@ -597,7 +597,8 @@ class JANA_ReaderClass(G2obj.ImportPhase):
             Atom = [Name,aType,'',XYZ[0],XYZ[1],XYZ[2],1.0,SytSym,Mult,IA,Uiso]
             Atom += Uij
             Atom.append(ran.randint(0,sys.maxsize))
-            Atom.append({'SS1':{'Sfrac':[waveType,]+Sfrac,'Spos':[waveType,]+Spos,'Sadp':['Fourier',]+Sadp,'Smag':['Fourier',]+Smag}})    #SS2 is for (3+2), etc.
+            if len(S1) > 55:
+                Atom.append({'SS1':{'Sfrac':[waveType,]+Sfrac,'Spos':[waveType,]+Spos,'Sadp':['Fourier',]+Sadp,'Smag':['Fourier',]+Smag}})    #SS2 is for (3+2), etc.
             Atoms.append(Atom)
         file2.close()
         self.errors = 'Error after read complete'
@@ -607,13 +608,15 @@ class JANA_ReaderClass(G2obj.ImportPhase):
             raise self.ImportException("No cell found")
         Phase = G2obj.SetNewPhase(Name=Title,SGData=SGData,cell=cell+[Volume,])
         Phase['General']['Type'] = Type
-        Phase['General']['Modulated'] = True
-        Phase['General']['Super'] = nqi
-        Phase['General']['SuperVec'] = SuperVec
-        Phase['General']['SuperSg'] = SuperSg
-        if SuperSg:
-            Phase['General']['SSGData'] = G2spc.SSpcGroup(SGData,SuperSg)[1]
+        Phase['General']['Modulated'] = False
         Phase['General']['AtomPtrs'] = [3,1,7,9]
+        if len(S1) > 55:
+            Phase['General']['Modulated'] = True
+            Phase['General']['Super'] = nqi
+            Phase['General']['SuperVec'] = SuperVec
+            Phase['General']['SuperSg'] = SuperSg
+            if SuperSg:
+                Phase['General']['SSGData'] = G2spc.SSpcGroup(SGData,SuperSg)[1]
         Phase['Atoms'] = Atoms
         return Phase
     

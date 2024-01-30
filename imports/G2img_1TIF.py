@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-08-24 13:37:20 -0500 (Thu, 24 Aug 2023) $
+# $Date: 2023-10-28 16:43:36 -0500 (Sat, 28 Oct 2023) $
 # $Author: vondreele $
-# $Revision: 5653 $
+# $Revision: 5687 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2img_1TIF.py $
-# $Id: G2img_1TIF.py 5653 2023-08-24 18:37:20Z vondreele $
+# $Id: G2img_1TIF.py 5687 2023-10-28 21:43:36Z vondreele $
 ########### SVN repository information ###################
 '''
 Note that the name ``G2img_1TIF`` is used so that this file will
@@ -20,7 +20,7 @@ import GSASIIfiles as G2fil
 import numpy as np
 import time
 DEBUG = False
-GSASIIpath.SetVersionNumber("$Revision: 5653 $")
+GSASIIpath.SetVersionNumber("$Revision: 5687 $")
 class TIF_ReaderClass(G2obj.ImportImage):
     '''Reads TIF files using a routine (:func:`GetTifData`) that looks
     for files that can be identified from known instruments and will
@@ -95,7 +95,8 @@ def GetTifData(filename):
                 G2fil.G2Print('error reading metadata: '+line)
         Meta.close()
     except IOError:
-        G2fil.G2Print ('no metadata file found - will try to read file anyway')
+        if DEBUG:
+            G2fil.G2Print ('no metadata file found - will try to read file anyway')
         head = ['no metadata file found',]
         
     tag = File.read(2)
@@ -337,6 +338,13 @@ def GetTifData(filename):
         dt = np.dtype(np.float32)
         dt = dt.newbyteorder(byteOrd)
         image = np.array(np.frombuffer(File.read(Npix*4),dtype=np.uint32),dtype=np.int32)
+    elif sizexy == [1024,402]:
+        pixy = [56.,56.]
+        File.seek(8)
+        dt = np.dtype(np.float32)
+        dt = dt.newbyteorder(byteOrd)
+        image = np.array(np.frombuffer(File.read(Npix*2),dtype=np.uint16),dtype=np.int32)
+        
 #    elif sizexy == [960,960]:
 #        tiftype = 'PE-BE'
 #        pixy = (200,200)
@@ -347,12 +355,15 @@ def GetTifData(filename):
            
     if image is None:
         lines = ['not a known detector tiff file',]
+        File.close()    
         return lines,0,0,0
         
     if sizexy[1]*sizexy[0] != image.size: # test is resize is allowed
         lines = ['not a known detector tiff file',]
+        File.close()    
         return lines,0,0,0
-    if GSASIIpath.GetConfigValue('debug'):
+#    if GSASIIpath.GetConfigValue('debug'):
+    if DEBUG:
         G2fil.G2Print ('image read time: %.3f'%(time.time()-time0))
     image = np.reshape(image,(sizexy[1],sizexy[0]))
     center = (not center[0]) and [pixy[0]*sizexy[0]/2000,pixy[1]*sizexy[1]/2000] or center

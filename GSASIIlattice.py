@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-06-22 15:47:18 -0500 (Thu, 22 Jun 2023) $
+# $Date: 2023-11-30 08:10:11 -0600 (Thu, 30 Nov 2023) $
 # $Author: vondreele $
-# $Revision: 5620 $
+# $Revision: 5702 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIlattice.py $
-# $Id: GSASIIlattice.py 5620 2023-06-22 20:47:18Z vondreele $
+# $Id: GSASIIlattice.py 5702 2023-11-30 14:10:11Z vondreele $
 ########### SVN repository information ###################
 '''
 :mod:`GSASIIlattice` Classes & routines follow
@@ -22,7 +22,7 @@ import GSASIIpath
 import GSASIImath as G2mth
 import GSASIIspc as G2spc
 import GSASIIElem as G2elem
-GSASIIpath.SetVersionNumber("$Revision: 5620 $")
+GSASIIpath.SetVersionNumber("$Revision: 5702 $")
 # trig functions in degrees
 sind = lambda x: np.sin(x*np.pi/180.)
 asind = lambda x: 180.*np.arcsin(x)/np.pi
@@ -38,6 +38,7 @@ try:  # fails on doc build
     SQ2 = np.sqrt(2.)
     RSQPI = 1./np.sqrt(np.pi)
     R2pisq = 1./(2.*np.pi**2)
+    Forpi = 4.0*np.pi
 except TypeError:
     pass
 nxs = np.newaxis
@@ -126,7 +127,7 @@ def A2Gmat(A,inverse=True):
 def Gmat2A(G):
     """Extract A from reciprocal metric tensor (G)
 
-    :param G: reciprocal maetric tensor (3x3 numpy array
+    :param G: reciprocal metric tensor (3x3 numpy array)
     :return: A = [G11,G22,G33,2*G12,2*G13,2*G23]
 
     """
@@ -2726,16 +2727,14 @@ def SphHarmAng(L,M,P,Th,Ph):
     
     :returns ylmp value/array: as reals
     '''
-    
     ylmp = spsp.sph_harm(M,L,rpd*Th,rpd*Ph)   #wants radians; order then degree
-    norm = np.sqrt((2.*L+1.)/(2.*np.pi))
     
-    if M == 0:
-        return norm*np.real(ylmp)/SQ2
-    if P>0:
-        return norm*np.real(ylmp)
+    if M > 0:
+        return (-1)**M*P*np.real(ylmp)*SQ2
+    elif M == 0:
+        return P*np.real(ylmp)        
     else:
-        return -norm*np.imag(ylmp)
+        return (-1)**M*P*np.imag(ylmp)*SQ2
     
 def CubicSHarm(L,M,Th,Ph):
     '''Calculation of the cubic harmonics given in Table 3 in M.Kara & K. Kurki-Suonio, 

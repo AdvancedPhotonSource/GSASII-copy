@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-07-27 18:21:18 -0500 (Thu, 27 Jul 2023) $
+# $Date: 2024-01-17 10:23:41 -0600 (Wed, 17 Jan 2024) $
 # $Author: toby $
-# $Revision: 5636 $
+# $Revision: 5718 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIplot.py $
-# $Id: GSASIIplot.py 5636 2023-07-27 23:21:18Z toby $
+# $Id: GSASIIplot.py 5718 2024-01-17 16:23:41Z toby $
 ########### SVN repository information ###################
 '''
 Classes and routines defined in :mod:`GSASIIplot` follow. 
@@ -44,7 +44,7 @@ except (ImportError, ValueError) as err:
     if GSASIIpath.GetConfigValue('debug'): print('error msg:',err)
 
 Clip_on = GSASIIpath.GetConfigValue('Clip_on',True)
-GSASIIpath.SetVersionNumber("$Revision: 5636 $")
+GSASIIpath.SetVersionNumber("$Revision: 5718 $")
 import GSASIIdataGUI as G2gd
 import GSASIIimage as G2img
 import GSASIIpwd as G2pwd
@@ -1012,8 +1012,7 @@ def changePlotSettings(G2frame,Plot):
 
     txtChoices = [str(i) for i in range (8,26)]
     lwidChoices = ('0.5','0.7','1','1.5','2','2.5','3','4')
-    dlg = wx.Dialog(G2frame.plotFrame,
-                style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+    dlg = wx.Dialog(G2frame.plotFrame,style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
     vbox = wx.BoxSizer(wx.VERTICAL)
     hbox = wx.BoxSizer(wx.HORIZONTAL)
     hbox.Add(wx.StaticText(dlg,wx.ID_ANY,'Text size'),0,wx.ALL)
@@ -2665,7 +2664,9 @@ def PlotPatterns(G2frame,newPlot=False,plotType='PWDR',data=None,
                         data[1][1] = max(xy[0],data[1][0])
                 G2frame.GPXtree.SetItemPyData(LimitId,data)
                 G2pdG.UpdateLimitsGrid(G2frame,data,plottype)
+                G2frame.GPXtree.SelectItem(LimitId)
                 wx.CallAfter(PlotPatterns,G2frame,plotType=plottype,extraKeys=extraKeys)
+                return
             else:                                                   #picked a limit line
                 # prepare to animate move of line
                 G2frame.itemPicked = pick
@@ -6831,9 +6832,68 @@ def PlotPeakWidths(G2frame,PatternName=None):
         Page.ToolBarDraw()
     else:
         Page.canvas.draw()
+        
+#### PlotDeform ######################################################################################
+def PlotDeform(G2frame,general,atName,atType,deform,UVmat,neigh):
+    ''' Plot deformation atoms & neighbors
+    '''
+    SHC = {}
+#    Nek3 = 1.0
+    Nek3 = 0.0
+    for item in deform:
+        if '<j0>' in item[0]:
+            # if 's' in item[0] or 'd' in item[0]:
+            #     Nek3 = item[1]['Ne'][0]*item[1]['kappa'][0]**3
+            continue
+        if 'kappa' in item[1]:
+            kappa = item[1]['kappa'][0]
+        for trm in item[1]:
+            if 'D(' in trm:
+                SHC[trm.replace('D','C')] = [item[1][trm][0],True,kappa]
+    plotType = atName+' deformation'
+    G2frame.G2plotNB.Delete(plotType)
+    new,plotNum,Page,Plot,lim = G2frame.G2plotNB.FindPlotTab(plotType,'3d')
+    if not new:
+        if not Page.IsShown():
+            Page.Show()
+    PHI = np.linspace(0.,360.,31,True)
+    PSI = np.linspace(0.,180.,31,True)
+    X = 0.5*np.outer(npcosd(PHI),npsind(PSI))
+    Y = 0.5*np.outer(npsind(PHI),npsind(PSI))
+    Z = 0.5*np.outer(np.ones(np.size(PHI)),npcosd(PSI))
+    XYZ = np.array([X.flatten(),Y.flatten(),Z.flatten()])
+    RAP = G2mth.Cart2Polar(XYZ[0],XYZ[1],XYZ[2])
+    P  = np.zeros((31,31))*Nek3
+    for shc in SHC:
+        P += 2.*SHC[shc][0]*SHC[shc][2]**3*G2lat.KslCalc(shc,RAP[1],RAP[2]).reshape((31,31))
+    if not np.any(P):
+        P = np.ones((31,31))
+    P = np.abs(P)
+    color = np.array(general['Color'][general['AtomTypes'].index(atType)])/255.
+    Plot.plot_surface(X*P,Y*P,Z*P,rstride=1,cstride=1,color=color,linewidth=1)
+    for atm in neigh[0]:
+        x,y,z = np.inner(atm[3],UVmat)
+        color = np.array(general['Color'][general['AtomTypes'].index(atm[1])])/255.
+        Plot.plot_surface(X+x,Y+y,Z+z,rstride=1,cstride=1,color=color,linewidth=1)
+    xyzlim = np.array([Plot.get_xlim3d(),Plot.get_ylim3d(),Plot.get_zlim3d()]).T
+    XYZlim = [min(xyzlim[0]),max(xyzlim[1])]
+    Plot.set_xlim3d(XYZlim)
+    Plot.set_ylim3d(XYZlim)
+    Plot.set_zlim3d(XYZlim)
+    Plot.set_xlabel(r'X, '+Angstr)
+    Plot.set_ylabel(r'Y, '+Angstr)
+    Plot.set_zlabel(r'Z, '+Angstr)
+    try:
+        Plot.set_aspect('equal')
+    except NotImplementedError:
+        pass
+    
+    
+    Page.canvas.draw()
+
     
 #### PlotSizeStrainPO ################################################################################
-def PlotSizeStrainPO(G2frame,data,hist='',Start=False):
+def PlotSizeStrainPO(G2frame,data,hist=''):
     '''Plot 3D mustrain/size/preferred orientation figure. In this instance data is for a phase
     '''
     
@@ -6876,9 +6936,6 @@ def PlotSizeStrainPO(G2frame,data,hist='',Start=False):
     import scipy.interpolate as si
     generalData = data['General']
     SGData = generalData['SGData']
-    # if Start:                   #initialize the spherical harmonics qlmn arrays
-    #     ptx.pyqlmninit()
-    #     Start = False
     cell = generalData['Cell'][1:]
     Amat,Bmat = G2lat.cell2AB(cell[:6])
     useList = data['Histograms']
@@ -7417,7 +7474,7 @@ def ModulationPlot(G2frame,data,atom,ax,off=0):
     Page.canvas.draw()
    
 #### PlotCovariance ################################################################################
-def PlotCovariance(G2frame,Data):
+def PlotCovariance(G2frame,Data,Cube=False):
     '''Plots the covariance matrix. Also shows values for parameters 
     and their standard uncertainties (esd's) or the correlation between 
     variables.
@@ -7457,7 +7514,9 @@ def PlotCovariance(G2frame,Data):
                     covFile.write('\n')
                 covFile.write('\n\n\n')
             covFile.close()
-        wx.CallAfter(PlotCovariance,G2frame,Data)
+        elif event.key == 'c':
+            Page.cube = not Page.cube
+        wx.CallAfter(PlotCovariance,G2frame,Data,Page.cube)
 
     def OnMotion(event):
         if event.button:
@@ -7490,6 +7549,7 @@ def PlotCovariance(G2frame,Data):
         print ('No covariance matrix available')
         return
     new,plotNum,Page,Plot,lim = G2frame.G2plotNB.FindPlotTab('Covariance','mpl')
+    Page.cube = Cube
     if not new:
         if not Page.IsShown():
             Page.Show()
@@ -7507,15 +7567,19 @@ def PlotCovariance(G2frame,Data):
     title = G2obj.StripUnicode(' for\n'+Data['title'],'') # matplotlib 1.x does not like unicode
     Page.newAtomDict = Data.get('newAtomDict',{})
     G2frame.G2plotNB.status.DestroyChildren() #get rid of special stuff on status bar
-    Page.Choice = ['s: to change colors','p: to save covariance as text file']
+    Page.Choice = ['c: toggle v-cov cube plot','s: to change colors','p: to save covariance as text file']
     Page.keyPress = OnPlotKeyPress
     G2frame.G2plotNB.status.SetStatusText('',0)
     G2frame.G2plotNB.status.SetStatusText('',1)
     G2frame.G2plotNB.status.SetStatusWidths([G2frame.G2plotNB.status.firstLen,-1])
     if Page.varyList:
         acolor = GetColorMap(G2frame.VcovColor)
-        Img = Plot.imshow(Page.covArray,aspect='equal',cmap=acolor,interpolation='nearest',origin='lower',
-            vmin=-1.,vmax=1.)   #,extent=[0.5,nVar+.5,0.5,nVar+.5])
+        if Page.cube:
+            Img = Plot.imshow(Page.covArray**3,aspect='equal',cmap=acolor,interpolation='nearest',origin='lower',
+                vmin=-1.,vmax=1.)   #,extent=[0.5,nVar+.5,0.5,nVar+.5])
+        else:
+            Img = Plot.imshow(Page.covArray,aspect='equal',cmap=acolor,interpolation='nearest',origin='lower',
+                vmin=-1.,vmax=1.)   #,extent=[0.5,nVar+.5,0.5,nVar+.5])
         imgAx = Img.axes
         if step:
             imgAx.set_yticks(np.arange(nVar)[::step])
@@ -7524,7 +7588,10 @@ def PlotCovariance(G2frame,Data):
             imgAx.set_yticks(np.arange(nVar))
             imgAx.set_yticklabels(Page.varyList)
         Page.figure.colorbar(Img)
-        Plot.set_title('V-Cov matrix'+title)
+        if Page.cube:
+            Plot.set_title('V-Cov matrix**3'+title)
+        else:
+            Plot.set_title('V-Cov matrix'+title)
         Plot.set_xlabel('Variable number')
         Plot.set_ylabel('Variable name')
     Page.canvas.draw()
@@ -11952,10 +12019,11 @@ def PlotClusterXYZ(G2frame,YM,XYZ,CLuDict,Title='',PlotName='cluster'):
     Page.Choice = None
     np.seterr(all='ignore')
         
-    Imin = np.min(YM)
-    Imax = np.max(YM)
-    Ndata = len(CLuDict['Files'])
-    neighD = [YM[i][i+1] for i in range(Ndata-1)]
+    if YM is not None:
+        Imin = np.min(YM)
+        Imax = np.max(YM)
+        Ndata = len(CLuDict['Files'])
+        neighD = [YM[i][i+1] for i in range(Ndata-1)]
     Codes = copy.copy(CLuDict['codes'])
     if Codes is not None:
         Codes = np.where(Codes<0,5,Codes)
@@ -11969,12 +12037,23 @@ def PlotClusterXYZ(G2frame,YM,XYZ,CLuDict,Title='',PlotName='cluster'):
         Plot.set_title(Title+' distances')
         Plot.set_xlabel('Data set',fontsize=12)
         Plot.set_ylabel('Data set',fontsize=12)
+    elif CLuDict['plots'] == 'Suprise':
+        Suprise = []
+        for I in CLuDict['DataMatrix']:
+            meanI = np.mean(I)
+            N = I.shape[0]
+            S = -1.0+np.sum(np.log(meanI**2/(I-meanI)**2))/N
+            Suprise.append(S)
+        Plot.plot(Suprise)
+        Plot.set_title('Suprise factor')
+        Plot.set_xlabel('Data no.',fontsize=12)
+        Plot.set_ylabel('Suprise factor',fontsize=12)
     elif CLuDict['plots'] == 'Dendrogram':
         CLR = SCH.dendrogram(CLuDict['CLuZ'],orientation='right',ax=Plot)
         Plot.set_title('%s %s'%(CLuDict['LinkMethod'],Title))
         Plot.set_xlabel(r''+'data set no.',fontsize=12)
         Plot.set_ylabel(r''+CLuDict['Method']+' distance',fontsize=12)
-    elif CLuDict['plots'] == 'Diffs':
+    elif CLuDict['plots'] == 'Diffs' and YM is not None:
         Plot.plot(neighD)
         Plot.set_title('Distance to next data set')
         Plot.set_xlabel('Data no.',fontsize=12)
@@ -12021,9 +12100,10 @@ def PlotClusterXYZ(G2frame,YM,XYZ,CLuDict,Title='',PlotName='cluster'):
                 ax2.scatter(xyz[0],xyz[1],color=Colors[0],picker=True)
         ax2.set_xlabel('PCA axis-1',fontsize=12)
         ax2.set_ylabel('PCA axis-2',fontsize=12)
-        ax4.plot(neighD)
-        ax4.set_xlabel('Data no.',fontsize=12)
-        ax4.set_ylabel('dist to next',fontsize=12)
+        if YM is not None:
+            ax4.plot(neighD)
+            ax4.set_xlabel('Data no.',fontsize=12)
+            ax4.set_ylabel('dist to next',fontsize=12)
         if CLuDict['CLuZ'] is not None:
             CLR = SCH.dendrogram(CLuDict['CLuZ'],orientation='right',ax=ax3)
             ax3.set_title('%s %s'%(CLuDict['LinkMethod'],Title))

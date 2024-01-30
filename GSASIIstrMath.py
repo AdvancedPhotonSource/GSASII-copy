@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-08-31 16:58:38 -0500 (Thu, 31 Aug 2023) $
-# $Author: toby $
-# $Revision: 5655 $
+# $Date: 2023-12-12 12:48:03 -0600 (Tue, 12 Dec 2023) $
+# $Author: vondreele $
+# $Revision: 5706 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIstrMath.py $
-# $Id: GSASIIstrMath.py 5655 2023-08-31 21:58:38Z toby $
+# $Id: GSASIIstrMath.py 5706 2023-12-12 18:48:03Z vondreele $
 ########### SVN repository information ###################
 '''
 :mod:`GSASIIstrMath` routines, used for refinement computations 
@@ -21,7 +21,7 @@ import scipy.special as sp
 import multiprocessing as mp
 import pickle
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5655 $")
+GSASIIpath.SetVersionNumber("$Revision: 5706 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -333,19 +333,20 @@ def ApplyRBModelDervs(dFdvDict,parmDict,rigidbodyDict,Phase):
                 dFdvDict[pfx+'RBRSBB:'+rbsx] += rpd*(dFdu[5]*X[0]-dFdu[3]*X[2])
             if 'U' in RBObj['ThermalMotion'][0]:
                 dFdvDict[pfx+'RBRU:'+rbsx] += dFdvDict[pfx+'AUiso:'+str(AtLookup[atId])]
-                
-def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=False):
+                                
+def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,ORBtables,BLtables,FF,SQ,ifDeriv=False):
     ''' Computes hkl dependent form factors & derivatives from spinning rigid bodies
     :param array HKL: reflection hkl set to be considered
     :param array Bmat: inv crystal to Cartesian transfomation matrix
-    :param dict SHCdict: spin RB data
+    :param dict SHCdict: RB spin/deformation data
     :param array Tdata: atom type info
     :param str hType: histogram type
     :param dict FFtables: x-ray form factor tables
+    :param dict ORBtables: x-ray orbital form factor tables
     :param dict BLtables: neutron scattering lenghts
-    :param array FF: form factors - will be modified by adding the spin RB spherical harmonics terms
+    :param array FF: form factors - will be modified by adding the spin/deformation RB spherical harmonics terms
     :param array SQ: 1/4d^2 for the HKL set
-    :param bool ifDeriv: True if dFF/dR, dFF/dA, & dFF/dShC to be returned
+    :param bool ifDeriv: True if dFF/dcoff to be returned
     
     :returns: dict dFFdS of derivatives if ifDeriv = True
     '''
@@ -357,8 +358,11 @@ def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=Fa
         
     dFFdS = {}
     atFlg = []
+    Th,Ph = G2lat.H2ThPh(np.reshape(HKL,(-1,3)),Bmat,[1.,0.,0.,1.])
+    SQR = np.repeat(SQ,HKL.shape[1])
     for iAt,Atype in enumerate(Tdata):
         if 'Q' in Atype:
+            Th,Ph = G2lat.H2ThPh(np.reshape(HKL,(-1,3)),Bmat,[1.,0.,0.,1.])
             atFlg.append(1.0)
             SHdat = SHCdict[iAt]
             symAxis = np.array(SHdat['symAxis'])
@@ -374,7 +378,6 @@ def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=Fa
             ThMj,PhMj = MakePolar([SHdat['Oa'],SHdat['Oi'],SHdat['Oj']-dp,SHdat['Ok']],QB)
             ThMk,PhMk = MakePolar([SHdat['Oa'],SHdat['Oi'],SHdat['Oj'],SHdat['Ok']-dp],QB)
             QR = np.repeat(twopi*np.sqrt(4.*SQ),HKL.shape[1])     #refl Q for Bessel fxn
-            SQR = np.repeat(SQ,HKL.shape[1])
             FF[:,iAt] = 0.
             ishl = 0
             dSHdO = np.zeros(HKL.shape[0]*HKL.shape[1])
@@ -449,6 +452,50 @@ def MakeSpHarmFF(HKL,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,ifDeriv=Fa
             dFFdS[Oiname] = dSHdOi
             dFFdS[Ojname] = dSHdOj
             dFFdS[Okname] = dSHdOk
+        elif iAt in SHCdict and 'X' in hType:
+            orKeys = [item for item in ORBtables[Atype] if item not in ['ZSlater','NSlater','SZE','popCore','popVal']]
+            orbs = SHCdict[iAt]
+            UVmat = np.inner(nl.inv(SHCdict[-iAt]['UVmat']),Bmat)
+            Th,Ph = G2lat.H2ThPh(np.reshape(HKL,(-1,3)),UVmat,[1.,0.,0.,1.])
+            atFlg.append(1.0)
+            orbTable = ORBtables[Atype][orKeys[0]] 
+            ffOrb = {item:orbTable[item] for item in orbTable if item not in ['ZSlater','NSlater','SZE','popCore','popVal']}
+            FFcore = G2el.ScatFac(ffOrb,SQR)    #core
+            FFtot = np.zeros_like(FFcore)
+            for orb in orbs:
+                if 'UVmat' in orb:
+                    continue
+                Ne = orbs[orb].get('Ne',1.0) # not there for non <j0> orbs
+                if 'kappa' in orbs[orb]:
+                    kappa = orbs[orb]['kappa']
+                    SQk = SQR/kappa**2
+                    korb = orb
+                orbTable = ORBtables[Atype][orKeys[int(orb)+1]]
+                ffOrb = {item:orbTable[item] for item in orbTable if item not in ['ZSlater','NSlater','SZE','popCore','popVal']}
+                ff = Ne*G2el.ScatFac(ffOrb,SQk)
+                dffdk = G2el.ScatFacDer(ffOrb,SQk)
+                dSH = 0.0
+                if '<j0>' in orKeys[int(orb)+1]:
+                    dSH = 1.0
+                for term in orbs[orb]:
+                    if 'D(' in term:
+                        item = term.replace('D','C')
+                        SH = G2lat.KslCalc(item,Th,Ph)
+                        FFtot += SH*orbs[orb][term]*ff
+                        name = 'A%s%s:%d'%(term,orb,iAt)
+                        dFFdS[name] = SH*ff
+                        dSH += SH*orbs[orb][term]
+                    elif 'Ne' in term:
+                        name = 'ANe%s:%d'%(orb,iAt)
+                        dFFdS[name] = ff/Ne
+                        if 'j0' in orKeys[int(orb)+1]:
+                            FFtot += ff
+                name = 'Akappa%s:%d'%(korb,iAt)
+                if name in dFFdS:
+                    dFFdS[name] += -2.0*Ne*SQk*dSH*dffdk/kappa
+                else:
+                    dFFdS[name] = -2.0*Ne*SQk*dSH*dffdk/kappa
+            FF[:,iAt] = FFcore+FFtot
         else:
             atFlg.append(0.)
     if ifDeriv:
@@ -476,7 +523,25 @@ def GetSHC(pfx,parmDict):
             elif 'Sh' in name:
                 cof = bits[2]
                 SHCdict[atid][shno][cof] = parmDict[parm]
-    return SHCdict
+        if pfx+'AD(' in parm or pfx+'Akappa' in parm or pfx+'ANe' in parm:       #atom deformation parms
+            items = parm.split(':')
+            atid = int(items[-1])
+            name = items[2][1:]    #strip 'A'
+            if atid not in SHCdict:
+                SHCdict[atid] = {}
+            orb = name[-1]
+            if orb not in SHCdict[atid]:
+                SHCdict[atid][orb] = {}
+            SHCdict[atid][orb][name[:-1]] = parmDict[parm] #[atom id][orb no.][deform. coef]
+        if pfx+'UVmat' in parm:
+            items = parm.split(':')
+            atid = int(items[-1])
+            if -atid not in SHCdict:
+                SHCdict[-atid] = {}
+            SHCdict[-atid]['UVmat'] = parmDict[parm]
+    if len(SHCdict):
+        return {pfx:SHCdict,}
+    else: return {}
     
 ################################################################################
 ##### Penalty & restraint functions 
@@ -947,6 +1012,7 @@ def StructureFactor2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
     FFtables = calcControls['FFtables']
     EFtables = calcControls['EFtables']
     BLtables = calcControls['BLtables']
+    ORBtables = calcControls['ORBtables']
     Amat,Bmat = G2lat.Gmat2AB(G)
     Flack = 1.0
     if not SGData['SGInv'] and 'S' in calcControls[hfx+'histType'] and phfx+'Flack' in parmDict:
@@ -993,7 +1059,7 @@ def StructureFactor2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         refDict['FF']['FF'] = np.zeros((nRef,len(dat)))
         for iel,El in enumerate(refDict['FF']['El']):
             refDict['FF']['FF'].T[iel] = G2el.ScatFac(FFtables[El],SQ)
-    SHCdict = GetSHC(pfx,parmDict)
+    SHCdict = GetSHC(pfx,parmDict)  #this is pfx keyed dict!
 #reflection processing begins here - big arrays!
     iBeg = 0
     while iBeg < nRef:
@@ -1034,8 +1100,8 @@ def StructureFactor2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         FF = np.repeat(refDict['FF']['FF'][iBeg:iFin].T[Tindx].T,len(SGT)*len(TwinLaw),axis=0)
         #FF has to have the Bessel*Sph.Har.*atm form factor for each refletion in Uniq for Q atoms; otherwise just normal FF
         #this must be done here. NB: same place for non-spherical atoms; same math except no Bessel part.
-        if len(SHCdict):
-            MakeSpHarmFF(Uniq,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ)     #Not Amat!
+        if pfx in SHCdict:
+            MakeSpHarmFF(Uniq,Bmat,SHCdict[pfx],Tdata,hType,FFtables,ORBtables,BLtables,FF,SQ)     #Not Amat!
         Bab = np.repeat(parmDict[phfx+'BabA']*np.exp(-parmDict[phfx+'BabU']*SQfactor),len(SGT)*len(TwinLaw))
         if 'T' in calcControls[hfx+'histType']: #fa,fb are 2 X blkSize X nTwin X nOps x nAtoms
             fa = np.array([np.reshape(((FF+FP).T-Bab).T,cosp.shape)*cosp*Tcorr,-np.reshape(Flack*FPP,sinp.shape)*sinp*Tcorr])
@@ -1088,6 +1154,7 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
     SGMT = np.array([ops[0].T for ops in SGData['SGOps']])    # must be ops[0].T
     SGT = np.array([ops[1] for ops in SGData['SGOps']])
     FFtables = calcControls['FFtables']
+    ORBtables = calcControls['ORBtables']
     BLtables = calcControls['BLtables']
     hType = calcControls[hfx+'histType'] 
     Amat,Bmat = G2lat.Gmat2AB(G)
@@ -1121,7 +1188,7 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
     Flack = 1.0
     if not SGData['SGInv'] and 'S' in calcControls[hfx+'histType'] and phfx+'Flack' in parmDict:
         Flack = 1.-2.*parmDict[phfx+'Flack']
-    SHCdict = GetSHC(pfx,parmDict)
+    SHCdict = GetSHC(pfx,parmDict)      #this is dict with pf as key
     dffdSH = {}
 #reflection processing begins here - big arrays!
     iBeg = 0
@@ -1143,7 +1210,7 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         Bab = np.repeat(parmDict[phfx+'BabA']*np.exp(-parmDict[phfx+'BabU']*SQfactor),len(SGT))
         Tindx = np.array([refDict['FF']['El'].index(El) for El in Tdata])
         FF = np.repeat(refDict['FF']['FF'][iBeg:iFin].T[Tindx].T,len(SGT),axis=0)
-        Uniq = np.inner(H,SGMT)             # array(nSGOp,3)
+        Uniq = np.inner(H,SGMT)             # array(nSGOp,3,3)
         Phi = np.inner(H,SGT)
         phase = twopi*(np.inner(Uniq,(dXdata+Xdata).T).T+Phi.T).T
         sinp = np.sin(phase)        #refBlk x nOps x nAtoms
@@ -1156,8 +1223,8 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         Tcorr = np.reshape(Tiso,Tuij.shape)*Tuij*Mdata*Fdata/len(SGMT)
         Hij = np.array([Mast*np.multiply.outer(U,U) for U in np.reshape(Uniq,(-1,3))])      #Nref*Nops,3,3
         Hij = np.reshape(np.array([G2lat.UijtoU6(uij) for uij in Hij]),(-1,len(SGT),6))     #Nref,Nops,6
-        if len(SHCdict):
-            dffdsh,atFlg = MakeSpHarmFF(Uniq,Bmat,SHCdict,Tdata,hType,FFtables,BLtables,FF,SQ,True)
+        if pfx in SHCdict:
+            dffdsh,atFlg = MakeSpHarmFF(Uniq,Bmat,SHCdict[pfx],Tdata,hType,FFtables,ORBtables,BLtables,FF,SQ,True)
             if len(dffdSH):
                 for item in dffdSH:
                     dffdSH[item] = np.concatenate((dffdSH[item],dffdsh[item]))
@@ -1180,14 +1247,14 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         fbx = np.array([fot*cosp,-fotp*sinp])
         #sum below is over Uniq
         dfadfr = np.sum(fa/occ,axis=-2)        #array(2,refBlk,nAtom) Fdata != 0 avoids /0. problem
-        dfadff = fa[0]*Tcorr*atFlg/fot           #ignores resonant scattering? no sum on Uniq
+        dfadff = fa[0]*Tcorr*atFlg/fot           #ignores resonant scattering? no sum on Uniq; array(refBlk,nEqv,nAtom)
         dfadba = np.sum(-cosp*Tcorr,axis=-2)  #array(refBlk,nAtom)
         dfadx = np.sum(twopi*Uniq[nxs,:,nxs,:,:]*np.swapaxes(fax,-2,-1)[:,:,:,:,nxs],axis=-2)
         dfadui = np.sum(-SQfactor[nxs,:,nxs,nxs]*fa,axis=-2) #array(Ops,refBlk,nAtoms)
         dfadua = np.sum(-Hij[nxs,:,nxs,:,:]*np.swapaxes(fa,-2,-1)[:,:,:,:,nxs],axis=-2)
         if not SGData['SGInv']:
             dfbdfr = np.sum(fb/occ,axis=-2)        #Fdata != 0 avoids /0. problem
-            dfbdff = fb[0]*Tcorr*atFlg/fot         #ignores resonant scattering? no sum on Uniq
+            dfbdff = fb[0]*Tcorr*atFlg/fot         #ignores resonant scattering? no sum on Uniq; array(refBlk,nEqv,nAtom)
             dfbdba = np.sum(-sinp*Tcorr,axis=-2)
             dfadfl = np.sum(np.sum(-fotp*sinp,axis=-1),axis=-1)
             dfbdfl = np.sum(np.sum(fotp*cosp,axis=-1),axis=-1)
@@ -1214,7 +1281,7 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
             dFdua[iBeg:iFin] = 2.*np.sum(fas[:,:,nxs,nxs]*dfadua+fbs[:,:,nxs,nxs]*dfbdua,axis=0)
         else:
             dFdfr[iBeg:iFin] = (2.*SA[:,nxs]*(dfadfr[0]+dfadfr[1])+2.*SB[:,nxs]*(dfbdfr[0]+dfbdfr[1]))*Mdata/len(SGMT)
-            dFdff[iBeg:iFin] = (2.*SA[:,nxs,nxs]*dfadff+2.*SB[:,nxs,nxs]*dfbdff)      #not summed on Uniq yet
+            dFdff[iBeg:iFin] = (2.*SA[:,nxs,nxs]*dfadff+2.*SB[:,nxs,nxs]*dfbdff)      #not summed on Uniq yet array(Nref,nEqv,nAtom)
             dFdx[iBeg:iFin] = 2.*SA[:,nxs,nxs]*(dfadx[0]+dfadx[1])+2.*SB[:,nxs,nxs]*(dfbdx[0]+dfbdx[1])
             dFdui[iBeg:iFin] = 2.*SA[:,nxs]*(dfadui[0]+dfadui[1])+2.*SB[:,nxs]*(dfbdui[0]+dfbdui[1])
             dFdua[iBeg:iFin] = 2.*SA[:,nxs,nxs]*(dfadua[0]+dfadua[1])+2.*SB[:,nxs,nxs]*(dfbdua[0]+dfbdua[1])
@@ -1224,7 +1291,7 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         iBeg += blkSize
 #    print 'derv time %.4f, nref %d, blkSize %d'%(time.time()-time0,nRef,blkSize)
         #loop over atoms - each dict entry is list of derivatives for all the reflections
-    for i in range(len(Mdata)):
+    for i in range(len(Tdata)):         #loop over atoms
         dFdvDict[pfx+'Afrac:'+str(i)] = dFdfr.T[i]
         dFdvDict[pfx+'dAx:'+str(i)] = dFdx.T[0][i]
         dFdvDict[pfx+'dAy:'+str(i)] = dFdx.T[1][i]
@@ -1237,8 +1304,12 @@ def StructureFactorDerv2(refDict,G,hfx,pfx,SGData,calcControls,parmDict):
         dFdvDict[pfx+'AU13:'+str(i)] = dFdua.T[4][i]
         dFdvDict[pfx+'AU23:'+str(i)] = dFdua.T[5][i]
         for item in dffdSH:
-            i = int(item.split(':')[1])
-            dFdvDict[pfx+'RBS'+item] = np.sum(dFdff[:,:,i]*np.reshape(dffdSH[item],(nRef,-1)),axis=-1)
+            if 'SH' in item or 'O' in item:
+                if i == int(item.split(':')[1]):
+                    dFdvDict[pfx+'RBS'+item] = np.sum(dFdff[:,:,i]*np.reshape(dffdSH[item],(nRef,-1)),axis=1)
+            else:
+                if i == int(item.split(':')[1]):
+                    dFdvDict[pfx+item] = np.sum(dFdff[:,:,i]*np.reshape(dffdSH[item],(nRef,-1)),axis=1)
     dFdvDict[phfx+'Flack'] = 4.*dFdfl.T
     dFdvDict[phfx+'BabA'] = dFdbab.T[0]
     dFdvDict[phfx+'BabU'] = dFdbab.T[1]
@@ -4074,7 +4145,7 @@ def getPowderProfileDerv(args):
                 try:
                     aname = name.split(pfx)[1][:2]
                     if aname not in ['Af','dA','AU','RB','AM','Xs','Xc','Ys','Yc','Zs','Zc',    \
-                        'Tm','Xm','Ym','Zm','U1','U2','U3','MX','MY','MZ']: continue # skip anything not an atom or rigid body param
+                        'Tm','Xm','Ym','Zm','U1','U2','U3','MX','MY','MZ','AN','Ak','AD']: continue # skip anything not an atom or rigid body param
                 except IndexError:
                     continue
             nonatomvarylist.append(name)
@@ -4084,7 +4155,7 @@ def getPowderProfileDerv(args):
                 try:
                     aname = name.split(pfx)[1][:2]
                     if aname not in ['Af','dA','AU','RB','AM','Xs','Xc','Ys','Yc','Zs','Zc',    \
-                        'Tm','Xm','Ym','Zm','U1','U2','U3','MX','MY','MZ']: continue # skip anything not an atom or rigid body param
+                        'Tm','Xm','Ym','Zm','U1','U2','U3','MX','MY','MZ','AN','Ak','AD']: continue # skip anything not an atom or rigid body param
                 except IndexError:
                     continue
             nonatomdependentVars.append(name)
@@ -4487,8 +4558,8 @@ def dervRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dl
             x,y,w,yc,yb,yd = Histogram['Data']
             xB = np.searchsorted(x,Limits[0])
             xF = np.searchsorted(x,Limits[1])+1
-            dMdv,depDerivDict = getPowderProfileDerv([parmDict,x[xB:xF],
-                varylist,Histogram,Phases,rigidbodyDict,calcControls,pawleyLookup,dependentVars])
+            dMdv,depDerivDict = getPowderProfileDerv([parmDict,x[xB:xF],varylist,Histogram,Phases,rigidbodyDict,
+                calcControls,pawleyLookup,dependentVars])
             G2mv.Dict2Deriv(varylist,depDerivDict,dMdv)
             dMdvh = np.sqrt(w[xB:xF])*dMdv
         elif 'HKLF' in histogram[:4]:
@@ -4584,7 +4655,10 @@ def HessRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dl
             Dy = dy[xB:xF][nxs,:]
             dMdvh *= Wt
             if dlg:
-                GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='Hessian for histogram %d\nAll data Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                if 'G2' in str(type(dlg)):
+                    GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='Hessian for histogram %d\nAll data Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                else:
+                    GoOn = dlg.Update(int(Histogram['Residuals']['wR']),newmsg='Hessian for histogram %d\nAll data Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
                 if type(GoOn) is tuple:
                     if not GoOn[0]:
                         raise G2obj.G2RefineCancel('Cancel pressed')
@@ -4613,7 +4687,10 @@ def HessRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dl
 #            print 'matrix build time: %.3f'%(time.time()-time0)
 
             if dlg:
-                GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='Hessian for histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                if 'G2' in str(type(dlg)):
+                    GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='Hessian for histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                else:
+                    GoOn = dlg.Update(int(Histogram['Residuals']['wR']),newmsg='Hessian for histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
                 if type(GoOn) is tuple:
                     if not GoOn[0]:
                         raise G2obj.G2RefineCancel('Cancel pressed')
@@ -4706,7 +4783,10 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
             Histogram['Residuals']['wRb'] = min(100.,100.*ma.sqrt(sumwYB2/sumwYmB2))
             Histogram['Residuals']['wRmin'] = min(100.,100.*ma.sqrt(Histogram['Residuals']['Nobs']/Histogram['Residuals']['sumwYo']))
             if dlg:
-                GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='For histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                if 'G2' in str(type(dlg)):
+                    GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='For histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                else:
+                    GoOn = dlg.Update(int(Histogram['Residuals']['wR']),newmsg='For histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
                 if type(GoOn) is tuple:
                     if not GoOn[0]:
                         raise G2obj.G2RefineCancel('Cancel pressed')
@@ -4762,7 +4842,7 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
                 SSnobs = np.zeros(10)
             nobs = 0
             nrej = 0
-            next = 0
+            Nexti = 0
             maxH = 0
             if calcControls['F**2']:
                 for i,ref in enumerate(refDict['RefList']):
@@ -4797,7 +4877,7 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
                                 ref[3+im] = -abs(ref[3+im])      #mark as rejected
                                 nrej += 1
                             else:   #sp.gp.extinct
-                                next += 1
+                                Nexti += 1
             else:
                 for i,ref in enumerate(refDict['RefList']):
                     if ref[5+im] > 0.:
@@ -4832,7 +4912,7 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
                                 ref[3+im] = -abs(ref[3+im])      #mark as rejected
                                 nrej += 1
                             else:   #sp.gp.extinct
-                                next += 1
+                                Nexti += 1
             Scale = sumFo2/sumFc2
             if (Scale < 0.8 or Scale > 1.2) and phfx+'Scale' in varylist:
                 print ('New scale: %.4f'%(Scale*parmDict[phfx+'Scale']))
@@ -4846,7 +4926,7 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
             Histogram['Residuals'][phfx+'Rf^2'] = 100.*sumdF2/sumFo2
             Histogram['Residuals'][phfx+'Nref'] = nobs
             Histogram['Residuals'][phfx+'Nrej'] = nrej
-            Histogram['Residuals'][phfx+'Next'] = next
+            Histogram['Residuals'][phfx+'Next'] = Nexti
             if im:
                 Histogram['Residuals'][phfx+'SSRf'] = 100.*sumSSdF[:maxH+1]/sumSSFo[:maxH+1]
                 Histogram['Residuals'][phfx+'SSRf^2'] = 100.*sumSSdF2[:maxH+1]/sumSSFo2[:maxH+1]
@@ -4854,9 +4934,12 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
                 Histogram['Residuals']['SSwR'] = np.sqrt(sumSSwdf2[:maxH+1]/sumSSwYo[:maxH+1])*100.                
             Nobs += nobs
             Nrej += nrej
-            Next += next
+            Next += Nexti
             if dlg:
-                GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='For histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                if 'G2' in str(type(dlg)):
+                    GoOn = dlg.Update(Histogram['Residuals']['wR'],newmsg='For histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
+                else:
+                    GoOn = dlg.Update(int(Histogram['Residuals']['wR']),newmsg='For histogram %d Rw=%8.3f%s'%(hId,Histogram['Residuals']['wR'],'%'))
                 if type(GoOn) is tuple:
                     if not GoOn[0]:
                         raise G2obj.G2RefineCancel('Cancel pressed')
@@ -4873,7 +4956,7 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
     Rw = min(100.,np.sqrt(np.sum(M**2)/SumwYo)*100.)
     if dlg:
         if hasattr(dlg,'SetHistogram'): dlg.SetHistogram(-1,'overall')
-        GoOn = dlg.Update(Rw,newmsg='%s%8.3f%s'%('All data Rw =',Rw,'%'))
+        GoOn = dlg.Update(int(Rw),newmsg='%s%8.3f%s'%('All data Rw =',Rw,'%'))
         if type(GoOn) is tuple:
             if not GoOn[0]:
                 parmDict['saved values'] = values
@@ -4894,7 +4977,7 @@ def errRefine(values,HistoPhases,parmDict,varylist,calcControls,pawleyLookup,dlg
         if hasattr(dlg,'SetHistogram'): dlg.SetHistogram(-2,'Restraints')
         Nobs += len(pVals)
         M = np.concatenate((M,np.sqrt(pWt)*pVals))
-        GoOn = dlg.Update(100*pSum/np.sum(M**2),newmsg='Restraints')
+        GoOn = dlg.Update(int(100.*pSum/np.sum(M**2)),newmsg='Restraints')
     Histograms['RestraintSum'] = pSum
     Histograms['RestraintTerms'] = len(pVals)
     return M

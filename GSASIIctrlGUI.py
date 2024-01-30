@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIctrlGUI - Custom GSAS-II GUI controls
 ########### SVN repository information ###################
-# $Date: 2023-08-14 20:10:19 -0500 (Mon, 14 Aug 2023) $
-# $Author: toby $
-# $Revision: 5649 $
+# $Date: 2023-10-20 15:25:51 -0500 (Fri, 20 Oct 2023) $
+# $Author: vondreele $
+# $Revision: 5683 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIctrlGUI.py $
-# $Id: GSASIIctrlGUI.py 5649 2023-08-15 01:10:19Z toby $
+# $Id: GSASIIctrlGUI.py 5683 2023-10-20 20:25:51Z vondreele $
 ########### SVN repository information ###################
 '''Documentation for all the routines in module :mod:`GSASIIctrlGUI`
 follows.
@@ -47,7 +47,7 @@ except ImportError:
     from matplotlib.backends.backend_wx import FigureCanvas as Canvas
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5649 $")
+GSASIIpath.SetVersionNumber("$Revision: 5683 $")
 import GSASIIdataGUI as G2gd
 import GSASIIpwdGUI as G2pdG
 import GSASIIspc as G2spc
@@ -2596,6 +2596,7 @@ def ShowScrolledColText(parent,txt,width=600,height=400,header='Warning info',co
     
     dlg = wx.Dialog(parent.GetTopLevelParent(),wx.ID_ANY,header, style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
     spanel = wxscroll.ScrolledPanel(dlg, wx.ID_ANY, size=(width-20, height))
+    spanel.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
     mainSizer = wx.BoxSizer(wx.VERTICAL)
     mainSizer.Add(spanel,1,wx.ALL|wx.EXPAND,1)
 
@@ -2603,11 +2604,12 @@ def ShowScrolledColText(parent,txt,width=600,height=400,header='Warning info',co
     for i,line in enumerate(txt.split('\n')):
         cols = max(cols,line.count('\t')+1)
 
-    txtSizer = wx.GridBagSizer()
+    txtSizer = wx.GridBagSizer(0,9)
     for i,line in enumerate(txt.split('\n')):
         if line.strip().endswith(':'):
             st = wx.StaticText(spanel,wx.ID_ANY,line)
             txtSizer.Add(st,pos=(i,0),span=(0,cols),flag=wx.EXPAND)
+            st.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE))
             continue
         elif line.strip().startswith('**') and line.strip().endswith('**'):
             st = wx.StaticText(spanel,wx.ID_ANY,line,style=wx.ALIGN_CENTER)
@@ -2641,7 +2643,7 @@ def ShowScrolledColText(parent,txt,width=600,height=400,header='Warning info',co
     txtSizer.AddGrowableCol(0)  #to fill screen
     spanel.SetSizer(txtSizer)
     btnsizer = wx.BoxSizer(wx.HORIZONTAL)
-    btn = wx.Button(dlg, wx.ID_CLOSE) 
+    btn = wx.Button(dlg, wx.ID_CLOSE)
     btn.Bind(wx.EVT_BUTTON,lambda event: dlg.EndModal(wx.ID_CANCEL))
     btnsizer.Add(btn)
     mainSizer.Add(btnsizer, 0, wx.ALIGN_CENTER|wx.ALL, 5)
@@ -2654,7 +2656,7 @@ def ShowScrolledColText(parent,txt,width=600,height=400,header='Warning info',co
     dlg.ShowModal()
     dlg.Destroy()
     
-def G2ScrolledGrid(G2frame,lbl,title,tbl,colLbls,colTypes,maxSize=(600,300)):
+def G2ScrolledGrid(G2frame,lbl,title,tbl,colLbls,colTypes,maxSize=(600,300),comment=''):
     '''Display a scrolled table of information in a dialog window
 
     :param wx.Frame G2frame: parent for dialog
@@ -2666,6 +2668,7 @@ def G2ScrolledGrid(G2frame,lbl,title,tbl,colLbls,colTypes,maxSize=(600,300)):
       wg.GRID_VALUE_STRING,wg.GRID_VALUE_FLOAT)
     :param list maxSize: Maximum size for the table in points. Defaults to 
       (600,300)
+      :param str comment: optional text that appears below table
 
     Example::
 
@@ -2675,6 +2678,7 @@ def G2ScrolledGrid(G2frame,lbl,title,tbl,colLbls,colTypes,maxSize=(600,300)):
        G2ScrolledGrid(frm,'window label','title',20*[row],colLbls,colTypes)
 
     '''
+        
     dlg = wx.Dialog(G2frame,title=title,style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(wx.StaticText(dlg,label=lbl),
@@ -2700,6 +2704,8 @@ def G2ScrolledGrid(G2frame,lbl,title,tbl,colLbls,colTypes,maxSize=(600,300)):
     scrGrid.SetScrollbars(10,10,int(Size[0]/10-4),int(Size[1]/10-1))
     scrGrid.Scroll(0,0)
     sizer.Add(scrGrid,1,wx.EXPAND,1)
+    if len(comment):
+        sizer.Add(wx.StaticText(dlg,label=comment))
         
     btnsizer = wx.BoxSizer(wx.HORIZONTAL)
     btnsizer.Add((-1,-1),1,wx.EXPAND,1)
@@ -4159,14 +4165,15 @@ class DisAglDialog(wx.Dialog):
                 aRadii = ValidatedTxtCtrl(self.panel,data['AngleRadii'],id,nDig=(10,3))
                 radiiSizer.Add(aRadii,0,WACV)
         mainSizer.Add(radiiSizer,0,wx.EXPAND)
+        Names = ['Bond']
+        factorSizer = wx.FlexGridSizer(0,2,5,5)
         if self.Angle:
-            factorSizer = wx.FlexGridSizer(0,2,5,5)
             Names = ['Bond','Angle']
-            for i,name in enumerate(Names):
-                factorSizer.Add(wx.StaticText(self.panel,-1,name+' search factor'),0,WACV)
-                bondFact = ValidatedTxtCtrl(self.panel,data['Factors'],i,nDig=(10,3))
-                factorSizer.Add(bondFact)
-            mainSizer.Add(factorSizer,0,wx.EXPAND)
+        for i,name in enumerate(Names):
+            factorSizer.Add(wx.StaticText(self.panel,-1,name+' search factor'),0,WACV)
+            bondFact = ValidatedTxtCtrl(self.panel,data['Factors'],i,nDig=(10,3))
+            factorSizer.Add(bondFact)
+        mainSizer.Add(factorSizer,0,wx.EXPAND)
         
         OkBtn = wx.Button(self.panel,-1,"Ok")
         OkBtn.Bind(wx.EVT_BUTTON, self.OnOk)
@@ -4952,14 +4959,11 @@ class GSGrid(wg.Grid):
             self.DisableCellEditControl()
                 
 ################################################################################           
-class Table(wg.PyGridTableBase):        #TODO: this works in python 3/phoenix but pygridtablebase doesn't exist
+class Table(wg.GridTableBase):
     '''Basic data table for use with GSgrid
     '''
     def __init__(self, data=[], rowLabels=None, colLabels=None, types = None):
-        if 'phoenix' in wx.version():
-            wg.GridTableBase.__init__(self)
-        else:
-            wg.PyGridTableBase.__init__(self)
+        wg.GridTableBase.__init__(self)
         self.colLabels = colLabels
         self.rowLabels = rowLabels
         self.dataTypes = types
@@ -6680,9 +6684,7 @@ class G2RefinementProgress(wx.Dialog):
       is displayed.  
     '''
     def __init__(self, title='Refinement progress', message='All data Rw =',
-                     maximum=101, parent=None, trialMode=False,
-                     seqLen=0, seqShow=3,
-                     style=None):
+        maximum=101, parent=None, trialMode=False,seqLen=0, seqShow=3,style=None):
 
         self.trialRw = trialMode # used for Levenberg-Marquardt fitting
         self.SeqLen = seqLen
@@ -6694,8 +6696,7 @@ class G2RefinementProgress(wx.Dialog):
         if self.trialRw: self.rows = 5
         if style is None: style = wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER
 
-        super(self.__class__,self).__init__(parent, wx.ID_ANY, title,
-                                            style=style, size=(-1,-1))
+        super(self.__class__,self).__init__(parent, wx.ID_ANY, title,style=style, size=(-1,-1))
         self.Bind(wx.EVT_CLOSE, self._onClose)
         mainSizer = wx.BoxSizer(wx.VERTICAL)
         self.startTime = time.time()
@@ -6790,13 +6791,12 @@ class G2RefinementProgress(wx.Dialog):
         self.Labels = wx.GridBagSizer(2,2)
         lblSizer.Add(self.Labels)
         self.RwPanel = wx.lib.scrolledpanel.ScrolledPanel(self, wx.ID_ANY, size=(180, 130),
-                                 style = wx.SUNKEN_BORDER)
+            style = wx.SUNKEN_BORDER)
         lblSizer.Add(self.RwPanel,1,wx.EXPAND,1)
 
         self.Labels.label = {}
         for i in range(self.rows):
-            self.Labels.label[i] = wx.StaticText(self,wx.ID_ANY,'',
-                                                style=wx.ALIGN_CENTER_VERTICAL)
+            self.Labels.label[i] = wx.StaticText(self,wx.ID_ANY,'',style=wx.ALIGN_CENTER_VERTICAL)
             self.Labels.Add(self.Labels.label[i],(i,0))
         mainsizer = wx.BoxSizer(wx.VERTICAL)
         tblsizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -6830,8 +6830,7 @@ class G2RefinementProgress(wx.Dialog):
             col = self.cols
         lbls = []
         for i in range(self.rows-1):
-            lbls.append(wx.StaticText(self.RwPanel,wx.ID_ANY,'',
-                                          style=wx.ALIGN_CENTER))
+            lbls.append(wx.StaticText(self.RwPanel,wx.ID_ANY,'',style=wx.ALIGN_CENTER))
             self.gridSiz.Add(lbls[-1],(1+i,col))
         return col,lbls
         
@@ -6896,8 +6895,7 @@ class G2RefinementProgress(wx.Dialog):
         if nextHist >= 0 and self.seqHist != nextHist:
             self.seqHist = nextHist
             self.SeqCount += 1
-            self.gauge.SetValue(int(min(self.gaugemaximum,
-                                100.*self.SeqCount/self.SeqLen)))
+            self.gauge.SetValue(int(min(self.gaugemaximum,100.*self.SeqCount/self.SeqLen)))
 
     def _plotBar(self,h):
         'plot a vertical bar for a histogram'
@@ -6912,7 +6910,7 @@ class G2RefinementProgress(wx.Dialog):
         else:
             self.histOff[h] = len([i for i in self.plotted if i >= 0])/wid
         self.plotaxis.bar(np.array(range(l))+self.histOff[h],self.fitVals[h],
-                              width=1/wid,label=lbl,color=sym)
+            width=1/wid,label=lbl,color=sym)
         self.plotted.append(h)
         
     def _getPlotSetting(self,h):

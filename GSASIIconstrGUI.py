@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIconstrGUI - constraint GUI routines
 ########### SVN repository information ###################
-# $Date: 2023-05-20 13:24:42 -0500 (Sat, 20 May 2023) $
-# $Author: vondreele $
-# $Revision: 5586 $
+# $Date: 2023-10-12 12:58:52 -0500 (Thu, 12 Oct 2023) $
+# $Author: toby $
+# $Revision: 5673 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIconstrGUI.py $
-# $Id: GSASIIconstrGUI.py 5586 2023-05-20 18:24:42Z vondreele $
+# $Id: GSASIIconstrGUI.py 5673 2023-10-12 17:58:52Z toby $
 ########### SVN repository information ###################
 '''
 Constraints and rigid bodies GUI routines follow.
@@ -25,7 +25,7 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as nl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5586 $")
+GSASIIpath.SetVersionNumber("$Revision: 5673 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 import GSASIIstrIO as G2stIO
@@ -384,7 +384,7 @@ def CheckConstraints(G2frame,Phases,Histograms,data,newcons=[],reqVaryList=None,
     rbIds = rigidbodyDict.get('RBIds', {'Vector': [], 'Residue': [],'Spin':[]})
     rbVary, rbDict = G2stIO.GetRigidBodyModels(rigidbodyDict, Print=False)
     parmDict.update(rbDict)
-    (Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtables,EFtables,BLtables,MFtables,maxSSwave) = \
+    (Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtables,EFtables,ORBtables,BLtables,MFtables,maxSSwave) = \
         G2stIO.GetPhaseData(Phases,RestraintDict=None,rbIds=rbIds,Print=False) # generates atom symmetry constraints
     parmDict.update(phaseDict)
     # get Hist and HAP info
@@ -445,6 +445,20 @@ def UpdateConstraints(G2frame, data, selectTab=None, Clear=False):
             namelist = ['dAx','dAy','dAz']
         elif 'AU' in name:
             namelist = ['AUiso','AU11','AU22','AU33','AU12','AU13','AU23']
+        elif 'Akappa' in name:
+            namelist = ['Akappa%d'%i for i in range(6)]
+        elif 'ANe' in name:
+            namelist = ['ANe0','ANe1']
+        elif 'AD(1' in name:
+            orb = name.split(':')[2][-1]
+            namelist = ['AD(1,0)'+orb,'AD(1,1)'+orb,'AD(1,-1)'+orb]
+        elif 'AD(2' in name:
+            orb = name.split(':')[2][-1]
+            namelist = ['AD(2,0)'+orb,'AD(2,1)'+orb,'AD(2,-1)'+orb,'AD(2,2)'+orb,'AD(2,-2)'+orb]
+        elif 'AD(4' in name:
+            orb = name.split(':')[2][-1]
+            namelist = ['AD(4,0)'+orb,'AD(4,1)'+orb,'AD(4,-1)'+orb,'AD(4,2)'+orb,'AD(4,-2)'+orb,
+                'AD(4,3)'+orb,'AD(4,-3)'+orb,'AD(4,4)'+orb,'AD(4,-4)'+orb]
         elif 'AM' in name:
             namelist = ['AMx','AMy','AMz']
         elif items[-1] in ['A0','A1','A2','A3','A4','A5']:
@@ -1083,6 +1097,8 @@ def UpdateConstraints(G2frame, data, selectTab=None, Clear=False):
                 Sizer1.Add(wx.StaticText(panel,label='No holds generated'))
             Sizer1.Add((-1,10))
             symGen,SymErr,SymHelp = G2mv.GetSymEquiv(seqmode,seqhistnum)
+            symGenD,SymErrD,SymHelpD = G2mv.GetDroppedSym(seqmode,seqhistnum)
+            
             if len(symGen) == 0:
                 Sizer1.Add(wx.StaticText(panel,label='No equivalences generated'))
                 return Sizer1
@@ -1092,6 +1108,23 @@ def UpdateConstraints(G2frame, data, selectTab=None, Clear=False):
             Sizer1.Add(Sizer)
             helptext = ''
             for sym,(warnmsg,note),helptext in zip(symGen,SymErr,SymHelp):
+                if warnmsg:
+                    if helptext: helptext += '\n\n'
+                    helptext += warnmsg
+                if helptext:
+                    ch = G2G.HelpButton(panel,helptext)
+                    Sizer.Add(ch,0,wx.LEFT|wx.RIGHT|WACV|wx.ALIGN_CENTER,1)
+                else:
+                    Sizer.Add((-1,-1))
+                Sizer.Add(wx.StaticText(panel,wx.ID_ANY,'EQUIV'),
+                    0,WACV|wx.ALIGN_CENTER|wx.RIGHT|wx.LEFT,2)
+                Sizer.Add(wx.StaticText(panel,wx.ID_ANY,sym),0,WACV|wx.ALIGN_LEFT|wx.RIGHT|wx.LEFT,2)
+                if note:
+                    Sizer.Add(wx.StaticText(panel,wx.ID_ANY,note),0,WACV|wx.ALIGN_LEFT|wx.RIGHT|wx.LEFT,2)
+                else:
+                    Sizer.Add((-1,-1))
+                Sizer.Add((-1,-1))
+            for sym,(warnmsg,note),helptext in zip(symGenD,SymErrD,SymHelpD):
                 if warnmsg:
                     if helptext: helptext += '\n\n'
                     helptext += warnmsg
@@ -1581,7 +1614,7 @@ def UpdateConstraints(G2frame, data, selectTab=None, Clear=False):
 
     # create a list of the phase variables
     symHolds = []
-    (Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtable,EFtable,BLtable,MFtable,maxSSwave) = \
+    (Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtable,EFtable,ORBtables,BLtable,MFtable,maxSSwave) = \
         G2stIO.GetPhaseData(Phases,rbIds=rbIds,Print=False,symHold=symHolds)
     phaseList = []
     for item in phaseDict:
@@ -1680,9 +1713,9 @@ def UpdateConstraints(G2frame, data, selectTab=None, Clear=False):
     errmsg,warnmsg = WarnConstraintLimit()  # check limits & constraints
     if errmsg:
         G2frame.ErrorDialog('Constraint Error',
-                            'Error in constraints.\nCheck console output for more information'+
-                            ' or press "Show Errors" & "Show Warnings" buttons',
-                            parent=G2frame)
+            'Error in constraints.\nCheck console output for more information'+
+            ' or press "Show Errors" & "Show Warnings" buttons',
+            parent=G2frame)
         if seqhistnum is None:
             print ('\nError message(s):\n',errmsg)
         else:

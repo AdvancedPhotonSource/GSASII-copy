@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIrestr - restraint GUI routines
 ########### SVN repository information ###################
-# $Date: 2023-08-31 16:58:38 -0500 (Thu, 31 Aug 2023) $
-# $Author: toby $
-# $Revision: 5655 $
+# $Date: 2023-09-29 15:47:55 -0500 (Fri, 29 Sep 2023) $
+# $Author: vondreele $
+# $Revision: 5663 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIrestrGUI.py $
-# $Id: GSASIIrestrGUI.py 5655 2023-08-31 21:58:38Z toby $
+# $Id: GSASIIrestrGUI.py 5663 2023-09-29 20:47:55Z vondreele $
 ########### SVN repository information ###################
 '''Restraint GUI routines follow.
 '''
@@ -16,7 +16,7 @@ import numpy as np
 import numpy.ma as ma
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5655 $")
+GSASIIpath.SetVersionNumber("$Revision: 5663 $")
 import GSASIImath as G2mth
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -288,8 +288,7 @@ def UpdateRestraints(G2frame,data,phaseName):
             style = wx.PD_ELAPSED_TIME|wx.PD_AUTO_HIDE|wx.PD_REMAINING_TIME)
         try:
             bondlst = G2mth.searchBondRestr(Lists['origin'],Lists['target'],
-                                            bond,Factor,General['Type'],
-                                            SGData,Amat,0.01,dlg)
+                bond,Factor,General['Type'],SGData,Amat,0.01,dlg)
             for newBond in bondlst:
                 if newBond not in bondRestData['Bonds']:
                     bondRestData['Bonds'].append(newBond)
@@ -404,7 +403,7 @@ def UpdateRestraints(G2frame,data,phaseName):
             IndBlist = []
             VectB = []
             for Tid,Ttype,Tcoord in targAtoms:
-                result = G2spc.GenAtom(Tcoord,SGData,False,Move=False)
+                result = G2spc.GenAtom(Tcoord,SGData,All=False,Move=False)
                 BsumR = (Radii[Otype][0]+Radii[Ttype][0])*Factor
                 AsumR = (Radii[Otype][1]+Radii[Ttype][1])*Factor
                 for Txyz,Top,Tunit,Spn in result:

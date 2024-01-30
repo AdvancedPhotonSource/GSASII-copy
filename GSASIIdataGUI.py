@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIdataGUI - Main GUI routines
 #========== SVN repository information ###################
-# $Date: 2023-08-31 16:58:38 -0500 (Thu, 31 Aug 2023) $
+# $Date: 2024-01-11 15:04:45 -0600 (Thu, 11 Jan 2024) $
 # $Author: toby $
-# $Revision: 5655 $
+# $Revision: 5712 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIdataGUI.py $
-# $Id: GSASIIdataGUI.py 5655 2023-08-31 21:58:38Z toby $
+# $Id: GSASIIdataGUI.py 5712 2024-01-11 21:04:45Z toby $
 #=========- SVN repository information ###################
 '''
 Routines for main GUI wx.Frame follow. 
@@ -51,14 +51,14 @@ import scipy as sp
 import struct as st
 try:
     import wx
-#    import wx.grid as wg
+    import wx.grid as wg
     #import wx.wizard as wz
     #import wx.aui
     import wx.lib.scrolledpanel as wxscroll
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5655 $")
+GSASIIpath.SetVersionNumber("$Revision: 5712 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIfiles as G2fil
@@ -421,12 +421,19 @@ def ShowVersions():
     import matplotlib as mpl
     import OpenGL as ogl
     import GSASIIpath
+    pkgList = [('Python',None), ('wx',wx), ('matplotlib', mpl), ('numpy',np),
+                   ('scipy',sp), ('OpenGL',ogl)]
+    if GSASIIpath.GetConfigValue('debug'):
+        try:
+            import IPython
+            pkgList.append(('IPython',IPython))
+        except:
+            pass
     print ("Python/module versions loaded:")
     version = '?'
     versionDict['errors'] = ''
     warn = False
-    for s,m in [('Python',None), ('wx',wx), ('matplotlib', mpl), ('numpy',np),
-                    ('scipy',sp), ('OpenGL',ogl)]:
+    for s,m in pkgList:
         msg = ''
         if s == 'Python':
             pkgver = platform.python_version()
@@ -822,6 +829,8 @@ class GSASII(wx.Frame):
         self.Refine.append(item)
         item.Enable(state) # disabled during sequential fits
         self.Bind(wx.EVT_MENU, self.OnRefinePartials, id=item.GetId())
+        item = parent.Append(wx.ID_ANY,'&Parameter Impact\tCTRL+I','Perform a derivative calculation')
+        self.Bind(wx.EVT_MENU, self.OnDerivCalc, id=item.GetId())
         
         item = parent.Append(wx.ID_ANY,'Save partials as csv','Save the computed partials as a csv file')
         self.Refine.append(item)
@@ -2180,7 +2189,7 @@ class GSASII(wx.Frame):
                     self,[inp] * len(inp),range(len(inp)),names,
                     header='Enter simulation name and range',
                     minvals=(None,.5,1.0,0.0001),
-                    maxvals=(None,200.,200.,.001),
+                    maxvals=(None,500.,500.,.01),
                     sizevals=((225,-1),)
                     )
             else:
@@ -2880,9 +2889,11 @@ class GSASII(wx.Frame):
         
         phasemenu = wx.Menu()
         item = menu.AppendSubMenu(phasemenu,'Phase as','Export phase or sometimes phases')
+        self.ExportNonSeq.append([menu,item.Id])
 
         powdermenu = wx.Menu()
         item = menu.AppendSubMenu(powdermenu,'Powder data as','Export powder diffraction histogram(s)')
+        self.ExportNonSeq.append([menu,item.Id])
         
         sasdmenu = wx.Menu()
         item = menu.AppendSubMenu(sasdmenu,'Small angle data as','Export small angle histogram(s)')
@@ -4202,8 +4213,7 @@ class GSASII(wx.Frame):
         selItem = self.GPXtree.GetSelection()
         Histograms,Phases = self.GetUsedHistogramsAndPhasesfromTree()
         if not self.GPXtree.GetCount():
-            G2G.G2MessageBox(self,'No tree items to be deleted',
-                                 'Nothing to delete')
+            G2G.G2MessageBox(self,'No tree items to be deleted','Nothing to delete')
             return            
         item, cookie = self.GPXtree.GetFirstChild(self.root)
         used = False
@@ -4632,7 +4642,10 @@ class GSASII(wx.Frame):
         try:
             if dlg.ShowModal() == wx.ID_OK: 
                 GSASprojectfile = dlg.GetPath()
-                GSASprojectfile = G2IO.FileDlgFixExt(dlg,GSASprojectfile)
+                if not os.path.exists(GSASprojectfile):
+                    print(f'File not found {GSASprojectfile}')
+                    dlg.Destroy()
+                    return
                 self.LastGPXdir = dlg.GetDirectory()
         finally:
             dlg.Destroy()
@@ -5267,6 +5280,23 @@ class GSASII(wx.Frame):
                 item, cookie = self.GPXtree.GetNextChild(sub, cookie)
         return phaseNames
     
+    def GetHistogramTypes(self):
+        """ Returns a list of histogram types found in the GSASII data tree
+        
+        :return: list of histogram types
+        
+        """
+        HistogramTypes = []
+        if self.GPXtree.GetCount():
+            item, cookie = self.GPXtree.GetFirstChild(self.root)
+            while item:
+                name = self.GPXtree.GetItemText(item)
+                if name[:4] in ['PWDR','HKLF']:
+                    Inst = self.GPXtree.GetItemPyData(GetGPXtreeItemId(self,item,'Instrument Parameters'))
+                    HistogramTypes.append(Inst[0]['Type'][0])
+                item, cookie = self.GPXtree.GetNextChild(self.root, cookie)
+        return HistogramTypes
+    
     def GetHistogramNames(self,hType):
         """ Returns a list of histogram names found in the GSASII data tree
         Note routine :func:`GSASIIstrIO.GetHistogramNames` also exists to
@@ -5396,7 +5426,7 @@ class GSASII(wx.Frame):
         rigidbodyDict = self.GPXtree.GetItemPyData(GetGPXtreeItemId(self,self.root,'Rigid bodies'))
         rbVary,rbDict = G2stIO.GetRigidBodyModels(rigidbodyDict,Print=False)
         rbIds = rigidbodyDict.get('RBIds',{'Vector':[],'Residue':[],'Spin':[]})
-        Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtable,EFtable,BLtable,MFtable,maxSSwave = \
+        Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtable,EFtable,ORBtables,BLtable,MFtable,maxSSwave = \
             G2stIO.GetPhaseData(Phases,RestraintDict=None,rbIds=rbIds,Print=False)        
         hapVary,hapDict,controlDict = G2stIO.GetHistogramPhaseData(Phases,histDict,Print=False,resetRefList=False)
         histVary,histDict,controlDict = G2stIO.GetHistogramData(histDict,Print=False)
@@ -5482,6 +5512,40 @@ class GSASII(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
         
+    def OnDerivCalc(self,event):
+        Controls = self.GPXtree.GetItemPyData(GetGPXtreeItemId(self,self.root, 'Controls'))
+        self._cleanPartials(Controls)  # set phase partials as invalid
+        self.OnFileSave(event)
+        errmsg, warnmsg = G2stIO.ReadCheckConstraints(self.GSASprojectfile) # check constraints are OK
+        if errmsg:
+            print ('\nError message(s):\n',errmsg)
+            self.ErrorDialog('Error in constraints',errmsg)
+            return
+        Controls = self.GPXtree.GetItemPyData(GetGPXtreeItemId(self,self.root, 'Controls'))
+        wx.BeginBusyCursor()
+        pdlg = wx.ProgressDialog('Computing derivatives','Impact computation in progress',100,
+            parent=self,style = wx.PD_ELAPSED_TIME|wx.PD_AUTO_HIDE|wx.PD_CAN_ABORT)
+        pdlg.CenterOnParent()
+        derivCalcs,varyList = G2stMn.Refine(self.GSASprojectfile,pdlg,allDerivs=True)
+        pdlg.Destroy()
+        wx.EndBusyCursor()
+        if derivCalcs is None:
+            print('Calculation aborted')
+            return
+        # prepare table contents & display
+        colTypes = [wg.GRID_VALUE_STRING,wg.GRID_VALUE_STRING,wg.GRID_VALUE_FLOAT+':8,4',wg.GRID_VALUE_STRING]
+        colLbls = ['variable name','varied','Derivative','Definition']
+        tbl = []
+        for x in sorted(derivCalcs,key=lambda x:abs(derivCalcs[x][1]),reverse=True):
+            if derivCalcs[x][1] == 0.0 : continue
+            if np.sign(derivCalcs[x][2]) != np.sign(derivCalcs[x][0]): continue
+            txt = G2obj.fmtVarDescr(x)
+            txt = txt.replace('Ph=','Phase: ')
+            txt = txt.replace('Pwd=','Histogram: ')
+            tbl.append([x,(' T' if x in varyList else '  '),derivCalcs[x][1],txt])
+        G2G.G2ScrolledGrid(self,'Parameter Impact Results','Impact Results',tbl,colLbls,colTypes,
+            maxSize=(700,400),comment=' Cite: B.H. Toby, IUCrJ, to be published')
+
     def OnRefine(self,event):
         '''Perform a single refinement or a sequential refinement (depending on controls setting)
         Called from the Calculate/Refine menu.
@@ -6236,6 +6300,22 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
                 self.SetScrollRate(0,0) 
                 self.SendSizeEvent()
                 return
+        elif len(Sizer.GetChildren()) == 2: # case where there is a NoteBook & help button
+            if isinstance(Sizer.GetItem(0).GetWindow(), G2G.GSNoteBook):
+                # with wx4.2 (& 4.1?) AutoLayout causes all inner windows
+                # to be made large and scrolling is done at outer window
+                # this messes things up for grids inside notebooks (Reflection lists)
+                # for this case turn off AutoLayout on dataWindow, but
+                # use a Bind to redo Layout. This works for expansion but not
+                # contraction of the window. 
+                def _onResize(event):
+                    self.Layout()
+                    event.Skip()
+                self.Bind(wx.EVT_SIZE,_onResize)
+                self.SetScrollRate(0,0)
+                self.Layout()
+                self.SetAutoLayout(False)
+                return
         self.SetAutoLayout(True)
         self.SetScrollRate(10,10)
         self.SendSizeEvent()
@@ -6268,7 +6348,7 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         Do not use argument= for these as the argument names are different for classic & phoenix
         '''
         
-##### GSAS-II Menu items
+#### GSAS-II Menu items
         # Main menu
         G2frame = self.GetTopLevelParent()
         G2frame.GSASIIMenu = wx.MenuBar()
@@ -6889,11 +6969,15 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         self.GeneralCalc.Append(G2G.wxID_SINGLEMCSA,'MC/SA','Run Monte Carlo - Simulated Annealing')
         self.GeneralCalc.Append(G2G.wxID_MULTIMCSA,'Multi MC/SA','Run Monte Carlo - Simulated Annealing on multiprocessors')
         self.GeneralCalc.Append(G2G.wxID_TRANSFORMSTRUCTURE,'Transform','Transform crystal structure')
+        G2G.Define_wxId('wxID_TRANSFORMSTD')
+        self.GeneralCalc.Append(G2G.wxID_TRANSFORMSTD,'Std setting','Create a copy of this phase transformed into the standard setting')
         self.GeneralCalc.Append(G2G.wxID_COMPARECELLS,'Compare Cells','Compare Unit Cells using NIST*LATTICE')
         self.GeneralCalc.Append(G2G.wxID_COMPARESTRUCTURE,'Compare polyhedra','Compare polyhedra to ideal octahedra/tetrahedra')
         self.GeneralCalc.Enable(G2G.wxID_COMPARESTRUCTURE,False)   
         self.GeneralCalc.Append(G2G.wxID_USEBILBAOMAG,'Select magnetic/subgroup phase','If disabled, make in PWDR/Unit Cells')
         self.GeneralCalc.Append(G2G.wxID_USEBILBAOSUB,'Make subgroup project file(s)','Requires subcell search in PWDR/Unit Cells')
+        G2G.Define_wxId('wxID_SUPERSRCH')
+        self.GeneralCalc.Append(G2G.wxID_SUPERSRCH,'Supergroup search','Search for settings of this phase in higher symmetry')
         self.GeneralCalc.Append(G2G.wxID_VALIDPROTEIN,'Protein quality','Protein quality analysis')
         self.PostfillDataMenu()
         
@@ -7044,6 +7128,17 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         self.DataDrawOptions.Append(menu=wx.Menu(title=''),title='Select tab')
         self.PostfillDataMenu()
         
+        # Phase / Deformation tab
+        G2G.Define_wxId('wxID_DEFORMSETSEL','wxID_DEFORMDISTSET')
+        self.DeformationMenu = wx.MenuBar()
+        self.PrefillDataMenu(self.DeformationMenu)
+        self.DeformationMenu.Append(menu=wx.Menu(title=''),title='Select tab')
+        self.DeformationEdit = wx.Menu(title='')
+        self.DeformationMenu.Append(menu=self.DeformationEdit, title='Edit Deformations')
+        self.DeformationEdit.Append(G2G.wxID_DEFORMSETSEL,'Select atoms','Select atoms for deformation study')
+        self.DeformationEdit.Append(G2G.wxID_DEFORMDISTSET,'Set bond parms','Set bond selection parameters')
+        self.PostfillDataMenu()
+        
         # Phase / Draw Atoms tab 
         G2G.Define_wxId('wxID_DRAWATOMSTYLE', 'wxID_DRAWATOMLABEL', 'wxID_DRAWATOMCOLOR', 'wxID_DRAWATOMRESETCOLOR',
             'wxID_DRAWVIEWPOINT', 'wxID_DRAWTRANSFORM', 'wxID_DRAWDELETE', 'wxID_DRAWFILLCELL',
@@ -7185,7 +7280,7 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         self.PostfillDataMenu()
     # end of GSAS-II menu definitions
     
-#####  Notebook Tree Item editor ##############################################
+####  Notebook Tree Item editor ##############################################
 def UpdateNotebook(G2frame,data):
     '''Called when the data tree notebook entry is selected. Allows for
     editing of the text in that tree entry
@@ -7218,7 +7313,7 @@ def UpdateNotebook(G2frame,data):
     G2frame.dataWindow.SetDataSize()
     G2frame.SendSizeEvent()
 
-#####  Comments ###############################################################
+####  Comments ###############################################################
 def UpdateComments(G2frame,data):
     '''Place comments into the data window
     '''
@@ -7236,7 +7331,7 @@ def UpdateComments(G2frame,data):
     G2frame.dataWindow.GetSizer().Add(text,1,wx.ALL|wx.EXPAND)
 
             
-#####  Controls Tree Item editor ##############################################
+####  Controls Tree Item editor ##############################################
 def UpdateControls(G2frame,data):
     '''Edit overall GSAS-II controls in main Controls data tree entry
     '''
@@ -7542,7 +7637,7 @@ def UpdateControls(G2frame,data):
     G2frame.dataWindow.SetDataSize()
     G2frame.SendSizeEvent()
     
-#####  Main PWDR panel ########################################################    
+####  Main PWDR panel ########################################################    
 def UpdatePWHKPlot(G2frame,kind,item):
     '''Called when the histogram main tree entry is called. Displays the
     histogram weight factor, refinement statistics for the histogram
@@ -7564,7 +7659,7 @@ def UpdatePWHKPlot(G2frame,kind,item):
                 G2frame,[inp] * len(inp), range(len(inp)), names,
                 header='Edit simulation range',
                 minvals=(0.5,1.0,0.0001),
-                maxvals=(200.,200.,.001),
+                maxvals=(500.,500.,.01),
                 )            
         else:
             inp = [
@@ -7787,8 +7882,14 @@ def UpdatePWHKPlot(G2frame,kind,item):
         'Update to show edits to mag factors in window and plot'
         wx.CallAfter(UpdatePWHKPlot,G2frame,kind,G2frame.PatternId)
 
-    # Start of UpdatePWHKPlot
+    #### Start of UpdatePWHKPlot
     data = G2frame.GPXtree.GetItemPyData(item)
+    if kind == 'PWDR':              # Compute a "data entropy" factor?
+        Limits = G2frame.GPXtree.GetItemPyData(GetGPXtreeItemId(G2frame,item,'Limits'))
+        iBeg = np.searchsorted(data[1][0],Limits[1][0])
+        iFin = np.searchsorted(data[1][0],Limits[1][1])+1
+        meanI = np.mean(data[1][1][iBeg:iFin])
+        S = -1.0+np.sum(np.log(meanI**2/(data[1][1][iBeg:iFin]-meanI)**2))/(iFin-iBeg)
 #patches
     if not data:
         return
@@ -7832,6 +7933,9 @@ def UpdatePWHKPlot(G2frame,kind,item):
 #        comp.SetValue(str(data[0]['Compression']))
 #        comp.Bind(wx.EVT_COMBOBOX, OnCompression)
 #        wtSizer.Add(comp,0,WACV)
+
+    if kind == 'PWDR':
+        wtSizer.Add(wx.StaticText(G2frame.dataWindow,label=' Data "Surprise" factor: %.3f'%S))
     wtSizer.Add((-1,-1),1,wx.EXPAND)
     wtSizer.Add(G2G.HelpButton(G2frame.dataWindow,helpIndex=G2frame.dataWindow.helpKey))
     mainSizer.Add(wtSizer,0,wx.EXPAND)
@@ -7887,8 +7991,7 @@ def UpdatePWHKPlot(G2frame,kind,item):
                     mainSizer.Add(wx.StaticText(G2frame.dataWindow,-1,u' For incommensurate phase '+name+u':'))
                     for m,(Rf2,Rf,Nobs) in enumerate(zip(data[0][pfx+'Rf^2'],data[0][pfx+'Rf'],data[0][value])):
                         mainSizer.Add(wx.StaticText(G2frame.dataWindow,-1,
-                            u' m = +/- %d: RF\u00b2: %.3f%%, RF: %.3f%% on %d reflections  '% \
-                            (m,Rf2,Rf,Nobs)))
+                            u' m = +/- %d: RF\u00b2: %.3f%%, RF: %.3f%% on %d reflections  '%(m,Rf2,Rf,Nobs)))
                 else:
                     mainSizer.Add((5,5),)
                     mainSizer.Add(wx.StaticText(G2frame.dataWindow,-1,u' For phase '+name+u':'))
@@ -8145,7 +8248,7 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
             if 'Rvals' in data:
                 lbl = 'Refinement results'
             else:
-                lbl = 'No refinement results'
+                lbl = 'No refinement results' + 50*' '
             subSizer.Add(wx.StaticText(G2frame.dataWindow,label=lbl))
             if 'Rvals' in data:
                 Nvars = len(data['varyList'])
@@ -8238,8 +8341,14 @@ def SelectDataTreeItem(G2frame,item,oldFocus=None):
             if len(data['G(R)']):
                 G2plt.PlotISFG(G2frame,data,plotType='G(R)')
         elif G2frame.GPXtree.GetItemText(item) == 'Phases':
-            G2frame.dataWindow.GetSizer().Add(
-                wx.StaticText(G2frame.dataWindow,wx.ID_ANY,'Select one phase to see its parameters'))
+            if len(G2frame.GetPhaseNames()) == 1: # if there is only one phase, select it
+                item, cookie = G2frame.GPXtree.GetFirstChild(item)
+                data = G2frame.GPXtree.GetItemPyData(item)
+                G2phG.UpdatePhaseData(G2frame,item,data)
+                wx.CallAfter(G2frame.GPXtree.SelectItem,item)
+            else:
+                G2frame.dataWindow.GetSizer().Add(wx.StaticText(G2frame.dataWindow,
+                    wx.ID_ANY,'Select one phase to see its parameters'))
         elif G2frame.GPXtree.GetItemText(item) == 'Cluster Analysis':
             data = G2frame.GPXtree.GetItemPyData(item)
             G2frame.dataWindow.helpKey = 'Cluster Analysis'

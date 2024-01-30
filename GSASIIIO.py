@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-07-25 11:56:58 -0500 (Tue, 25 Jul 2023) $
-# $Author: vondreele $
-# $Revision: 5634 $
+# $Date: 2024-01-22 12:08:46 -0600 (Mon, 22 Jan 2024) $
+# $Author: toby $
+# $Revision: 5720 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIIO.py $
-# $Id: GSASIIIO.py 5634 2023-07-25 16:56:58Z vondreele $
+# $Id: GSASIIIO.py 5720 2024-01-22 18:08:46Z toby $
 ########### SVN repository information ###################
 '''
 Misc routines for input and output, including image reading follow. 
@@ -39,7 +39,7 @@ import sys
 import re
 import random as ran
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5634 $")
+GSASIIpath.SetVersionNumber("$Revision: 5720 $")
 try:
     import GSASIIdataGUI as G2gd
 except ImportError:
@@ -571,7 +571,7 @@ def PutG2Image(filename,Comments,Data,Npix,image):
     File.close()
     return
 
-objectScanIgnore = [int,bool,float,str,np.float64,np.float32,np.int32,np.int64,np.ndarray,G2obj.G2VarObj,G2obj.ExpressionObj,np.bool_]
+objectScanIgnore = [int,bool,float,str,np.float64,np.float32,np.int32,np.int64,np.int16,np.ndarray,G2obj.G2VarObj,G2obj.ExpressionObj,np.bool_]
 try:
     objectScanIgnore += [ma.MaskedArray] # fails in doc builds
 except AttributeError:
@@ -1472,7 +1472,7 @@ class ExportBaseclass(object):
         rbVary,rbDict =  G2stIO.GetRigidBodyModels(rigidbodyDict,Print=False)
         self.parmDict.update(rbDict)
         rbIds = rigidbodyDict.get('RBIds',{'Vector':[],'Residue':[]})
-        Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtables,EFtables,BLtables,MFtables,maxSSwave =  \
+        Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtables,EFtables,ORBtables,BLtables,MFtables,maxSSwave =  \
             G2stIO.GetPhaseData(Phases,RestraintDict=None,rbIds=rbIds,Print=False)
         self.parmDict.update(phaseDict)
         hapVary,hapDict,controlDict =  G2stIO.GetHistogramPhaseData(Phases,Histograms,Print=False,resetRefList=False)
@@ -1509,7 +1509,7 @@ class ExportBaseclass(object):
             G2gd.GetGPXtreeItemId(self.G2frame,self.G2frame.root,'Rigid bodies'))
         rbIds = rigidbodyDict.get('RBIds',{'Vector':[],'Residue':[]})
         rbVary,rbDict = G2stIO.GetRigidBodyModels(rigidbodyDict,Print=False)  # done twice, needed?
-        Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtables,EFtables,BLtables,MFtables,maxSSwave = \
+        Natoms,atomIndx,phaseVary,phaseDict,pawleyLookup,FFtables,EFtables,ORBtables,BLtables,MFtables,maxSSwave = \
             G2stIO.GetPhaseData(Phases,RestraintDict=None,rbIds=rbIds,Print=False) # generates atom symmetry constraints
         msg = G2mv.EvaluateMultipliers(constrDict,phaseDict)
         if msg:
@@ -2185,14 +2185,30 @@ def ReadDIFFaX(DIFFaXfile):
                 Layer['Stacking'][2] += ' '+stack
     return Layer
 
-def postURL(URL,postdict):
-    '''Posts a set of values as from a web form. If access fails to an https 
-    site the access is retried with http.
+def postURL(URL,postdict,getcookie=None,usecookie=None,
+                timeout=None,retry=2,mode='get'):
+    '''Posts a set of values as from a web form using the "get" or "post" 
+    protocols. 
+    If access fails to an https site, the access is retried with http.
 
     :param str URL: the URL to post; typically something 
        like 'http://www.../dir/page?'
     :param dict postdict: contains keywords and values, such
        as {'centrosymmetry': '0', 'crystalsystem': '0', ...}
+    :param dict getcookie: dict to save cookies created in call, or None
+       (default) if not needed. 
+    :param dict usecookie: dict containing cookies to be used in call, 
+       or None (default) if not needed.
+    :param int timeout: specifies a timeout period for the get or post (default 
+      is None, which means the timeout period is set by the server). The value 
+      when specified is the time in seconds to wait before giving up on the 
+      request.
+    :param int retry: the number of times to retry the request, if it times out.
+      This is only used if timeout is specified. The default is 2. Note that
+      if retry is left at the default value (2), The timeout is increased by
+      25% for the second try.
+    :param str mode: either 'get' (default) or 'post'. Determines how
+       the request will be submitted. 
     :returns: a string with the response from the web server or None
        if access fails.
     '''
@@ -2203,27 +2219,71 @@ def postURL(URL,postdict):
         # macs; it should not!
         print('Warning: failed to import requests. Python config error')
         return None
-        
+
+    if mode == 'get':
+        reqopt = requests.get
+    else:
+        reqopt = requests.post
+    
     repeat = True
+    count = 0
     while repeat:
+        count += 1
         r = None
         repeat = False
         try:
-            r = requests.get(URL,params=postdict)
+            if timeout is not None:
+                r = reqopt(URL,params=postdict,cookies=usecookie,
+                                     timeout=timeout)
+            else:
+                r = reqopt(URL,params=postdict,cookies=usecookie)
             if r.status_code == 200:
-                print('request OK')
+                if GSASIIpath.GetConfigValue('debug'): print('request OK')
                 page = r.text
+                if getcookie is not None:
+                    getcookie.update(r.cookies)
                 return page # success
             else:
                 print('request to {} failed. Reason={}'.format(URL,r.reason))
-        except Exception as msg:     #ConnectionError?
-            print('connection error - not on internet?')
+        except requests.exceptions.ConnectionError as msg:
+            if 'time' in str(msg) and 'out' in str(msg): 
+                print(f'server timeout accessing {URL}')
+                if GSASIIpath.GetConfigValue('debug'): print('full error=',msg)
+                if timeout is not None and count < retry:
+                    if retry == 2:
+                        timeout *= 1.25
+                        print(f'retry with timout={timeout} sec')
+                    repeat = True
+            else:
+                print('connection error - not on internet?')
+                if URL.startswith('https:'):
+                    print('Retry with http://')
+                    repeat = True
+                    URL = URL.replace('https:','http:')
+        except requests.exceptions.Timeout as msg:
+            print(f'timeout accessing {URL}')
+            if GSASIIpath.GetConfigValue('debug'): print('full error=',msg)
+            if timeout is not None and count < retry:
+                if retry == 2:
+                    timeout *= 1.25
+                    print(f'retry with timout={timeout} sec')
+                repeat = True
+            if timeout is not None and count <= retry: repeat = True
+        except requests.exceptions.ReadTimeout as msg:
+            print(f'timeout reading from {URL}')
+            if GSASIIpath.GetConfigValue('debug'): print('full error=',msg)
+            if timeout is not None and count < retry:
+                if retry == 2:
+                    timeout *= 1.25
+                    print(f'retry with timout={timeout} sec')
+                repeat = True
+        except requests.exceptions.ConnectTimeout:
+            print(f'timeout accessing {URL}')
+        except Exception as msg:    # other error
+            print(f'Error accessing {URL}')
             if GSASIIpath.GetConfigValue('debug'): print(msg)
         finally:
             if r: r.close()
-        if URL.startswith('https:'):
-            repeat = True
-            URL = URL.replace('https:','http:')
     else:
         return None
 

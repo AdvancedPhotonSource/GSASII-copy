@@ -1,11 +1,11 @@
 #/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-09 21:43:48 -0500 (Tue, 09 May 2023) $
-# $Author: toby $
-# $Revision: 5572 $
+# $Date: 2023-10-31 11:22:16 -0500 (Tue, 31 Oct 2023) $
+# $Author: vondreele $
+# $Revision: 5693 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/Substances.py $
-# $Id: Substances.py 5572 2023-05-10 02:43:48Z toby $
+# $Id: Substances.py 5693 2023-10-31 16:22:16Z vondreele $
 ########### SVN repository information ###################
 """
 Defines materials commonly found in small angle & reflectometry experiments.
@@ -31,6 +31,7 @@ Substances = {
 'Teflon':{'Elements':{'C':{'Num':1.},'F':{'Num':2.}},'Density':2.25,},
 'Mylar':{'Elements':{'C':{'Num':5.},'H':{'Num':4.},'O':{'Num':2.}},'Density':1.38,},
 'Iron':{'Elements':{'Fe':{'Num':4.}},'Density':7.87,},
+'Fe3C':{'Elements':{'Fe':{'Num':3.},'C':{'Num':1.}},'Volume':38.8,},
 'FeO-wustite':{'Elements':{'Fe':{'Num':4.},'O':{'Num':4.}},'Volume':79.285},
 'Fe2O3-hematite':{'Elements':{'Fe':{'Num':12.},'O':{'Num':18.}},'Volume':301.689},
 'Fe3O4-magnetite':{'Elements':{'Fe':{'Num':24.},'O':{'Num':32.}},'Volume':591.921},

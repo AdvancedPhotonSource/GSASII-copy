@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASII - image data display routines
 ########### SVN repository information ###################
-# $Date: 2023-06-21 23:36:16 -0500 (Wed, 21 Jun 2023) $
-# $Author: toby $
-# $Revision: 5619 $
+# $Date: 2023-10-30 11:07:19 -0500 (Mon, 30 Oct 2023) $
+# $Author: vondreele $
+# $Revision: 5692 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIimgGUI.py $
-# $Id: GSASIIimgGUI.py 5619 2023-06-22 04:36:16Z toby $
+# $Id: GSASIIimgGUI.py 5692 2023-10-30 16:07:19Z vondreele $
 ########### SVN repository information ###################
 '''Image GUI routines follow.
 '''
@@ -24,7 +24,7 @@ import matplotlib as mpl
 import numpy as np
 import numpy.ma as ma
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5619 $")
+GSASIIpath.SetVersionNumber("$Revision: 5692 $")
 import GSASIIimage as G2img
 import GSASIImath as G2mth
 import GSASIIElem as G2elem
@@ -82,7 +82,7 @@ def GetImageZ(G2frame,data,newRange=False):
     Npix,imagefile,imagetag = G2IO.GetCheckImageFile(G2frame,G2frame.Image)
     if imagefile is None: return []
     formatName = data.get('formatName','')
-    sumImg = np.array(G2IO.GetImageData(G2frame,imagefile,True,ImageTag=imagetag,FormatName=formatName),dtype='int32')
+    sumImg = np.array(G2IO.GetImageData(G2frame,imagefile,True,ImageTag=imagetag,FormatName=formatName),dtype='float32')
     if sumImg is None:
         return []
     darkImg = False
@@ -94,9 +94,10 @@ def GetImageZ(G2frame,data,newRange=False):
                 Ddata = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Did,'Image Controls'))
                 dformatName = Ddata.get('formatName','')
                 Npix,darkfile,imagetag = G2IO.GetCheckImageFile(G2frame,Did)
-                darkImage = G2IO.GetImageData(G2frame,darkfile,True,ImageTag=imagetag,FormatName=dformatName)
+#                darkImage = G2IO.GetImageData(G2frame,darkfile,True,ImageTag=imagetag,FormatName=dformatName)
+                darkImage = np.array(G2IO.GetImageData(G2frame,darkfile,True,ImageTag=imagetag,FormatName=dformatName),dtype='float32')
                 if darkImg is not None:                
-                    sumImg += np.array(darkImage*darkScale,dtype='int32')
+                    sumImg += np.array(darkImage*darkScale,dtype='float32')
             else:
                 print('Warning: resetting dark image (not found: {})'.format(
                     darkImg))
@@ -109,11 +110,11 @@ def GetImageZ(G2frame,data,newRange=False):
                 Npix,backfile,imagetag = G2IO.GetCheckImageFile(G2frame,Bid)
                 Bdata = G2frame.GPXtree.GetItemPyData(G2gd.GetGPXtreeItemId(G2frame,Bid,'Image Controls'))
                 bformatName = Bdata.get('formatName','')
-                backImage = G2IO.GetImageData(G2frame,backfile,True,ImageTag=imagetag,FormatName=bformatName)
+                backImage = np.array(G2IO.GetImageData(G2frame,backfile,True,ImageTag=imagetag,FormatName=bformatName),dtype='float32')
                 if darkImg and backImage is not None:
-                    backImage += np.array(darkImage*darkScale/backScale,dtype='int32')
+                    backImage += np.array(darkImage*darkScale/backScale,dtype='float32')
                 if backImage is not None:
-                    sumImg += np.array(backImage*backScale,dtype='int32')
+                    sumImg += np.array(backImage*backScale,dtype='float32')
     if 'Gain map' in data:
         gainMap = data['Gain map']
         if gainMap:
@@ -126,9 +127,10 @@ def GetImageZ(G2frame,data,newRange=False):
                 sumImg = sumImg*GMimage/1000
     sumImg -= int(data.get('Flat Bkg',0))
     Imax = np.max(sumImg)
+    Imin = np.min(sumImg)
     if 'range' not in data or newRange:
-        data['range'] = [(0,Imax),[0,Imax]]
-    return np.asarray(sumImg,dtype='int32')
+        data['range'] = [(Imin,Imax),[Imin,Imax]]
+    return np.asarray(np.rint(sumImg),dtype='int32')
 
 def UpdateImageData(G2frame,data):
     
@@ -2087,7 +2089,7 @@ def UpdateMasks(G2frame,data):
         # Imin = sv0 * (Imax-Imin0-1) / 100 + Imin0
         DeltOne  = max(1.0,Range[1][1]-max(0.0,Range[0][0])-1) # Imax-Imin0-1
         sv0 = min(100,max(0,int(0.5+100.*(Range[1][0]-Range[0][0])/DeltOne)))
-        minVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,Range[1],0,
+        minVal = G2G.ValidatedTxtCtrl(G2frame.dataWindow,Range[1],0,xmin=-100,
             xmax=Range[0][1],typeHint=int,OnLeave=OnNewVal)
         slideSizer.Add(minVal,0,WACV)
         minSel = G2G.G2Slider(parent=G2frame.dataWindow,style=wx.SL_HORIZONTAL,value=sv0)
