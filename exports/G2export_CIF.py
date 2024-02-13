@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-09-13 12:07:36 -0500 (Wed, 13 Sep 2023) $
+# $Date: 2024-02-05 15:49:09 -0600 (Mon, 05 Feb 2024) $
 # $Author: toby $
-# $Revision: 5659 $
+# $Revision: 5722 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/exports/G2export_CIF.py $
-# $Id: G2export_CIF.py 5659 2023-09-13 17:07:36Z toby $
+# $Id: G2export_CIF.py 5722 2024-02-05 21:49:09Z toby $
 ########### SVN repository information ###################
 '''Classes in :mod:`G2export_CIF` follow:
 '''
@@ -40,7 +40,7 @@ except ImportError:
     wx = Placeholder()
     wxscroll = Placeholder()
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5659 $")
+GSASIIpath.SetVersionNumber("$Revision: 5722 $")
 import GSASIIIO as G2IO
 try:
     import GSASIIctrlGUI as G2G
@@ -4587,6 +4587,8 @@ class ExportCIF(G2IO.ExportBaseclass):
 class ExportProjectCIF(ExportCIF):
     '''Used to create a CIF of an entire project
 
+    also called directly in :func:`GSASIIIO.ExportSequentialFullCIF`
+
     :param wx.Frame G2frame: reference to main GSAS-II frame
     '''
     def __init__(self,G2frame):
@@ -4611,6 +4613,8 @@ class ExportPhaseCIF(ExportCIF):
     '''Used to create a simple CIF with one phase. Uses exact same code as
     :class:`ExportCIF` except that `phaseOnly` is set for the Exporter
     Shows up in menu as Quick CIF.
+
+    also called directly in OnISOSearch in GSASIIphsGUI
 
     :param wx.Frame G2frame: reference to main GSAS-II frame
     '''

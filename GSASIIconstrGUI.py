@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIconstrGUI - constraint GUI routines
 ########### SVN repository information ###################
-# $Date: 2023-10-12 12:58:52 -0500 (Thu, 12 Oct 2023) $
+# $Date: 2024-02-07 14:07:07 -0600 (Wed, 07 Feb 2024) $
 # $Author: toby $
-# $Revision: 5673 $
+# $Revision: 5723 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIconstrGUI.py $
-# $Id: GSASIIconstrGUI.py 5673 2023-10-12 17:58:52Z toby $
+# $Id: GSASIIconstrGUI.py 5723 2024-02-07 20:07:07Z toby $
 ########### SVN repository information ###################
 '''
 Constraints and rigid bodies GUI routines follow.
@@ -25,7 +25,7 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as nl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5673 $")
+GSASIIpath.SetVersionNumber("$Revision: 5723 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 import GSASIIstrIO as G2stIO
@@ -1427,7 +1427,7 @@ def UpdateConstraints(G2frame, data, selectTab=None, Clear=False):
             btn.Enable(len(errmsg) > 0)
             btn = wx.Button(panel, wx.ID_ANY, 'Show Warnings')
             butSizer.Add(btn,0,wx.ALIGN_CENTER_VERTICAL)
-            btn.Bind(wx.EVT_BUTTON,lambda event: G2G.ShowScrolledInfo(panel,warnmsg))
+            btn.Bind(wx.EVT_BUTTON,lambda event: G2G.ShowScrolledInfo(panel,warnmsg.replace('&','&&')))
             btn.Enable(len(warnmsg) > 0)
             btn = wx.Button(panel, wx.ID_ANY, 'Show generated constraints')
             butSizer.Add(btn,0,wx.ALIGN_CENTER_VERTICAL)

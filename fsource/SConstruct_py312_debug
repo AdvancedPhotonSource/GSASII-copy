@@ -60,27 +60,20 @@ def GetBinaryDir():
 def find(name, path):
     '~unix find command; returns first file found'
     for root, dirs, files in os.walk(path):
-        if sys.platform == "win32" or sys.platform == "darwin":
-            if name.lower() in [i.lower() for i in files]:
-                return os.path.join(root, name)
-        else:
-            if name in files:
-                return os.path.join(root, name)
+        if name in files:
+            return os.path.join(root, name)
 def findInPython(name):
     'find a file in the current Python directory'
     base = os.path.split(sys.executable)[0]
     if not sys.platform == "win32":
         base = os.path.split(base)[0]
-    n = find(name,base)
-    if not n: raise Exception(f'{name} not found')
-    print(f'{name} found as {n}')
-    return n
+    return find(name,base)
 #==========================================================================================
 # misc initializations
 # need command-line options for fortran command and fortran options
 F2PYflags = '' # compiler options for f2py command
-if 'arm' in platform.machine() and sys.platform == "darwin":
-    F2PYflags = '-I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.1.sdk/usr/include' # compiler options for f2py command
+#if 'arm' in platform.machine() and sys.platform == "darwin":
+#    F2PYflags = '-I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include' # compiler options for f2py command
 F2PYpath = ARGUMENTS.get('F2PYpath', '')
 # find a default f2py relative to the scons location. Should be in the same place as f2py
 spath = os.path.normpath(os.path.split(sys.executable)[0])
@@ -152,12 +145,13 @@ if sys.platform == "win32":
       sys.exit()
 elif sys.platform == "darwin":
     if 'arm' in platform.machine():
-        LDFLAGS = '-undefined dynamic_lookup -bundle -rpath ./ -mmacosx-version-min=11.1'
+        pass
+        #LDFLAGS = '-undefined dynamic_lookup -bundle' #  -rpath ./ ' # -mmacosx-version-min=11.1'
         # I am not sure I completely understand the -rpath & -mmacosx-version-min options,
         # but thet seem to work; this probably needs to be tested more
     else:
         LDFLAGS = '-undefined dynamic_lookup -bundle'
-    SDKROOT = os.environ.get('SDKROOT','')
+#    SDKROOT = os.environ.get('SDKROOT','')
     F2PYsuffix = '.so'
 elif sys.platform.startswith("linux"):
     #LDFLAGS = '-Wall -shared -static-libgfortran -static-libgcc' # does not work with gfortran 4.4.4 20100726 (Red Hat 4.4.4-13)
@@ -315,8 +309,7 @@ try:
     pythonInc = os.path.split(findInPython('Python.h'))[0]
     numpyInc = os.path.split( os.path.split(findInPython('ndarraytypes.h'))[0] )[0]
     if sys.platform == "win32":
-        ver = str(sys.version_info.major)+str(sys.version_info.minor)
-        pythonLib = findInPython(f'python{ver}.lib')
+        pythonLib = findInPython('python310.lib')
         if C_only: print('locations:\n',pythonLib,'\n',numpyInc)
     if sys.platform == "win32" and C_only: print(pythonLib)
 except TypeError:

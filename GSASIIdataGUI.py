@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIdataGUI - Main GUI routines
 #========== SVN repository information ###################
-# $Date: 2024-01-11 15:04:45 -0600 (Thu, 11 Jan 2024) $
+# $Date: 2024-02-08 19:12:23 -0600 (Thu, 08 Feb 2024) $
 # $Author: toby $
-# $Revision: 5712 $
+# $Revision: 5727 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIdataGUI.py $
-# $Id: GSASIIdataGUI.py 5712 2024-01-11 21:04:45Z toby $
+# $Id: GSASIIdataGUI.py 5727 2024-02-09 01:12:23Z toby $
 #=========- SVN repository information ###################
 '''
 Routines for main GUI wx.Frame follow. 
@@ -58,7 +58,7 @@ try:
 except ImportError:
     pass
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5712 $")
+GSASIIpath.SetVersionNumber("$Revision: 5727 $")
 import GSASIImath as G2mth
 import GSASIIIO as G2IO
 import GSASIIfiles as G2fil
@@ -409,7 +409,7 @@ versionDict['badVersionWarn'] = {'numpy':['1.16.0'],
 'versions of modules that are known to have bugs'
 versionDict['tooNewWarn'] = {} 
 'module versions newer than what we have tested & where problems are suspected'
-versionDict['tooNewUntested'] = {'Python':'3.11','wx': '4.2.1'}  # still catching up to wx4.2.0
+versionDict['tooNewUntested'] = {'Python':'3.12','wx': '4.2.2'}  
 'module versions newer than what we have tested but no problems are suspected'
 
 def ShowVersions():
@@ -4299,9 +4299,10 @@ class GSASII(wx.Frame):
             dlg.Destroy()
         if DelList:
             SelectDataTreeItem(self,selItem)
-            self.GPXtree.UpdateSelection()
-            # self.GPXtree.SelectItem(self.root)
-            # self.GPXtree.SelectItem(selItem)
+            try: # fails if previously selected item is deleted
+                self.GPXtree.UpdateSelection()
+            except:            
+                self.GPXtree.SelectItem(self.root)
                 
     def OnPlotDelete(self,event):
         '''Delete one or more plots from plot window. Called by the
@@ -6977,7 +6978,9 @@ class G2DataWindow(wx.ScrolledWindow):      #wxscroll.ScrolledPanel):
         self.GeneralCalc.Append(G2G.wxID_USEBILBAOMAG,'Select magnetic/subgroup phase','If disabled, make in PWDR/Unit Cells')
         self.GeneralCalc.Append(G2G.wxID_USEBILBAOSUB,'Make subgroup project file(s)','Requires subcell search in PWDR/Unit Cells')
         G2G.Define_wxId('wxID_SUPERSRCH')
-        self.GeneralCalc.Append(G2G.wxID_SUPERSRCH,'Supergroup search','Search for settings of this phase in higher symmetry')
+        self.GeneralCalc.Append(G2G.wxID_SUPERSRCH,'Bilbao Supergroup search','Search for settings of this phase in higher symmetry')
+        G2G.Define_wxId('wxID_ISOSRCH')
+        self.GeneralCalc.Append(G2G.wxID_ISOSRCH,'ISOCIF Supergroup search','Search for settings of this phase in higher symmetry')
         self.GeneralCalc.Append(G2G.wxID_VALIDPROTEIN,'Protein quality','Protein quality analysis')
         self.PostfillDataMenu()
         

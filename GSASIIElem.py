@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # Copyright: 2008, Robert B. Von Dreele & Brian H. Toby (Argonne National Laboratory)
 ########### SVN repository information ###################
-# $Date: 2023-12-31 17:38:59 -0600 (Sun, 31 Dec 2023) $
+# $Date: 2024-02-12 09:29:26 -0600 (Mon, 12 Feb 2024) $
 # $Author: vondreele $
-# $Revision: 5710 $
+# $Revision: 5728 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIElem.py $
-# $Id: GSASIIElem.py 5710 2023-12-31 23:38:59Z vondreele $
+# $Id: GSASIIElem.py 5728 2024-02-12 15:29:26Z vondreele $
 ########### SVN repository information ###################
 """
 Routines used to define element settings follow. 
@@ -15,13 +15,15 @@ import math
 import sys
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5710 $")
+GSASIIpath.SetVersionNumber("$Revision: 5728 $")
 import copy
 import numpy as np
 import atmdata
 import GSASIImath as G2mth
 import ElementTable as ET
 import GSASIIElem as G2elem
+nxs = np.newaxis
+Bohr = 0.529177
 
 
 getElSym = lambda sym: sym.split('+')[0].split('-')[0].capitalize()
@@ -470,7 +472,36 @@ def MagScatFac(El, SQ):
 
 #def SlaterFF(El,SQ,k,N):
     
+def scaleCoef(terms):
+    ''' rescale J2K6 form factor coeff - now correct?
+    '''
+    terms = copy.deepcopy(terms)
+    for term in terms:
+        z2 = 2.*term[1]/Bohr
+        k = 2*term[2]+1
+        term[0] *= np.sqrt((z2**k)/math.factorial(k-1))
+    return terms
 
+def J2Kff(sq,terms):
+    
+    def Transo(nn,z,s):
+        d = s**2+z**2
+        a = np.zeros((12,len(list(s))))
+        a[1,:] = 1./d
+        tz = 2.0*z
+        for nx in list(range(nn-1)):
+            a[nx+2,:] = (tz*(nx+1)*a[nx+1,:]-(nx+2)*(nx)*a[nx,:])/d[nxs,:]
+        return a[nn]
+    
+    fjc = np.zeros_like(sq)
+    for term1 in terms:
+        for term2 in terms:
+            zz = (term1[1]+term2[1])/Bohr
+            nn = term1[2]+term2[2]
+            ff = term1[0]*term2[0]*Transo(nn,zz,sq)
+            fjc += ff
+    return fjc
+    
 def ClosedFormFF(Z,SQ,k,N):
     """Closed form expressions for FT Slater fxns. IT B Table 1.2.7.4
     (not used at present - doesn't make sense yet)
@@ -714,8 +745,12 @@ mapDefault = {'MapType':'','RefList':'','GridStep':0.25,'Show bonds':True,
                 'rho':[],'rhoMax':0.,'mapSize':10.0,'cutOff':50.,'Flip':False}
 
 def SetupGeneral(data, dirname):
-    '''Initialize the General sections of the Phase tree contents
-    Called by SetupGeneral in GSASIIphsGUI and in GSASIIscriptable.SetupGeneral
+    '''Initialize the General sections of the Phase tree contents. Should
+    be done after changes to the Atoms array.
+
+    Called by routine SetupGeneral (in :func:`GSASIIphsGUI.UpdatePhaseData`), 
+    :func:`GSASIIphsGUI.makeIsoNewPhase`, :func:`SUBGROUPS.saveNewPhase`,
+    and in :func:`GSASIIscriptable.SetupGeneral`.
     '''
     generalData = data['General']
     atomData = data['Atoms']

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIImath - major mathematics routines
 ########### SVN repository information ###################
-# $Date: 2023-10-20 15:25:51 -0500 (Fri, 20 Oct 2023) $
-# $Author: vondreele $
-# $Revision: 5683 $
+# $Date: 2024-02-05 15:49:09 -0600 (Mon, 05 Feb 2024) $
+# $Author: toby $
+# $Revision: 5722 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIImath.py $
-# $Id: GSASIImath.py 5683 2023-10-20 20:25:51Z vondreele $
+# $Id: GSASIImath.py 5722 2024-02-05 21:49:09Z toby $
 ########### SVN repository information ###################
 '''
 Routines defined in :mod:`GSASIImath` follow.
@@ -20,7 +20,7 @@ import time
 import math
 import copy
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5683 $")
+GSASIIpath.SetVersionNumber("$Revision: 5722 $")
 import GSASIIElem as G2el
 import GSASIIlattice as G2lat
 import GSASIIspc as G2spc
@@ -1545,6 +1545,36 @@ def getDensity(generalData):
     density = mass/(0.6022137*Volume)
     return density,Volume/mass
     
+def phaseContents(phase):
+    '''Compute the unit cell and asymmetric unit contents for a phase.
+
+    This has been tested only on type='nuclear' phases and 
+    might need adaptation for phases of other types, if the 
+    phase type does not have an occupancy defined. 
+
+    :param dict phase: the dict for a phase, as found in the 
+      data tree 
+    :returns: acomp,ccomp where acomp is the asymmetric unit contents and 
+      ccomp is the contents of the unit cell
+    '''
+    generalData = phase['General']
+    cx,ct,cs,cia = generalData['AtomPtrs']
+    ccomp = {} # contents of cell
+    acomp = {} # contents of asymmetric unit
+    for atom in phase['Atoms']:
+        if atom[ct] not in ccomp:
+            ccomp[atom[ct]] = 0        
+            acomp[atom[ct]] = 0        
+        ccomp[atom[ct]] += atom[cs+1]*atom[cx+3]
+        acomp[atom[ct]] += atom[cx+3]
+    return acomp,ccomp
+
+def fmtPhaseContents(compdict):
+    '''Format results from :func:`phaseContents`
+    '''
+    n = ', '.join([f'{i}({compdict[i]})' for i in sorted(compdict)])
+    return f"contents: {n}"
+
 def getWave(Parms):
     '''returns wavelength from Instrument parameters dictionary
     
@@ -6060,7 +6090,7 @@ def make2Quat(A,B):
         Q[1:] = V1*S
         D *= 2.
     return Q,D
-    
+
 def annealtests():
     from numpy import cos
     # minimum expected at ~-0.195
