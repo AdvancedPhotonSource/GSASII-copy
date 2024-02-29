@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIpath - file location & update routines
 ########### SVN repository information ###################
-# $Date: 2023-12-09 09:55:33 -0600 (Sat, 09 Dec 2023) $
+# $Date: 2024-02-29 08:50:59 -0600 (Thu, 29 Feb 2024) $
 # $Author: toby $
-# $Revision: 5705 $
+# $Revision: 5741 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpath.py $
-# $Id: GSASIIpath.py 5705 2023-12-09 15:55:33Z toby $
+# $Id: GSASIIpath.py 5741 2024-02-29 14:50:59Z toby $
 ########### SVN repository information ###################
 '''
 :mod:`GSASIIpath` Classes & routines follow
@@ -17,12 +17,29 @@ import sys
 import platform
 import glob
 import subprocess
+import datetime as dt
 try:
     import numpy as np
 except ImportError:
     print("skipping numpy in GSASIIpath")
-g2home = 'https://subversion.xray.aps.anl.gov/pyGSAS'
-'Define the location of the GSAS-II subversion repository'
+try:
+    import requests
+    try:
+        import git
+    except ImportError as msg:
+        if 'Failed to initialize' in msg.msg:
+            print('The gitpython package is unable to locate a git installation.')
+            print('See https://gsas-ii.readthedocs.io/en/latest/packages.html for more information.')
+        elif 'No module' in msg.msg:
+            print('Python gitpython module not installed')
+        else:
+            print(f'gitpython failed to import, but why? Error:\n{msg}')
+    except Exception as msg:
+        print(f'git import failed with unexpected error:\n{msg}')
+except:
+    print('Python requests package not installed (required for GSAS-II\n'+
+          'to install/update from git)')
+
     
 path2GSAS2 = os.path.dirname(os.path.abspath(os.path.expanduser(__file__))) # location of this file; save before any changes in pwd
 
@@ -80,12 +97,12 @@ def addPrevGPX(fil,configDict):
 # routines for looking a version numbers in files
 version = -1
 def SetVersionNumber(RevString):
-    '''Set the subversion version number
+    '''Set the subversion (svn) version number
 
-    :param str RevString: something like "$Revision: 5705 $"
+    :param str RevString: something like "$Revision: 5741 $"
       that is set by subversion when the file is retrieved from subversion.
 
-    Place ``GSASIIpath.SetVersionNumber("$Revision: 5705 $")`` in every python
+    Place ``GSASIIpath.SetVersionNumber("$Revision: 5741 $")`` in every python
     file.
     '''
     try:
@@ -95,14 +112,6 @@ def SetVersionNumber(RevString):
     except:
         pass
         
-def GetVersionNumber():
-    '''Return the maximum version number seen in :func:`SetVersionNumber`
-    '''
-    if version > 1000:
-        return version
-    else:
-        return "unknown"
-
 def LoadConfigFile(filename):
     '''Read a GSAS-II configuration file.
     Comments (starting with "%") are removed, as are empty lines
@@ -129,12 +138,638 @@ def LoadConfigFile(filename):
             fp.close()
     return info
 
+def GetBinaryPrefix(pyver=None):
+    '''Creates the first part of the binary directory name
+    such as linux_64_p3.9 (where the full name will be 
+    linux_64_p3.9_n1.21). 
 
+    Note that any change made here is also needed in GetBinaryDir in 
+    fsource/SConstruct
+    '''
+    if sys.platform == "win32":
+        prefix = 'win'
+    elif sys.platform == "darwin":
+        prefix = 'mac'
+    elif sys.platform.startswith("linux"):
+        prefix = 'linux'
+    else:
+        print(u'Unknown platform: '+sys.platform)
+        raise Exception('Unknown platform')
+    if 'arm' in platform.machine() and sys.platform == "darwin":
+        bits = 'arm'
+    elif 'aarch' in platform.machine() and '64' in platform.architecture()[0]:
+        bits = 'arm64'
+    elif 'arm' in platform.machine():
+        bits = 'arm32'
+    elif '64' in platform.architecture()[0]:
+        bits = '64'
+    else:
+        bits = '32'
+
+    # format current python version
+    if pyver:
+        pyver = 'p'+pyver
+    else:
+        pyver = 'p{}.{}'.format(*sys.version_info[0:2])
+
+    return '_'.join([prefix,bits,pyver])
+
+#==============================================================================
+#==============================================================================
+# hybrid routines that use git & svn (to be revised to remove svn someday)
+def HowIsG2Installed():
+    '''Determines if GSAS-II was installed with git, svn or none of the above
+
+    :returns: 'github' if installed from the GSAS-II GitHub repository (defined in g2URL),
+      or 'git' if installed from git, but not the GSAS-II repository, 
+      or 'svn' is installed from an svn repository (assumed as defined in g2home)
+      or 'noVCS' if installed without a connection to a version control system
+    '''
+    try:
+        g2repo = git.Repo(path2GSAS2)
+        if g2URL in g2repo.remote().urls:
+            return 'github'
+        return 'git'
+    except:
+        pass
+    if svnGetRev(): return 'svn'
+    return 'noVCS'
+        
+def GetVersionNumber():
+    '''Obtain a version number for GSAS-II from git, svn or from the 
+    files themselves, if no other choice. 
+
+    This routine was used to get the GSAS-II version from strings 
+    placed in files by svn with the version number being the latest 
+    number found, gathered by :func:`SetVersionNumber` (not 100% accurate
+    as the latest version might have files changed that are not tagged
+    by svn or with a call to SetVersionNumber. Post-svn this info
+    will not be reliable, and this mechanism is replaced by a something
+    created with a git hook, file git_verinfo.py (see the git_filters.py file).
+
+    Before resorting to the approaches above, try to ask git or svn 
+    directly.
+
+    :returns: an int value usually, but a value of 'unknown' might occur 
+    '''
+    if HowIsG2Installed().startswith('git'):
+        g2repo = git.Repo(path2GSAS2)
+        for h in list(g2repo.iter_commits('head'))[:50]: # (don't go too far back)
+            tags = g2repo.git.tag('--points-at',h).split('\n')
+            try:
+                for item in tags:
+                    if item.isnumeric(): return int(item)
+            except:
+                pass
+        
+    elif HowIsG2Installed() == 'svn':
+        rev = svnGetRev()
+        if rev is not None: return rev
+
+    # No luck asking, look up version information from git_verinfo.py
+    try:
+        import git_verinfo as gv
+        try:
+            for item in gv.git_tags:
+                if item.isnumeric(): return int(item)
+        except:
+            pass
+        try:
+            for item in gv.git_prevtags:
+                if item.isnumeric(): return int(item)
+        except:
+            pass
+    except:
+        pass
+        
+    # all else failed, use the SetVersionNumber value
+    if version > 5000:  # a small number must be wrong
+        return version
+    else:
+        return "unknown"
+    
+def getG2VersionInfo():
+    if HowIsG2Installed().startswith('git'):
+        g2repo = git.Repo(path2GSAS2)
+        commit = g2repo.head.commit
+        ctim = commit.committed_datetime.strftime('%d-%b-%Y %H:%M')
+        now = dt.datetime.now().replace(
+            tzinfo=commit.committed_datetime.tzinfo)
+        delta = now - commit.committed_datetime
+        age = delta.total_seconds()/(60*60*24.)
+        tags = g2repo.git.tag('--points-at',commit).split('\n')
+        tags = [i for i in tags if i.isnumeric()]
+        gversion = "of "
+        if len(tags) >= 1:
+            gversion = f"#{tags[0]} "
+        msg = ''
+        if g2repo.head.is_detached:
+            msg = ("\n" +
+            "**** You have reverted to a past version of GSAS-II. Please \n"
+            +
+            "contact the developers with what is preferred in this version ****"
+                    )
+        else:
+            rc,lc,_ = gitCheckForUpdates(False,g2repo)
+            if rc is None:
+                msg = "\nOn locally defined branch?"
+            elif age > 60 and len(rc) > 0:
+                msg = f"\n**** This version is really old. Please update. >= {len(rc)} updates have been posted ****"
+            elif age > 5 and len(rc) > 0:
+                msg = f"\n**** Please consider updating. >= {len(rc)} updates have been posted"
+            elif len(rc) > 0:
+                msg = f"\nThis GSAS-II version is ~{len(rc)} updates behind current."
+        return f"GSAS-II version {gversion} {ctim} ({age:.1f} days old). Git: {commit.hexsha[:6]}{msg}"
+    elif HowIsG2Installed() == 'svn':
+        rev = svnGetRev()
+        if rev is None: 
+            "no SVN"
+        else:
+            rev = f"SVN version {rev}"
+
+        # patch 11/2020: warn if GSASII path has not been updated past v4576.
+        # For unknown reasons on Mac with gsas2full, there have been checksum
+        # errors in the .so files that prevented svn from completing updates.
+        # If GSASIIpath.svnChecksumPatch is not present, then the fix for that
+        # has not been retrieved, so warn. Keep for a year or so. 
+        try:
+            svnChecksumPatch
+        except:
+            print('Warning GSAS-II incompletely updated. Please contact toby@anl.gov')
+        # end patch
+            
+        return f"Latest GSAS-II revision: {GetVersionNumber()} (svn {rev})"
+    else:
+        try:
+            import git_verinfo as gv
+            if gv.git_tags:
+                msg = f"{' '.join(gv.git_tags)}, Git: {gv.git_version[:6]}"
+            else:
+                msg = (f"{gv.git_version[:6]}; "+
+                       f"Prev ver: {' '.join(gv.git_prevtags)}"+
+                       f", {gv.git_prevtaggedversion[:6]}")
+            return f"GSAS-II version: {msg} (Manual update)"
+        except:
+            pass
+    # all else fails, use the old version number routine
+    return f"GSAS-II installed manually, last revision: {GetVersionNumber()}"
+
+#==============================================================================
+#==============================================================================
+# routines to interface with git
+#g2URL = "https://github.com/AdvancedPhotonSource/GSASII-copy.git"
+g2URL = "https://github.com/GSASII/codetest.git"
+G2binURL = "https://api.github.com/repos/GSASII/binarytest"
+
+BASE_HEADER = {'Accept': 'application/vnd.github+json',
+               'X-GitHub-Api-Version': '2022-11-28'}
+def gitLookup(repo_path,gittag=None,githash=None):
+    '''Return information on a particular checked-in version
+    of GSAS-II. 
+
+    :param str repo_path: location where GSAS-II has been installed
+    :param str gittag: a tag value. 
+    :param str githash: hex hash code (abbreviated to as few characters as 
+       needed to keep it unique). If None (default), a tag must be supplied.
+    :returns: either None if the tag/hash is not found or a tuple with 
+       four values (hash, tag-list, message,date_time) where 
+
+        * hash (str) is the git checking hash code; 
+        * tag-list is a list of tags (typically there will 
+          be one or two); 
+        * message is the check-in message (str)
+        * date_time is the check-in date as a datetime object
+    '''
+    g2repo = git.Repo(repo_path)
+    if gittag is not None and githash is not None:
+        raise ValueError("Cannot specify a hash and a tag")
+    if gittag is not None:
+        try:
+            commit = g2repo.tag(gittag).commit
+        except ValueError:
+            return None
+    elif githash is not None:
+        try:
+            commit = g2repo.commit(githash)
+        except git.BadName:
+            return None
+    else:
+        raise ValueError("Must specify either a hash or a tag")
+    tags = [i.name for i in g2repo.tags if i.commit == commit]
+    return (commit.hexsha, tags, commit.message,commit.committed_datetime)
+    
+def gitHash2Tags(githash=None,g2repo=None):
+    '''Find tags associated with a particular git commit. 
+    Note that if `githash` cannot be located because it does not 
+    exist or is not unique, a `git.BadName` exception is raised. 
+
+    :param str githash: hex hash code (abbreviated to as few characters as 
+       needed to keep it unique). If None (default), the HEAD is used.
+    :param str g2repo: git.Rwpo connecton to GSAS-II installation. If 
+       None (default) it will be opened. 
+    :returns: a list of tags (each a string)
+    '''
+    if g2repo is None:
+        g2repo = git.Repo(path2GSAS2)
+    if githash is None:
+        commit = g2repo.head.object
+    else:
+        commit = g2repo.commit(githash)
+    #return [i.name for i in g2repo.tags if i.commit == commit] # slow with a big repo
+    return g2repo.git.tag('--points-at',commit).split('\n')
+    
+def gitTag2Hash(gittag,g2repo=None):
+    '''Provides the hash number for a git tag.
+    Note that if `gittag` cannot be located because it does not 
+    exist or is too old and is beyond the `depth` of the local 
+    repository, a `ValueError` exception is raised. 
+
+    :param str repo_path: location where GSAS-II has been installed.
+    :param str gittag: a tag value.
+    :param str g2repo: git.Rwpo connecton to GSAS-II installation. If 
+       None (default) it will be opened. 
+    :returns: a str value with the hex hash for the commit.
+    '''
+    if g2repo is None:
+        g2repo = git.Repo(path2GSAS2)
+    return g2repo.tag(gittag).commit.hexsha
+
+def gitTestGSASII(verbose=True,g2repo=None):
+    '''Test a the status of a GSAS-II installation
+
+    :param bool verbose: if True (default), status messages are printed
+    :param str g2repo: git.Rwpo connecton to GSAS-II installation. If 
+       None (default) it will be opened. 
+    :returns: istat, with the status of the repository, with one of the 
+      following values:
+
+       * -1: path is not found
+       * -2: no git repository at path
+       * -3: unable to access repository
+
+       * value&1==1: repository has local changes (uncommitted/stashed)
+       * value&2==2: repository has been regressed (detached head)
+       * value&4==4: repository has staged files
+       * value&8==8: repository has has been switched to non-master branch
+
+       * value==0:   no problems noted
+    '''
+    if g2repo is None:
+        if not os.path.exists(path2GSAS2): 
+            if verbose: print(f'Warning: Directory {path2GSAS2} not found')
+            return -1
+        if not os.path.exists(os.path.join(path2GSAS2,'.git')): 
+            if verbose: print(f'Warning: Repository {path2GSAS2} not found')
+            return -2
+        try:
+            g2repo = git.Repo(path2GSAS2)
+        except Exception as msg:
+            if verbose: print(f'Warning: Failed to open repository. Error: {msg}')
+            return -3
+    code = 0
+    if g2repo.is_dirty():                     # has changed files
+        code += 1
+        count_modified_files = len(g2repo.index.diff(None))
+    if g2repo.head.is_detached:
+        code += 2                             # detached
+    else:
+        if g2repo.active_branch.name != 'master':
+            code += 8                         # not on master branch
+    if g2repo.index.diff("HEAD"): code += 4   # staged
+
+    # test if there are local changes committed
+    return code
+
+def gitCheckForUpdates(fetch=True,g2repo=None):
+    '''Provides a list of the commits made locally and those in the 
+    local copy of the repo that have not been applied. Does not 
+    provide useful information in the case of a detached Head (see 
+    :func:`countDetachedCommits` for that.)
+
+    :param bool fetch: if True (default), updates are copied over from
+      the remote repository (git fetch), before checking for changes.
+    :param str g2repo: git.Rwpo connecton to GSAS-II installation. If 
+       None (default) it will be opened. 
+    :returns: a list containing (remotecommits, localcommits, fetched) where 
+
+       * remotecommits is a list of hex hash numbers of remote commits and 
+       * localcommits is a list of hex hash numbers of local commits and
+       * fetched is a bool that will be True if the update (fetch)
+         step ran successfully
+
+       Note that if the head is detached (GSAS-II has been reverted to an 
+       older version) or the branch has been changed, the values for each 
+       of the three items above will be None.
+    '''
+    fetched = False
+    if g2repo is None:
+        g2repo = git.Repo(path2GSAS2)
+    if g2repo.head.is_detached:
+        return (None,None,None)
+    if fetch:
+        try:
+            g2repo.remote().fetch()
+            fetched = True
+        except git.GitCommandError as msg:
+            print(f'Failed to get updates from {g2repo.remote().url}')
+    try:
+        head = g2repo.head.ref
+        tracking = head.tracking_branch()
+        localcommits = [i.hexsha for i in head.commit.iter_items(g2repo, f'{tracking.path}..{head.path}')]
+        remotecommits = [i.hexsha for i in head.commit.iter_items(g2repo, f'{head.path}..{tracking.path}')]
+        return remotecommits,localcommits,fetched
+    except:
+        return (None,None,None)
+    
+def countDetachedCommits(g2repo=None):
+    '''Count the number of commits that have been made since
+    a commit that is containined in the master branch
+
+    returns the count and the commit object for the 
+    parent commit that connects the current stranded
+    branch to the master branch.
+
+    None is returned if no connection is found
+    '''
+    if g2repo is None:
+        g2repo = git.Repo(path2GSAS2)
+    if not g2repo.head.is_detached:
+        return 0,g2repo.commit()
+    # is detached head in master branch?
+    if g2repo.commit() in g2repo.iter_commits('master'):
+        return 0,g2repo.commit()
+    # count number of commits since leaving master branch
+    masterList = list(g2repo.iter_commits('master'))
+    for c,i in enumerate(g2repo.commit().iter_parents()):
+        if i in masterList:
+            return c+1,i
+    else:
+        return None,None
+
+def gitCountRegressions(g2repo=None):
+    '''Count the number of new check ins on the master branch since
+    the head was detached as well as any checkins made on the detached
+    head. 
+
+    :returns: mastercount,detachedcount, where 
+
+      * mastercount is the number of check ins made on the master branch 
+        remote repository since the reverted check in was first made. 
+      * detachedcount is the number of check ins made locally 
+        starting from the detached head (hopefully 0)
+
+      If the connection between the current head and the master branch 
+      cannot be established, None is returned for both.
+      If the connection from the reverted check in to the newest version
+      (I don't see how this could happen) then only mastercount will be None.
+    '''
+    if g2repo is None:
+        g2repo = git.Repo(path2GSAS2)
+    # get parent of current head that is in master branch
+    detachedcount,parent = countDetachedCommits(g2repo)
+    if detachedcount is None: return None,None
+    mastercount = 0
+    for h in g2repo.iter_commits('master'):
+        if h == parent:
+            return mastercount,detachedcount
+        mastercount += 1
+    return None,detachedcount
+
+def gitGetUpdate(mode='Background'):
+    '''Download the latest updates into the local copy of the GSAS-II 
+    repository from the remote master, but don't actually update the 
+    GSAS-II files being used. This can be done immediately or in background. 
+
+    In 'Background' mode, a background process is launched. The results 
+    from the process are recorded in file in ~/GSASII_bkgUpdate.log 
+    (located in %HOME% on Windows). A pointer to the created process is 
+    returned.
+
+    In 'immediate' mode, the update is performed immediately. The 
+    function does not return until after the update is downloaded.
+
+    :returns: In 'Background' mode, returns a Popen object (see subprocess). 
+      In 'immediate' mode nothing is returned.
+    '''
+    if mode == 'Background':
+        return subprocess.Popen([sys.executable, __file__, '--git-fetch'])
+    else:
+        g2repo = git.Repo(path2GSAS2)
+        g2repo.remote().fetch()
+        if GetConfigValue('debug'): print(f'Updates fetched')
+
+def gitHistory(values='tag',g2repo=None,maxdepth=100):
+    '''Provides the history of commits to the master, either as tags 
+    or hash values
+
+    :param str values: specifies what type of values are returned. 
+      If values=='hash', then hash values or for values=='tag', a 
+      list of list of tag(s). 
+    :param str g2repo: git.Rwpo connecton to GSAS-II installation. If 
+       None (default) it will be opened. 
+    :returns: a list of str values where each value is a hash for 
+      a commit (values=='hash'), 
+      for values=='tag', a list of lists, where a list of tags is provided
+      for each commit. When tags are provided, for any commit that does 
+      not have any associated tag(s), that entry is omitted from the list.
+      for values=='both', a list of lists, where a hash is followed by a 
+      list of tags (if any) is provided
+    '''
+    if g2repo is None:
+        g2repo = git.Repo(path2GSAS2)
+    history = list(g2repo.iter_commits('master'))
+    if values.lower().startswith('h'):
+        return [i.hexsha for i in history]
+    elif values.lower().startswith('t'):
+        tagmap = {} # generate lookup table for to get tags
+        for t in g2repo.tags:
+            tagmap.setdefault(t.commit.hexsha, []).append(t.name)
+        return [tagmap[i.hexsha] for i in history if i.hexsha in tagmap]
+    elif values.lower().startswith('b'):
+        # slow with history >thousands
+        # tagmap = {} # generate lookup table for to get tags
+        # for t in g2repo.tags:
+        #     tagmap.setdefault(t.commit.hexsha, []).append(t.name)
+        # return [[i.hexsha]+tagmap.get(i.hexsha,[]) for i in history]
+        
+        # potentially faster code
+        r1 = [[i.hexsha]+g2repo.git.tag('--points-at',i).split('\n')
+                    for i in history[:maxdepth]]
+        return [[i[0]] if i[1]=='' else i for i in r1]
+    else:
+        raise ValueError(f'gitHistory has invalid value specified: {value}')
+
+def getGitBinaryReleases():
+    '''Retrieves the binaries and download urls of the latest release
+
+    :returns: a URL dict for GSAS-II binary distributions found in the newest 
+      release in a GitHub repository. The repo location is defined in global 
+      `G2binURL`.
+
+      The dict keys are references to binary distributions, which are named 
+      as f"{platform}_p{pver}_n{npver}" where platform is determined 
+      in :func:`GSASIIpath.GetBinaryPrefix` (linux_64, mac_arm, win_64,...)
+      and where `pver` is the Python version (such as "3.10") and `npver` is 
+      the numpy version (such as "1.26").
+
+      The value associated with each key contains the full URL to 
+      download a tar containing that binary distribution. 
+    '''
+    # Get first page of releases
+    releases = requests.get(
+        url=f"{G2binURL}/releases", 
+        headers=BASE_HEADER
+    ).json()
+    
+    # Get assets of latest release
+    assets = requests.get(
+        url=f"{G2binURL}/releases/{releases[-1]['id']}/assets",
+        headers=BASE_HEADER
+    ).json()
+
+    versions = []
+    URLs = []
+    for asset in assets:
+        if asset['name'].endswith('.tgz'):
+            versions.append(asset['name'][:-4]) # Remove .tgz tail
+            URLs.append(asset['browser_download_url'])
+
+    return dict(zip(versions,URLs))
+
+def getGitBinaryLoc(npver=None,pyver=None,verbose=True):
+    '''Identify the best GSAS-II binary download location from the 
+    distributions in the latest release section of the github repository 
+    on the CPU platform, and Python & numpy versions. The CPU & Python
+    versions must match, but the numpy version may only be close.
+    
+    :param str npver: Version number to use for numpy, if None (default)
+      the version is taken from numpy in the current Python interpreter.
+    :param str pyver: Version number to use for Python, if None (default)
+      the version is taken from the current Python interpreter.
+    :param bool verbose: if True (default), status messages are printed
+    :returns: a URL for the tar file (success) or None (failure)
+    '''    
+    bindir = GetBinaryPrefix(pyver)
+    if npver:
+        inpver = npver
+    else:
+        inpver = intver(np.__version__)
+    # get binaries matching the required install, approximate match for numpy
+    URLdict = getGitBinaryReleases()
+    versions = {}
+    for d in URLdict:
+        if d.startswith(bindir):
+            v = intver(d.rstrip('/').split('_')[3].lstrip('n'))
+            versions[v] = d
+    intVersionsList = sorted(versions.keys())
+    if not intVersionsList:
+        print('No binaries located to match',bindir)
+        return
+    elif inpver < min(intVersionsList):
+        vsel = min(intVersionsList)
+        if verbose: print(
+                f'Warning: The installed numpy, version, {np.__version__},'
+                f' is older than\n\tthe oldest dist version, {fmtver(vsel)}')
+    elif inpver >= max(intVersionsList):
+        vsel = max(intVersionsList)
+        if verbose and inpver == max(intVersionsList):
+            print(
+                f'The current numpy version, {np.__version__},'
+                f' matches the binary dist, version {fmtver(vsel)}')
+        elif verbose:
+            print(
+                f'Note: using a binary dist for numpy version {fmtver(vsel)} '
+                f'which is older than the installed numpy, version {np.__version__}')
+    else:
+        vsel = min(intVersionsList)
+        for v in intVersionsList:
+            if v <= inpver:
+                vsel = v
+            else:
+                if verbose: print(
+                        f'FYI: Selecting dist version {fmtver(v)}'
+                        f' as the installed numpy, version, {np.__version__},'
+                        f'\n\tis older than the next dist version {fmtver(v)}')
+                break
+    return URLdict[versions[vsel]]
+
+def InstallGitBinary(tarURL, instDir, nameByVersion=False, verbose=True):
+    '''Install the GSAS-II binary files into the location
+    specified. 
+    
+    :param str tarURL: a URL for the tar file.
+    :param str instDir: location directory to install files. This directory
+        may not exist and will be created if needed.
+    :param bool nameByVersion: if True, files are put into a subdirectory
+        of `instDir`, named to match the tar file (with plaform, Python & 
+        numpy versions). 
+        Default is False, where the binary files are put directly into 
+        `instDir`.
+    :param bool verbose: if True (default), status messages are printed.
+    :returns: None
+    '''
+    # packages not commonly used so import them here not on startup
+    import requests
+    import tempfile
+    import tarfile
+    # download to scratch
+    tar = tempfile.NamedTemporaryFile(suffix='.tgz',delete=False)
+    try:
+        tar.close()
+        if verbose: print(f'Downloading {tarURL}')
+        r = requests.get(tarURL, allow_redirects=True)
+        open(tar.name, 'wb').write(r.content)
+        # open in tar
+        tarobj = tarfile.open(name=tar.name)
+        if nameByVersion:
+            binnam = os.path.splitext(os.path.split(tarURL)[1])[0]
+            install2dir = os.path.join(instDir,binnam)
+        else:
+            install2dir = instDir
+        for f in tarobj.getmembers(): # loop over files in repository
+            # do a bit of sanity checking for safety. Don't install anything
+            #  unless it goes into in the specified directory
+            if '/' in f.name or '\\' in f.name:
+                print(f'skipping file {f.name} -- path alteration not allowed')
+                continue
+            if f.name != os.path.basename(f.name):
+                print(f'skipping file {f.name} -- how did this happen?')
+                continue
+            newfil = os.path.normpath(os.path.join(install2dir,f.name))
+            tarobj.extract(f, path=install2dir, set_attrs=False)
+            # set file mode and mod/access times (but not ownership)
+            os.chmod(newfil,f.mode)
+            os.utime(newfil,(f.mtime,f.mtime))
+            if verbose: print(f'Created GSAS-II binary file {newfil}')
+    finally:
+        del tarobj
+        os.unlink(tar.name)
+
+def GetRepoUpdatesInBackground():
+    '''Wrapper to make sure that :func:`gitGetUpdate` is called only 
+    if git has been used to install GSAS-II.
+    
+    :returns: returns a Popen object (see subprocess)
+    '''
+    if HowIsG2Installed().startswith('git'):
+        return gitGetUpdate(mode='Background')
+
+def gitStartUpdate(cmdopts):
+    '''Update GSAS-II in a separate process, by running this script with the 
+    options supplied in the call to this function and then exiting GSAS-II. 
+    '''
+    cmd = [sys.executable, __file__] + cmdopts
+    if GetConfigValue('debug'): print('Starting updates with command\n\t'+
+                                      f'{" ".join(cmd)}')
+    subprocess.Popen(cmd)
+    sys.exit()
+    
+#==============================================================================
+#==============================================================================
 # routines to interface with subversion
-proxycmds = []
-'Used to hold proxy information for subversion, set if needed in whichsvn'
-svnLocCache = None
-'Cached location of svn to avoid multiple searches for it'
+g2home = 'https://subversion.xray.aps.anl.gov/pyGSAS' # 'Define the location of the GSAS-II subversion repository'
+proxycmds = [] # 'Used to hold proxy information for subversion, set if needed in whichsvn'
+svnLocCache = None  # 'Cached location of svn to avoid multiple searches for it'
 
 def MakeByte2str(arg):
     '''Convert output from subprocess pipes (bytes) to str (unicode) in Python 3.
@@ -352,7 +987,7 @@ def svnGetLog(fpath=os.path.split(__file__)[0],version=None):
     return d
 
 svnLastError = ''
-def svnGetRev(fpath=os.path.split(__file__)[0],local=True):
+def svnGetRev(fpath=os.path.split(__file__)[0],local=True,verbose=True):
     '''Obtain the version number for the either the last update of the local version
     or contacts the subversion server to get the latest update version (# of Head).
 
@@ -385,11 +1020,10 @@ def svnGetRev(fpath=os.path.split(__file__)[0],local=True):
     s = subprocess.Popen(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     out,err = MakeByte2str(s.communicate())
     if err:
-        print ('svn failed\n%s'%out)
-        print ('err=%s'%err)
-        s = '\nsvn command:  '
-        for i in cmd: s += i + ' '
-        print(s)
+        if verbose:
+            print ('svn failed\n%s'%out)
+            print ('err=%s'%err)
+            print('\nsvn command:',' '.join(cmd))
         global svnLastError
         svnLastError = err
         return None
@@ -774,42 +1408,6 @@ def svnGetFileStatus(fpath=os.path.split(__file__)[0],version=None):
         #print(filename,wc_rev,file_rev,status,local_status,switched)
     return updatecount,modcount,locked
 
-def GetBinaryPrefix(pyver=None):
-    '''Creates the first part of the binary directory name
-    such as linux_64_p3.9 (where the full name will be 
-    linux_64_p3.9_n1.21). 
-
-    Note that any change made here is also needed in GetBinaryDir in 
-    fsource/SConstruct
-    '''
-    if sys.platform == "win32":
-        prefix = 'win'
-    elif sys.platform == "darwin":
-        prefix = 'mac'
-    elif sys.platform.startswith("linux"):
-        prefix = 'linux'
-    else:
-        print(u'Unknown platform: '+sys.platform)
-        raise Exception('Unknown platform')
-    if 'arm' in platform.machine() and sys.platform == "darwin":
-        bits = 'arm'
-    elif 'aarch' in platform.machine() and '64' in platform.architecture()[0]:
-        bits = 'arm64'
-    elif 'arm' in platform.machine():
-        bits = 'arm32'
-    elif '64' in platform.architecture()[0]:
-        bits = '64'
-    else:
-        bits = '32'
-
-    # format current python version
-    if pyver:
-        pyver = 'p'+pyver
-    else:
-        pyver = 'p{}.{}'.format(*sys.version_info[0:2])
-
-    return '_'.join([prefix,bits,pyver])
-
 def svnList(URL,verbose=True):
     '''Get a list of subdirectories from and svn repository
     '''    
@@ -918,7 +1516,61 @@ def svnSwitch2branch(branch=None,loc=None,svnHome=None):
         else:
             svnURL += '/' + branch
     svnSwitchDir('','',svnURL,loadpath=loc)
+#==============================================================================
+#==============================================================================
     
+def runScript(cmds=[], wait=False, G2frame=None):
+    '''run a shell script of commands in an external process
+    
+    :param list cmds: a list of str's, each ietm containing a shell (cmd.exe
+      or bash) command
+    :param bool wait: if True indicates the commands should be run and then 
+      the script should return. If False, then the currently running Python 
+      will exit. Default is False
+    :param wx.Frame G2frame: provides the location of the current .gpx file
+      to be used to restart GSAS-II after running the commands, if wait 
+      is False. Default is None which prevents restarting GSAS-II regardless of
+      the value of wait.
+    '''
+    import tempfile
+    if not cmds:  #debug
+        print('nothing to do in runScript')
+        return
+    if sys.platform != "win32":
+        suffix = '.sh'
+    else:
+        suffix = '.bat'
+        
+    fp = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
+    shellname = fp.name
+    for line in cmds:
+        fp.write(line)
+        fp.write('\n')
+
+    if not wait:
+        if G2frame:
+            projectfile = ''
+            if G2frame.GSASprojectfile:
+                projectfile = os.path.realpath(G2frame.GSASprojectfile)
+            main = os.path.join(path2GSAS2,'GSASII.py')
+            ex = sys.executable
+            if sys.platform == "darwin": # mac requires pythonw which is not always reported as sys.executable
+                if os.path.exists(ex+'w'): ex += 'w'
+            print ('restart using ',' '.join([ex,main,projectfile]))
+            fp.write(' '.join([ex,main,projectfile]))
+            fp.write('\n')
+    fp.close()
+
+    # start the upgrade in a separate interpreter (avoids loading .pyd files)
+    if sys.platform != "win32":
+        proc = subprocess.Popen(['bash',shellname])
+    else:
+        proc = subprocess.Popen([shellname],shell=True)
+    if wait:
+        proc.wait()
+    else:
+        if sys.platform != "win32": proc.wait()
+        sys.exit()
 
 def IPyBreak_base(userMsg=None):
     '''A routine that invokes an IPython session at the calling location
@@ -950,11 +1602,6 @@ def IPyBreak_base(userMsg=None):
     ipshell(msg,stack_depth=2) # Go up one level, to see the calling routine
     sys.excepthook = savehook # reset IPython's change to the exception hook
 
-try:
-    from IPython.core import ultratb
-except:
-    pass
-
 def exceptHook(*args):
     '''A routine to be called when an exception occurs. It prints the traceback
     with fancy formatting and then calls an IPython shell with the environment
@@ -962,6 +1609,10 @@ def exceptHook(*args):
     
     This routine is only used when debug=True is set in config.py    
     '''
+    try:
+        from IPython.core import ultratb
+    except:
+        pass
 
     try: 
         from IPython.terminal.embed import InteractiveShellEmbed
@@ -1001,8 +1652,6 @@ def DoNothing():
     '''
     pass 
 
-IPyBreak = DoNothing
-pdbBreak = DoNothing
 def InvokeDebugOpts():
     'Called in GSASII.py to set up debug options'
     if any('SPYDER' in name for name in os.environ):
@@ -1036,39 +1685,30 @@ def TestSPG(fpth):
         pyspg.sgforpy('P -1')
     except Exception as err:
         print(70*'=')
-        print('Failed to run pyspg in {}\nerror: {}'.format(fpth,err))
+        print(f'Failed to run pyspg in {fpth!r}\nerror: {err}')
         print(70*'=')
         sys.path = savpath
         return False
     sys.path = savpath
     return True
     
-# see if a directory for local modifications is defined. If so, stick that in the path
-if os.path.exists(os.path.expanduser('~/.G2local/')):
-    sys.path.insert(0,os.path.expanduser('~/.G2local/'))
-    fl = glob.glob(os.path.expanduser('~/.G2local/GSASII*.py*'))
-    files = ""
-    prev = None
-    for f in sorted(fl): # make a list of files, dropping .pyc files where a .py exists
-        f = os.path.split(f)[1]
-        if os.path.splitext(f)[0] == prev: continue
-        prev = os.path.splitext(f)[0]
-        if files: files += ", "
-        files += f
-    if files:
-        print("*"*75)
-        print("Warning: the following source files are locally overridden in "+os.path.expanduser('~/.G2local/'))
-        print("  "+files)
-        print("*"*75)
-
-BinaryPathLoaded = False
-binaryPath = ''
-def SetBinaryPath(printInfo=False, loadBinary=True):
+def SetBinaryPath(printInfo=False, loadBinary=False):
     '''
-    Add location of GSAS-II shared libraries (binaries: .so or .pyd files) to path
+    Add location of GSAS-II shared libraries (binaries: .so or 
+    .pyd files) to path
     
-    This routine must be executed after GSASIIpath is imported and before any other
-    GSAS-II imports are done.
+    This routine must be executed after GSASIIpath is imported 
+    and before any other GSAS-II imports are done, since 
+    they assume binary files are in path
+
+    :param bool printInfo: When True, information is printed to show
+      has happened (default is False)
+    :param bool loadBinary: when True, if the binary files fail
+      to load, an attempt is made to download the binaries
+      (default is False).
+
+      TODO: this is not implemented at present and is not used in 
+      any of the calls to SetBinaryPath
     '''
     # do this only once no matter how many times it is called
     global BinaryPathLoaded,binaryPath
@@ -1081,19 +1721,33 @@ def SetBinaryPath(printInfo=False, loadBinary=True):
         sys.path.insert(0,path2GSAS2)  # make sure current path is used
     binpath = None
     binprfx = GetBinaryPrefix()
-    for loc in (os.path.abspath(sys.path[0]),os.path.abspath(os.path.split(__file__)[0]),
-               os.path.expanduser('~/.GSASII')):
+    # places to look for the GSAS-II binary directory
+    binseapath = [os.path.abspath(sys.path[0])]  # where Python is installed
+    binseapath += [os.path.abspath(os.path.dirname(__file__))]  # directory where this file is found
+    binseapath += [os.path.dirname(binseapath[-1])]  # parent of above directory
+    binseapath += [os.path.expanduser('~/.GSASII')]       # directory in user's home
+    def appendIfExists(searchpathlist,loc,subdir):
+        newpath = os.path.join(loc,subdir)
+        if os.path.exists(newpath):
+            if newpath in searchpathlist: return
+            searchpathlist.append(newpath)
+    for loc in binseapath:
         # Look at bin directory (created by a local compile) before looking for standard dist files
-        searchpathlist = [os.path.join(loc,'bin')]
-        # also look for matching binary dist in loc/AllBinaries
+        searchpathlist = []
+        appendIfExists(searchpathlist,loc,'bin')
+        appendIfExists(searchpathlist,loc,'bindist')
+        appendIfExists(searchpathlist,loc,'GSASII-bin')
+        # also look for directories named by platform etc in loc/AllBinaries or loc
         versions = {}
-        for d in glob.glob(os.path.join(loc,'AllBinaries',binprfx+'*')):
+        namedpath =  glob.glob(os.path.join(loc,'AllBinaries',binprfx+'*'))
+        namedpath += glob.glob(os.path.join(loc,'GSASII-bin',binprfx+'*'))
+        for d in namedpath:
             d = os.path.realpath(d)
             v = intver(d.rstrip('/').split('_')[-1].lstrip('n'))
             versions[v] = d
-        searchpathlist = [os.path.join(loc,'bin')]
         vmin = None
         vmax = None
+        # try to order the search in a way that makes sense
         for v in sorted(versions.keys()):
             if v <= inpver:
                 vmin = v
@@ -1104,86 +1758,47 @@ def SetBinaryPath(printInfo=False, loadBinary=True):
             searchpathlist.append(versions[vmin])
         if vmax in versions:
             searchpathlist.append(versions[vmax])
-        searchpathlist.append(os.path.join(loc,'bindist'))
         for fpth in searchpathlist:
             if TestSPG(fpth):
-                binpath = fpth
-                break        
-        if binpath: break
-    if binpath:                                            # were GSAS-II binaries found
-        sys.path.insert(0,binpath)
+                binpath = fpth   # got one that works, look no farther!
+                break
+        else:
+            continue
+        break
+    if binpath:  # were GSAS-II binaries found?
         binaryPath = binpath
-        if printInfo:
-            print('GSAS-II binary directory: {}'.format(binpath))
         BinaryPathLoaded = True
     elif not loadBinary:
-        raise Exception
+        #raise Exception('*** ERROR: Unable to find GSAS-II binaries. Cannot continue')
+        print('*** ERROR: Unable to find GSAS-II binaries. Cannot continue')
+        return None
     else:                                                  # try loading them 
-        if printInfo:
-            print('Attempting to download GSAS-II binary files...')
-        try:
-            binpath = DownloadG2Binaries(g2home)
-        except AttributeError:   # this happens when building in Read The Docs
-            if printInfo:
-                print('Problem with download')
-        if binpath and TestSPG(binpath):
-            if printInfo:
-                print('GSAS-II binary directory: {}'.format(binpath))
-            sys.path.insert(0,binpath)
-            binaryPath = binpath
-            BinaryPathLoaded = True
-        # this must be imported before anything that imports any .pyd/.so file for GSASII
-        else:
-            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # patch: use old location based on the host OS and the python version,  
-            # path is relative to location of the script that is called as well as this file
-            BinaryPathLoaded = True
-            bindir = None
-            if sys.platform == "win32":
-                if platform.architecture()[0] == '64bit':
-                    bindir = 'binwin64-%d.%d' % sys.version_info[0:2]
-                else:
-                    bindir = 'binwin%d.%d' % sys.version_info[0:2]
-            elif sys.platform == "darwin":
-                if platform.architecture()[0] == '64bit':
-                    bindir = 'binmac64-%d.%d' % sys.version_info[0:2]
-                else:
-                    bindir = 'binmac%d.%d' % sys.version_info[0:2]
-                #if platform.mac_ver()[0].startswith('10.5.'):
-                #    bindir += '_10.5'
-            elif sys.platform.startswith("linux"):
-                if platform.architecture()[0] == '64bit':
-                    bindir = 'binlinux64-%d.%d' % sys.version_info[0:2]
-                else:
-                    bindir = 'binlinux%d.%d' % sys.version_info[0:2]
-            for loc in os.path.abspath(sys.path[0]),os.path.abspath(os.path.split(__file__)[0]):
-            # Look at bin directory (created by a local compile) before standard dist
-            # that at the top of the path
-                fpth = os.path.join(loc,bindir)
-                binpath = fpth
-                if TestSPG(fpth):
-                    sys.path.insert(0,binpath)
-                    binaryPath = binpath
-                    if printInfo:
-                        print('\n'+75*'*')
-                        print('  Warning. Using an old-style GSAS-II binary library. This is unexpected')
-                        print('  and will break in future GSAS-II versions. Please contact toby@anl.gov')
-                        print('  so we can learn what is not working on your installation.')
-                        print('GSAS-II binary directory: {}'.format(binpath))
-                        print(75*'*')
-                    break
-            else:
-            # end patch
-            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                if printInfo:
-                    print(75*'*')
-                    print('Use of GSAS-II binary directory {} failed!'.format(binpath))
-                    print(75*'*')
-                raise Exception("**** ERROR GSAS-II binary libraries not found, GSAS-II cannot run ****")
+        raise Exception("**** ERROR GSAS-II binary libraries not found and loadBinary not"+
+                        "\nimplemented in SetBinaryPath, GSAS-II cannot run ****""")
+        # if printInfo:
+        #     print('Attempting to download GSAS-II binary files...')
+        # try:
+        #     binpath = DownloadG2Binaries(g2home)
+        # except AttributeError:   # this happens when building in Read The Docs
+        #     if printInfo:
+        #         print('Problem with download')
+        # if binpath and TestSPG(binpath):
+        #     if printInfo:
+        #         print('GSAS-II binary directory: {}'.format(binpath))
+        #     sys.path.insert(0,binpath)
+        #     binaryPath = binpath
+        #     BinaryPathLoaded = True
+        # # this must be imported before anything that imports any .pyd/.so file for GSASII
+        # else:
+        #     if printInfo:
+        #         print(75*'*')
+        #         print('Use of GSAS-II binary directory {} failed!'.format(binpath))
+        #         print(75*'*')
+        #     raise Exception("**** ERROR GSAS-II binary libraries not found, GSAS-II cannot run ****")
 
     # add the data import and export directory to the search path
+    if binpath not in sys.path: sys.path.insert(0,binpath)
+    if printInfo: print(f'GSAS-II binary directory: {binpath}')
     newpath = os.path.join(path2GSAS2,'imports')
     if newpath not in sys.path: sys.path.append(newpath)
     newpath = os.path.join(path2GSAS2,'exports')
@@ -1263,7 +1878,8 @@ end tell
 '''.format(script)
     subprocess.Popen(["osascript","-e",osascript])
 
-#======================================================================
+#==============================================================================
+#==============================================================================
 # conda/pip routines
 def findConda():
     '''Determines if GSAS-II has been installed as g2conda or gsas2full
@@ -1283,59 +1899,6 @@ def findConda():
         return conda,activate
     else:
         return None
-
-def runScript(cmds=[], wait=False, G2frame=None):
-    '''run a shell script of commands in an external process
-    
-    :param list cmds: a list of str's, each ietm containing a shell (cmd.exe
-      or bash) command
-    :param bool wait: if True indicates the commands should be run and then 
-      the script should return. If False, then the currently running Python 
-      will exit. Default is False
-    :param wx.Frame G2frame: provides the location of the current .gpx file
-      to be used to restart GSAS-II after running the commands, if wait 
-      is False. Default is None which prevents restarting GSAS-II regardless of
-      the value of wait.
-    '''
-    import tempfile
-    if not cmds:  #debug
-        print('nothing to do in runScript')
-        return
-    if sys.platform != "win32":
-        suffix = '.sh'
-    else:
-        suffix = '.bat'
-        
-    fp = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
-    shellname = fp.name
-    for line in cmds:
-        fp.write(line)
-        fp.write('\n')
-
-    if not wait:
-        if G2frame:
-            projectfile = ''
-            if G2frame.GSASprojectfile:
-                projectfile = os.path.realpath(G2frame.GSASprojectfile)
-            main = os.path.join(path2GSAS2,'GSASII.py')
-            ex = sys.executable
-            if sys.platform == "darwin": # mac requires pythonw which is not always reported as sys.executable
-                if os.path.exists(ex+'w'): ex += 'w'
-            print ('restart using ',' '.join([ex,main,projectfile]))
-            fp.write(' '.join([ex,main,projectfile]))
-            fp.write('\n')
-    fp.close()
-
-    # start the upgrade in a separate interpreter (avoids loading .pyd files)
-    if sys.platform != "win32":
-        proc = subprocess.Popen(['bash',shellname])
-    else:
-        proc = subprocess.Popen([shellname],shell=True)
-    if wait:
-        proc.wait()
-    else:
-        if sys.platform != "win32": proc.wait()
-        sys.exit()
         
 def condaTest(requireAPI=False):
     '''Returns True if it appears that Python is being run under Anaconda 
@@ -1558,6 +2121,8 @@ def addCondaPkg():
         print(err)
     if currenv == "base":
         print('\nUnexpected action: adding conda to base environment???')
+#==============================================================================
+#==============================================================================
 
 def makeScriptShortcut():
     '''Creates a shortcut to GSAS-II in the current Python installation
@@ -1602,37 +2167,305 @@ else:
         return
     return newfil
 
+# see if a directory for local modifications is defined. If so, stick that in the path
+if os.path.exists(os.path.expanduser('~/.G2local/')):
+    sys.path.insert(0,os.path.expanduser('~/.G2local/'))
+    fl = glob.glob(os.path.expanduser('~/.G2local/GSASII*.py*'))
+    files = ""
+    prev = None
+    for f in sorted(fl): # make a list of files, dropping .pyc files where a .py exists
+        f = os.path.split(f)[1]
+        if os.path.splitext(f)[0] == prev: continue
+        prev = os.path.splitext(f)[0]
+        if files: files += ", "
+        files += f
+    if files:
+        print("*"*75)
+        print("Warning: the following source files are locally overridden in "+os.path.expanduser('~/.G2local/'))
+        print("  "+files)
+        print("*"*75)
+
+BinaryPathLoaded = False
+binaryPath = ''
+IPyBreak = DoNothing
+pdbBreak = DoNothing
+
 if __name__ == '__main__':
-    '''What follows is called to update (or downdate) GSAS-II in a separate process. 
+    '''What follows is called to update (or downdate) GSAS-II in a 
+    separate process. 
     '''
-    LoadConfig()
-    import time
-    time.sleep(1) # delay to give the main process a chance to exit
-    # perform an update and restart GSAS-II
-    try:
-        project,version = sys.argv[1:3]
-    except ValueError:
-        project = None
-        version = 'trunk'
-    loc = os.path.dirname(__file__)
-    if version == 'trunk':
-        svnSwitch2branch('')
-    elif '/' in version:
-        svnSwitch2branch(version)
-    elif version:
-        print("Regress to version "+str(version))
-        svnUpdateDir(loc,version=version)
+    # check what type of update is being called for
+    gitUpdate = False
+    preupdateType = None
+    updateType = None
+    regressversion = None
+    help = False
+    project = None
+    version = None
+    
+    for arg in sys.argv[1:]:
+        if '--git-fetch' in arg:   # pulls latest updates from server but does not apply them
+            if preupdateType or updateType:
+                print(f'previous option conflicts with {arg}')
+                help = True
+                break
+            updateType = 'fetch'
+        elif '--git-reset' in arg:   # restores locally changed GSAS-II files to distributed versions also updates
+            gitUpdate = True
+            if preupdateType:
+                print(f'previous option conflicts with {arg}')
+                help = True
+                break
+            preupdateType = 'reset'
+        elif '--git-stash' in arg:   # saves locally changed GSAS-II files in "stash"
+            argsplit = arg.split('=')
+            if len(argsplit) == 1:
+                message = None
+            elif len(argsplit) == 2:
+                message=argsplit[1]
+                if message.startswith('"') and message.endswith('"'):
+                    message = message.strip('"')
+                if message.startswith("'") and message.endswith("'"):
+                    message = message.strip("'")
+                message = message.replace('"',"'") # double quote not allowed
+            else:
+                print('invalid form for --git-stash')
+                help = True
+                break
+            gitUpdate = True
+            if preupdateType:
+                print(f'previous option conflicts with {arg}')
+                help = True
+                break
+            preupdateType = 'stash'
+        elif '--git-update' in arg:  # update to latest downloaded version
+            gitUpdate = True
+            if updateType:
+                print(f'previous option conflicts with {arg}')
+                help = True
+                break
+            updateType = 'update'
+        elif '--git-regress' in arg:
+            argsplit = arg.split('=')
+            if len(argsplit) != 2:
+                print('invalid form for --git-regress')
+                help = True
+                break
+            gitversion = argsplit[1]
+            # make sure the version or tag supplied is valid and convert to
+            # a full sha hash
+            g2repo = git.Repo(path2GSAS2)
+            try:
+                regressversion = g2repo.commit(gitversion).hexsha
+            except git.BadName:
+                print(f'invalid version specified ({version}) for GitHub regression')
+                help = True
+                break
+            if updateType:
+                print(f'previous option conflicts with {arg}')
+                help = True
+                break
+            updateType = 'regress'
+            gitUpdate = True
+        elif '--help' in arg:
+            help = True
+            break
+        elif os.path.exists(arg):   # svn args parsed later; this is just checking
+            project = arg
+            pass
+        else:   # for old-style svn update
+            if arg.isdecimal() or not arg: 
+                #version = arg
+                pass
+            else:
+                print(f'unknown arg {arg}')
+                help = True
+        if gitUpdate and version:
+            print('Conflicting arguments (git & svn opts combined?)')
+            help = True
+
+    if help or len(sys.argv) == 1:
+        print('''Options when running GSASIIpath.py standalone
+
+to update/regress repository from svn repository:
+   python GSASIIpath.py <project> <version>
+            where <project> is an optional path reference to a .gpx file
+            and <version> is a specific GSAS-II version to install 
+                (default is latest)
+
+to update/regress repository from git repository:
+   python GSASIIpath.py option <project>
+       where option will be one or more of the following:
+            --git-fetch            downloads lastest changes from repo
+                                   any other options will be ignored
+
+            --git-stash="message"  saves local changes 
+
+            --git-reset            discards local changes 
+
+            --git-update
+
+            --git-regress=version
+
+       and where <project> is an optional path reference to a .gpx file
+
+       Note: --git-reset and --git-stash cannot be used together. Likewise
+             --git-update and --git-regress cannot be used together.
+             However either --git-reset or --git-stash can be used 
+             with either --git-update or --git-regress.
+             --git-fetch cannot be used with any other options.
+''')
+        sys.exit()
+
+
+    if updateType == 'fetch':
+        # download the latest updates from GitHub to the local repository
+        # in background while GSAS-II runs no updates are applied
+        logfile = os.path.join(os.path.expanduser('~'),'GSASII_bkgUpdate.log')
+        mode = 'a'
+        # don't let log file get too large (20K bytes)
+        if os.path.exists(logfile) and os.path.getsize(logfile) > 20000:
+            mode = 'w'
+        # if file open fails, there is probably a concurent update process
+        try:
+            fp = open(logfile,mode)
+        except:
+            print('background git update was unable to open log file')
+            sys.exit()
+        fp.write('Starting background git update')
+        fp.write(dt.datetime.strftime(dt.datetime.now(),
+                                      " at %Y-%m-%dT%H:%M\n"))
+        try:
+            import git
+        except:
+            fp.write('git import failed')
+            fp.close()
+            sys.exit()
+        try:
+            g2repo = git.Repo(path2GSAS2)
+            g2repo.remote().fetch()
+            fp.write(f'Updates fetched\n')
+        except Exception as msg:
+            fp.write(f'Update failed with message {msg}\n')
+
+        if g2repo.head.is_detached:
+            fp.write(f'Status: reverted to an old install\n')
+        else:
+            try:
+                rc,lc,_ = gitCheckForUpdates(False,g2repo)
+                if len(rc) == 0:
+                    fp.write('Status: no unapplied commits\n')
+                else:
+                    fp.write(f'Status: unapplied commits now {len(rc)}\n')
+            except Exception as msg:
+                fp.write(f'\ngitCheckForUpdates failed with message {msg}\n')
+        fp.write('update done at')
+        fp.write(dt.datetime.strftime(dt.datetime.now(),
+                                      " at %Y-%m-%dT%H:%M\n\n"))
+        fp.close()
+        sys.exit()
+        
+    if gitUpdate:
+        import time
+        time.sleep(1) # delay to give the main process a chance to exit
+                      # so we don't change code for a running process
+                      # windows does not like that
+        try:
+            import git
+        except:
+            print('git import failed')
+            sys.exit()
+        try:
+            g2repo = git.Repo(path2GSAS2)
+        except Exception as msg:
+            print(f'Update failed with message {msg}\n')
+            sys.exit()
+        print('git repo opened')
+                  
+    if preupdateType == 'reset':
+        # --git-reset   (preupdateType = 'reset')
+        print('Restoring locally-updated GSAS-II files to original status')
+        git.Repo(path2GSAS2).git.reset('--hard','origin/master')
+        try:
+            if g2repo.active_branch.name != 'master': 
+                g2repo.git.switch('master')
+        except TypeError:   # fails on detached head
+            pass
+
+    elif preupdateType == 'stash':
+        # --git-stash   (preupdateType = 'stash')
+        print('Stashing locally-updated GSAS-II files')
+        if message:
+            g2repo.git.stash(f'-m"{message}"')
+        else:
+            g2repo.git.stash()
+            
+    # Update to the latest GSAS-II version. This assumes that a fetch has
+    # been done prior, or this will only update to the last time that
+    # it was done.
+    if updateType == 'update':
+        # --git-update  (updateType = 'update')
+        if g2repo.is_dirty():
+            print('Cannot update a directory with locally-made changes')
+            sys.exit()
+        print('Updating to latest GSAS-II version')
+        if g2repo.head.is_detached:
+            g2repo.git.switch('master')
+        g2repo.git.merge('--ff-only')
+        print('git: updated to latest version')
+
+    # Update or regress to a specific GSAS-II version.
+    # this will always cause a "detached head" status
+    elif updateType == 'regress':
+        # --git-regress (updateType = 'regress')
+        if g2repo.is_dirty():
+            print('Cannot regress a directory with locally-made changes')
+            sys.exit()
+        print(f'Regressing to git version {regressversion[:6]}')
+        g2repo.git.checkout(regressversion)
+
+    if gitUpdate:
+        # now restart GSAS-II with the new version
+        G2scrpt = os.path.join(path2GSAS2,'GSASII.py')
+        if project:
+            print(f"Restart GSAS-II with project file {project!r}")
+            subprocess.Popen([sys.executable,G2scrpt,project])
+        else:
+            print("Restart GSAS-II without a project file ")
+            subprocess.Popen([sys.executable,G2scrpt])
+        print ('exiting update process')
+        sys.exit()
+        
     else:
-        print("Update to current version")
-        svnUpdateDir(loc)
-    ex = sys.executable
-    if sys.platform == "darwin": # mac requires pythonw which is not always reported as sys.executable
-        if os.path.exists(ex+'w'): ex += 'w'
-    if project:
-        print("Restart GSAS-II with project file "+str(project))
-        subprocess.Popen([ex,os.path.join(loc,'GSASII.py'),project])
-    else:
-        print("Restart GSAS-II without a project file ")
-        subprocess.Popen([ex,os.path.join(loc,'GSASII.py')])
-    print ('exiting update process')
-    sys.exit()
+        # this is the old svn update process
+        LoadConfig()
+        import time
+        time.sleep(1) # delay to give the main process a chance to exit
+        # perform an update and restart GSAS-II
+        try:
+            project,version = sys.argv[1:3]
+        except ValueError:
+            project = None
+            version = 'trunk'
+        loc = os.path.dirname(__file__)
+        if version == 'trunk':
+            svnSwitch2branch('')
+        elif '/' in version:
+            svnSwitch2branch(version)
+        elif version:
+            print("Regress to version "+str(version))
+            svnUpdateDir(loc,version=version)
+        else:
+            print("Update to current version")
+            svnUpdateDir(loc)
+        ex = sys.executable
+        if sys.platform == "darwin": # mac requires pythonw which is not always reported as sys.executable
+            if os.path.exists(ex+'w'): ex += 'w'
+        if project:
+            print("Restart GSAS-II with project file "+str(project))
+            subprocess.Popen([ex,os.path.join(loc,'GSASII.py'),project])
+        else:
+            print("Restart GSAS-II without a project file ")
+            subprocess.Popen([ex,os.path.join(loc,'GSASII.py')])
+        print ('exiting update process')
+        sys.exit()
