@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIctrlGUI - Custom GSAS-II GUI controls
 ########### SVN repository information ###################
-# $Date: 2024-02-25 16:03:48 -0600 (Sun, 25 Feb 2024) $
+# $Date: 2024-03-10 16:26:56 -0500 (Sun, 10 Mar 2024) $
 # $Author: toby $
-# $Revision: 5739 $
+# $Revision: 5764 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIctrlGUI.py $
-# $Id: GSASIIctrlGUI.py 5739 2024-02-25 22:03:48Z toby $
+# $Id: GSASIIctrlGUI.py 5764 2024-03-10 21:26:56Z toby $
 ########### SVN repository information ###################
 '''Documentation for all the routines in module :mod:`GSASIIctrlGUI`
 follows.
@@ -47,7 +47,7 @@ except ImportError:
     from matplotlib.backends.backend_wx import FigureCanvas as Canvas
 
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5739 $")
+GSASIIpath.SetVersionNumber("$Revision: 5764 $")
 import GSASIIdataGUI as G2gd
 import GSASIIpwdGUI as G2pdG
 import GSASIIspc as G2spc
@@ -5598,9 +5598,11 @@ def updateNotifier(G2frame,fileVersion):
         txtbox.SetBackgroundColour(wx.Colour(0,0,0))
         tblSizer.Add(txtbox,0,wx.EXPAND)
     size = (700,500)
-    rev = GSASIIpath.svnGetRev()
-    if rev is None: rev = GSASIIpath.GetVersionNumber()
-    if rev is None: return
+    rev = GSASIIpath.GetVersionNumber()
+    try:
+        int(rev)
+    except:
+        pass
     lastNotice = max(GSASIIpath.GetConfigValue('lastUpdateNotice',0),fileVersion)
     show = None               # first version number to show
     allProjects = False       # if True notice is shown for all projects, otherwise only once
@@ -6949,7 +6951,7 @@ class gitVersionSelector(wx.Dialog):
         self.githistory = [h for h in self.githistory if
                         self.g2repo.commit(h).committed_datetime > cutoff]
         # end patch 
-        self.initial_commit = self.g2repo.commit('head')
+        self.initial_commit = self.g2repo.commit('HEAD')
         self.initial_commit_info = self.docCommit(self.initial_commit)
         
         wx.Dialog.__init__(self, parent, wx.ID_ANY, 'Select GSAS-II Version',
@@ -7561,8 +7563,13 @@ tutorialIndex = (
 
 tutorialCatalog = [l for l in tutorialIndex if len(l) >= 3]
 # A catalog of GSAS-II tutorials generated from the table in :data:`tutorialIndex`
+def OpenTutorial(parent):
+    if GSASIIpath.HowIsG2Installed().startswith('git'):
+        return OpenGitTutorial(parent)
+    else:
+        return OpenSvnTutorial(parent)
 
-class OpenTutorial(wx.Dialog):
+class OpenSvnTutorial(wx.Dialog):
     '''Open a tutorial web page, optionally copying the web page, screen images and
     data file(s) to the local disk.
     '''
@@ -7853,6 +7860,214 @@ class OpenTutorial(wx.Dialog):
             G2MessageBox(self,'Error downloading tutorial(s)\n\t'+fail,'Download error')
         self.EndModal(wx.ID_OK)
                     
+    def SelectDownloadLoc(self,event):
+        '''Select a download location,
+        Cancel resets to the default
+        '''
+        dlg = wx.DirDialog(self, "Choose a directory for tutorial downloads:",
+            defaultPath=self.tutorialPath)#,style=wx.DD_DEFAULT_STYLE)
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            pth = dlg.GetPath()
+        finally:
+            dlg.Destroy()
+
+        if not os.path.exists(pth):
+            try:
+                os.makedirs(pth)    #failing for no obvious reason
+            except OSError:
+                msg = 'The selected directory is not valid.\n\t'
+                msg += pth
+                msg += '\n\nAn attempt to create the directory failed'
+                G2MessageBox(self.frame,msg)
+                return
+        if os.path.exists(os.path.join(pth,"help")) and os.path.exists(os.path.join(pth,"Exercises")):
+            print("Note that you may have old tutorial files in the following directories")
+            print('\t'+os.path.join(pth,"help"))
+            print('\t'+os.path.join(pth,"Exercises"))
+            print('Subdirectories in the above can be deleted to save space\n\n')
+        self.tutorialPath = pth
+        self.dataLoc.SetLabel(self.tutorialPath)
+        if GSASIIpath.GetConfigValue('Tutorial_location') == pth: return
+        vars = GetConfigValsDocs()
+        try:
+            vars['Tutorial_location'][1] = pth
+            if GSASIIpath.GetConfigValue('debug'): print('DBG_Saving Tutorial_location: '+pth)
+            GSASIIpath.SetConfigValue(vars)
+            SaveConfigVars(vars)
+        except KeyError:
+            pass
+        
+class OpenGitTutorial(wx.Dialog):
+    '''Open a tutorial web page from the git repository, 
+    optionally copying the tutorial's exercise data file(s) to 
+    the local disk.
+    '''
+    
+    def __init__(self,parent):
+        style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+        wx.Dialog.__init__(self, parent, wx.ID_ANY, 'Open Tutorial', style=style)
+        self.G2frame = self.frame = parent
+        pnl = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer1 = wx.BoxSizer(wx.HORIZONTAL)
+        msg = ('To open a tutorial, select below the mode to be used. '+
+               'With either choice you can select a tutorial and view it '+
+               'in a web browser, but the 2nd option offers the option '+
+               'to automatically download the data files needed to run '+
+               'that tutorial.')
+        label = wx.StaticText(pnl,  wx.ID_ANY, msg)
+        label.Wrap(450)
+        msg = '''The data files needed to run the GSAS-II tutorials
+        require a fair amount of storage space; few users will
+        use all of them. This dialog allows you to open a
+        tutorial in a web browser and select if you want the data 
+        needed to run that exercise to be downloaded to your computer.
+
+        The location used to download tutorials is set using the
+        "Set download location" which is saved as the "Tutorial_location"
+        configuration option see File/Preference or the
+        config_example.py file.
+        '''
+        self.SetTutorialPath()
+        hlp = HelpButton(pnl,msg)
+        sizer1.Add((-1,-1),1, wx.EXPAND, 0)
+        sizer1.Add(label, 0, wx.ALIGN_CENTRE|wx.ALL, 5)
+        sizer1.Add((-1,-1),1, wx.EXPAND, 0)
+        sizer1.Add(hlp)
+        sizer.Add(sizer1,0,wx.EXPAND|wx.ALL,0)
+        sizer.Add((10,10))
+        sizer0 = wx.BoxSizer(wx.HORIZONTAL)        
+        sizer1 = wx.BoxSizer(wx.VERTICAL)
+        btn = wx.Button(pnl, wx.ID_ANY, "Select a tutorial to view")
+        btn.Bind(wx.EVT_BUTTON, self.onWebBrowse)
+        sizer1.Add(btn,0)
+        btn = wx.Button(pnl, wx.ID_ANY, "Select a tutorial to view and download its data files")
+        btn.Bind(wx.EVT_BUTTON, self.SelectAndDownload)
+        sizer1.Add(btn,0,wx.TOP,5)
+        sizer0.Add(sizer1,0,wx.EXPAND|wx.ALL,0)
+        sizer.Add(sizer0,5,wx.EXPAND|wx.ALL,5)
+        
+        sizer.Add((10,10))
+        sizer1 = wx.BoxSizer(wx.HORIZONTAL)
+        btn = wx.Button(pnl, wx.ID_ANY, "Set download location")
+        btn.Bind(wx.EVT_BUTTON, self.SelectDownloadLoc)
+        sizer1.Add(btn,0,WACV|wx.RIGHT|wx.LEFT,5)
+        self.dataLoc = wx.StaticText(pnl, wx.ID_ANY,self.tutorialPath)
+        sizer1.Add(self.dataLoc,0,WACV)
+        sizer.Add(sizer1)
+        
+        btnsizer = wx.StdDialogButtonSizer()
+        btn = wx.Button(pnl, wx.ID_CANCEL,"Close")
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+        sizer.Add(btnsizer, 0, wx.ALIGN_CENTER|wx.ALL, 5)
+        pnl.SetSizer(sizer)
+        sizer.Fit(self)
+        self.topsizer=sizer
+        self.CenterOnParent()
+
+    def SetTutorialPath(self):
+        '''Get the tutorial location if set; if not pick a default
+        directory in a logical place
+        '''
+        # has the user set a location and is it valid?
+        if GSASIIpath.GetConfigValue('Tutorial_location'):
+            tutorialPath = os.path.abspath(GSASIIpath.GetConfigValue('Tutorial_location'))
+            if os.path.exists(tutorialPath):
+                self.tutorialPath = tutorialPath
+                return
+            try:
+                os.makedirs(tutorialPath)
+                if os.path.exists(tutorialPath):
+                    self.tutorialPath = tutorialPath
+                    return
+            except:
+                print('Unable to use Tutorial_location config setting',
+                          tutorialPath)
+        # try a system-specific location
+        if (sys.platform.lower().startswith('win')):
+            for p in ('Documents','My Documents',''):
+                if os.path.exists(os.path.abspath(os.path.expanduser(
+                      os.path.join('~',p)))):
+                    tutorialPath = os.path.abspath(os.path.expanduser(
+                      os.path.join('~',p,'G2tutorials')))
+                    if os.path.exists(tutorialPath):
+                        self.tutorialPath = tutorialPath
+                        return
+                    try:
+                        os.makedirs(tutorialPath)
+                        if os.path.exists(tutorialPath):
+                            self.tutorialPath = tutorialPath
+                            return
+                    except:
+                        pass
+        else:
+            tutorialPath = os.path.abspath(os.path.expanduser(
+                    os.path.join('~','G2tutorials')))
+            if os.path.exists(tutorialPath):
+                self.tutorialPath = tutorialPath
+                return
+            try:
+                os.makedirs(tutorialPath)
+                if os.path.exists(tutorialPath):
+                    self.tutorialPath = tutorialPath
+                    return
+            except:
+                pass
+        # no success so far, use current working directory
+        tutorialPath = os.path.abspath(os.path.join(os.getcwd(),'G2tutorials'))
+        if os.path.exists(tutorialPath):
+            self.tutorialPath = tutorialPath
+            return
+        try:
+            os.makedirs(tutorialPath)
+            if os.path.exists(tutorialPath):
+                self.tutorialPath = tutorialPath
+                return
+        except:
+            pass
+        # nothing worked, set self.tutorialPath with os.getcwd() and hope for the best
+        print('Warning: Unable to set a TutorialPath, using',os.getcwd())
+        tutorialPath = os.getcwd()
+
+    def SelectAndDownload(self,event):
+        '''Shows a list of all tutorials so user can select one to view.
+        The data files associated with that directory are then downloaded.
+        '''
+        tutdir = self.onWebBrowse(event)
+        GSASIIpath.downloadDirContents([tutdir,'data'],self.tutorialPath)
+
+    def onWebBrowse(self,event):
+        '''Shows a list of all tutorials so user can select one to view.
+
+        :returns: the name of the directory where the tutorial is located,
+          which is used if called from :meth:`SelectAndDownload`.
+        '''
+        choices2 = [i[2:4] for i in tutorialCatalog]
+        selected = self.ChooseTutorial2(choices2)
+        if selected is None: return        
+        tutdir = tutorialCatalog[selected][0]
+        tutfil = tutorialCatalog[selected][1]
+        # open web page remotely, don't worry about data
+        URL = G2BaseURL+'/Tutorials/'+tutdir+'/'+tutfil
+        wx.CallAfter(self.EndModal,wx.ID_OK)
+        ShowWebPage(URL,self.frame)
+        return tutdir
+        
+    def ChooseTutorial2(self,choices):
+        '''Select tutorials from a two-column table, when possible
+        '''
+        lbls = ('tutorial name (indent indicates previous is required)','description')
+        colWidths=[400,400]
+        dlg = MultiColumnSelection(self,'select tutorial',lbls,choices,colWidths)
+        selection = dlg.Selection
+        dlg.Destroy()
+        if selection is not None:
+            if selection == -1: return
+            return selection
+
     def SelectDownloadLoc(self,event):
         '''Select a download location,
         Cancel resets to the default
@@ -9081,6 +9296,120 @@ class ScrolledStaticText(wx.StaticText):
         self.msgpos += 1
         if self.msgpos >= len(self.fullmsg): self.msgpos = 0
 
+#===========================================================================
+def openInNewTerm(project=None,g2script=None,pythonapp=sys.executable):
+    '''Open a new and independent GSAS-II session in separate terminal 
+    or console window and as a separate process that will continue
+    even if the calling process exits.
+    Intended to work on all platforms. 
+
+    This could be used to run other scripts inside python other than GSAS-II
+
+    :param str project: the name of an optional parameter to be
+      passed to the script (usually a .gpx file to be opened in 
+      a new GSAS-II session)
+    :param str g2script: the script to be run. If None (default)
+      the GSASII.py file in the same directory as this file will
+      be used. 
+    :param str pythonapp: the Python interpreter to be used. 
+      Defaults to sys.executable which is usually what is wanted.
+    :param str terminal: a name for a preferred terminal emulator
+    '''
+    import subprocess
+    if g2script is None:
+        g2script = os.path.join(os.path.dirname(__file__),'GSASII.py')
+    
+    if sys.platform == "darwin":
+        if project:
+            script = f'''
+set python to "{pythonapp}"
+set appwithpath to "{g2script}"
+set filename to "{project}"
+set filename to the quoted form of the POSIX path of filename
+
+tell application "Terminal"
+     activate
+     do script python & " " & appwithpath & " " & filename & "; exit"
+end tell
+'''
+        else:
+            script = f'''
+set python to "{pythonapp}"
+set appwithpath to "{g2script}"
+
+tell application "Terminal"
+     activate
+     do script python & " " & appwithpath & " " & "; exit"
+end tell
+'''
+        subprocess.Popen(["osascript","-e",script])
+    elif sys.platform.startswith("win"):
+        cmds = [pythonapp, g2script]
+        if project: cmds += [project]
+        subprocess.Popen(cmds,creationflags=subprocess.CREATE_NEW_CONSOLE)
+    else:
+        import shutil
+        script = ''
+        # try a bunch of common terminal emulators in Linux
+        # there does not appear to be a good way to way to specify this
+        # perhaps this should be a GSAS-II config option
+        for term in ("lxterminal", "gnome-terminal", 'konsole', "xterm",
+                         "terminator", "terminology", "tilix"):
+            try:
+                found = shutil.which(term)
+                if not found: continue
+            except AttributeError:
+                print(f'shutil.which() failed (why?); assuming {term} present'
+)
+                found = True
+            if term == "gnome-terminal":
+                #terminal = 'gnome-terminal -t "GSAS-II console" --'
+                cmds = [term,'--title','"GSAS-II console"','--']
+                script = "echo; echo Press Enter to close window; read line"
+                break
+            elif term == "lxterminal":
+               #terminal = 'lxterminal -t "GSAS-II console" -e'
+               cmds = [term,'-t','"GSAS-II console"','-e']
+               script = "echo;echo Press Enter to close window; read line"
+               break
+            elif term == "xterm":
+                #terminal = 'xterm -title "GSAS-II console" -hold -e'
+                cmds = [term,'-title','"GSAS-II console"','-hold','-e']
+                script = "echo; echo This window can now be closed"
+                break
+            elif term == "terminator":
+                cmds = [term,'-T','"GSAS-II console"','-x']
+                script = "echo;echo Press Enter to close window; read line"
+                break
+            elif term == "konsole":
+                cmds = [term,'-p','tabtitle="GSAS-II console"','--hold','-e']
+                script = "echo; echo This window can now be closed"
+                break
+            elif term == "tilix":
+                cmds = [term,'-t','"GSAS-II console"','-e']
+                script = "echo;echo Press Enter to close window; read line"
+                break
+            elif term == "terminology":
+                cmds = [term,'-T="GSAS-II console"','--hold','-e']
+                script = "echo; echo This window can now be closed"
+                break                
+        else:
+            print("No known terminal was found to use, Can't start {}")
+            return
+
+        fil = '/tmp/GSAS2-launch.sh'
+        cmds += ['/bin/sh',fil]
+        fp = open(fil,'w')
+        if project:
+            fp.write(f"{pythonapp} {g2script} {project}\n")
+        else:
+            fp.write(f"{pythonapp} {g2script}\n")
+        fp.write(f"rm {fil}\n")
+        if script:
+            fp.write(f"{script}\n")
+        fp.close()
+        subprocess.Popen(cmds,start_new_session=True)
+#===========================================================================
 def gitFetch(G2frame):
     wx.BeginBusyCursor()
     pdlg = wx.ProgressDialog('Updating','Performing git update',11,
@@ -9323,6 +9652,7 @@ def gitSelectVersion(G2frame):
     # launch changes and restart
     GSASIIpath.gitStartUpdate(cmds)
     
+#===========================================================================
 def svnCheckUpdates(G2frame):
     '''Check if the GSAS-II repository has an update for the current 
     source files and perform that update if requested.

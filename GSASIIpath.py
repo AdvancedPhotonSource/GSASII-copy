@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 #GSASIIpath - file location & update routines
 ########### SVN repository information ###################
-# $Date: 2024-02-29 08:50:59 -0600 (Thu, 29 Feb 2024) $
+# $Date: 2024-03-10 16:26:56 -0500 (Sun, 10 Mar 2024) $
 # $Author: toby $
-# $Revision: 5741 $
+# $Revision: 5764 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIpath.py $
-# $Id: GSASIIpath.py 5741 2024-02-29 14:50:59Z toby $
+# $Id: GSASIIpath.py 5764 2024-03-10 21:26:56Z toby $
 ########### SVN repository information ###################
 '''
 :mod:`GSASIIpath` Classes & routines follow
@@ -99,10 +99,10 @@ version = -1
 def SetVersionNumber(RevString):
     '''Set the subversion (svn) version number
 
-    :param str RevString: something like "$Revision: 5741 $"
+    :param str RevString: something like "$Revision: 5764 $"
       that is set by subversion when the file is retrieved from subversion.
 
-    Place ``GSASIIpath.SetVersionNumber("$Revision: 5741 $")`` in every python
+    Place ``GSASIIpath.SetVersionNumber("$Revision: 5764 $")`` in every python
     file.
     '''
     try:
@@ -214,7 +214,7 @@ def GetVersionNumber():
     '''
     if HowIsG2Installed().startswith('git'):
         g2repo = git.Repo(path2GSAS2)
-        for h in list(g2repo.iter_commits('head'))[:50]: # (don't go too far back)
+        for h in list(g2repo.iter_commits('HEAD'))[:50]: # (don't go too far back)
             tags = g2repo.git.tag('--points-at',h).split('\n')
             try:
                 for item in tags:
@@ -316,10 +316,12 @@ def getG2VersionInfo():
 
 #==============================================================================
 #==============================================================================
-# routines to interface with git
+# routines to interface with git.
+# next lines define where GitHub repositories are found
 #g2URL = "https://github.com/AdvancedPhotonSource/GSASII-copy.git"
 g2URL = "https://github.com/GSASII/codetest.git"
 G2binURL = "https://api.github.com/repos/GSASII/binarytest"
+gitOwner,gitRepo = 'GSASII', 'TutorialTest'
 
 BASE_HEADER = {'Accept': 'application/vnd.github+json',
                'X-GitHub-Api-Version': '2022-11-28'}
@@ -651,8 +653,9 @@ def getGitBinaryLoc(npver=None,pyver=None,verbose=True):
     '''    
     bindir = GetBinaryPrefix(pyver)
     if npver:
-        inpver = npver
+        inpver = intver(npver)
     else:
+        npver = np.__version__
         inpver = intver(np.__version__)
     # get binaries matching the required install, approximate match for numpy
     URLdict = getGitBinaryReleases()
@@ -668,18 +671,18 @@ def getGitBinaryLoc(npver=None,pyver=None,verbose=True):
     elif inpver < min(intVersionsList):
         vsel = min(intVersionsList)
         if verbose: print(
-                f'Warning: The installed numpy, version, {np.__version__},'
+                f'Warning: The requested numpy, version, {npver},'
                 f' is older than\n\tthe oldest dist version, {fmtver(vsel)}')
     elif inpver >= max(intVersionsList):
         vsel = max(intVersionsList)
         if verbose and inpver == max(intVersionsList):
             print(
-                f'The current numpy version, {np.__version__},'
+                f'The requested numpy version, {npver},'
                 f' matches the binary dist, version {fmtver(vsel)}')
         elif verbose:
             print(
                 f'Note: using a binary dist for numpy version {fmtver(vsel)} '
-                f'which is older than the installed numpy, version {np.__version__}')
+                f'which is older than the requested numpy, version {npver}')
     else:
         vsel = min(intVersionsList)
         for v in intVersionsList:
@@ -687,8 +690,8 @@ def getGitBinaryLoc(npver=None,pyver=None,verbose=True):
                 vsel = v
             else:
                 if verbose: print(
-                        f'FYI: Selecting dist version {fmtver(v)}'
-                        f' as the installed numpy, version, {np.__version__},'
+                        f'FYI: Selecting dist version {fmtver(vsel)}'
+                        f' as the requested numpy, version, {npver},'
                         f'\n\tis older than the next dist version {fmtver(v)}')
                 break
     return URLdict[versions[vsel]]
@@ -761,9 +764,87 @@ def gitStartUpdate(cmdopts):
     cmd = [sys.executable, __file__] + cmdopts
     if GetConfigValue('debug'): print('Starting updates with command\n\t'+
                                       f'{" ".join(cmd)}')
-    subprocess.Popen(cmd)
+    proc = subprocess.Popen(cmd)
+    # on windows the current process needs to end so that the source files can
+    # be written over. On unix the current process needs to stay running
+    # so the child is not killed.
+    if sys.platform != "win32": proc.wait()
     sys.exit()
-    
+
+def dirGitHub(dirlist,orgName=gitOwner, repoName=gitRepo):
+    '''Obtain a the contents of a GitHub repository directory using 
+    the GitHub REST API.
+
+    :param str dirlist: a list of sub-directories `['parent','child',sub']` 
+      for `parent/child/sub` or `[]` for a file in the top-level directory.     
+    :param str orgName: the name of the GitHub organization
+    :param str repoName: the name of the GitHub repository
+    :returns: a list of file names or None if the dirlist info does not 
+      reference a directory
+
+    examples::
+
+        dirGitHub([], 'GSASII', 'TutorialTest')
+        dirGitHub(['TOF Sequential Single Peak Fit', 'data'])
+
+    The first example will get the contents of the top-level 
+    directory for the specified repository 
+
+    The second example will provide the contents of the 
+    "TOF Sequential Single Peak Fit"/data directory. 
+    '''
+    dirname = ''
+    for item in dirlist:
+        dirname += item + '/'
+    URL = f"https://api.github.com/repos/{orgName}/{repoName}/contents/{dirname}"
+    r = requests.get(URL, allow_redirects=True)
+    try:
+        return [rec['name'] for rec in r.json()]
+    except:
+        return None
+
+def rawGitHubURL(dirlist,filename,orgName=gitOwner, repoName=gitRepo,
+                 branchname="master"):
+    '''Create a link that can be used to view/downlaod the raw version of 
+    file in a GitHub repository. 
+
+    :param str dirlist: a list of sub-directories `['parent','child',sub']` 
+      for `parent/child/sub` or `[]` for a file in the top-level directory.     
+    :param str filename: the name of the file
+    :param str orgName: the name of the GitHub organization
+    :param str repoName: the name of the GitHub repository
+    :param str branchname: the name of the GitHub branch. Defaults 
+       to "master".
+
+    :returns: a URL-encoded URL
+    '''
+    import urllib.parse  # not used very often, import only when needed
+    dirname = ''
+    for item in dirlist:
+        # it's not clear that the URLencode is needed for the directory name
+        dirname += urllib.parse.quote(item) + '/'
+        #filename = urllib.parse.quote(filename)
+    return f"https://raw.githubusercontent.com/{orgName}/{repoName}/{branchname}/{dirname}{filename}"
+
+def downloadDirContents(dirlist,targetDir,orgName=gitOwner, repoName=gitRepo):
+    filList = dirGitHub(dirlist, orgName=orgName, repoName=repoName)
+    if filList is None:
+        print(f'Directory {"/".join(dirlist)!r} does not have any files')
+        return None
+    for fil in filList:
+        if fil.lower() == 'index.html': continue
+        URL = rawGitHubURL(dirlist,fil,orgName=orgName,repoName=repoName)
+        r = requests.get(URL, allow_redirects=True)
+        outfil = os.path.join(targetDir,fil)
+        if r.status_code == 200:
+            open(outfil, 'wb').write(r.content)
+            print(f'wrote {outfil}')
+        elif r.status_code == 404:
+            print(f'Warning: {fil} is likley a subdirectory of directory {"/".join(dirlist)!r}')
+        else:
+            print(f'Unexpected web response for {fil}: {r.status_code}')
+    return
+
 #==============================================================================
 #==============================================================================
 # routines to interface with subversion
@@ -1675,8 +1756,11 @@ def InvokeDebugOpts():
 def TestSPG(fpth):
     '''Test if pyspg.[so,.pyd] can be run from a location in the path
     '''
-    if not os.path.exists(fpth): return False
-    if not glob.glob(os.path.join(fpth,'pyspg.*')): return False
+    try:
+        if not os.path.exists(fpth): return False
+        if not glob.glob(os.path.join(fpth,'pyspg.*')): return False
+    except:
+        return False
     savpath = sys.path[:]
     sys.path = [fpth]
     # test to see if a shared library can be used
@@ -1707,12 +1791,13 @@ def SetBinaryPath(printInfo=False, loadBinary=False):
       to load, an attempt is made to download the binaries
       (default is False).
 
-      TODO: this is not implemented at present and is not used in 
-      any of the calls to SetBinaryPath
+      TODO: the loadBinary option  not implemented at present and is 
+      not used in any of the calls to SetBinaryPath
     '''
     # do this only once no matter how many times it is called
-    global BinaryPathLoaded,binaryPath
+    global BinaryPathLoaded,binaryPath,BinaryPathFailed
     if BinaryPathLoaded: return
+    if BinaryPathFailed: return
     try:
         inpver = intver(np.__version__)
     except (AttributeError,TypeError): # happens on building docs
@@ -1769,10 +1854,11 @@ def SetBinaryPath(printInfo=False, loadBinary=False):
         binaryPath = binpath
         BinaryPathLoaded = True
     elif not loadBinary:
-        #raise Exception('*** ERROR: Unable to find GSAS-II binaries. Cannot continue')
-        print('*** ERROR: Unable to find GSAS-II binaries. Cannot continue')
+        print('*** ERROR: Unable to find GSAS-II binaries. Much of GSAS-II cannot function')
+        BinaryPathFailed = True
         return None
     else:                                                  # try loading them 
+        BinaryPathFailed = True
         raise Exception("**** ERROR GSAS-II binary libraries not found and loadBinary not"+
                         "\nimplemented in SetBinaryPath, GSAS-II cannot run ****""")
         # if printInfo:
@@ -1825,40 +1911,40 @@ def LoadConfig(printInfo=True):
         print(60*'*')
         configDict = {'Clip_on':True}
 
-def MacStartGSASII(g2script,project=''):
-    '''Start a new instance of GSAS-II by opening a new terminal window and starting
-    a new GSAS-II process. Used on Mac OS X only.
+# def MacStartGSASII(g2script,project=''):
+#     '''Start a new instance of GSAS-II by opening a new terminal window and starting
+#     a new GSAS-II process. Used on Mac OS X only.
 
-    :param str g2script: file name for the GSASII.py script
-    :param str project: GSAS-II project (.gpx) file to be opened, default is blank
-      which opens a new project
-    '''
-    if project and os.path.splitext(project)[1] != '.gpx':
-        print(f'file {project} cannot be used. Not GSAS-II project (.gpx) file')
-        return
-    if project and not os.path.exists(project):
-        print(f'file {project} cannot be found.')
-        return 
-    elif project:
-        project = os.path.abspath(project)
-        if not os.path.exists(project): 
-            print(f'lost project {project} with abspath')
-            raise Exception(f'lost project {project} with abspath')
-    g2script = os.path.abspath(g2script)
-    pythonapp = sys.executable
-    if os.path.exists(pythonapp+'w'): pythonapp += 'w'
-    script = f'''
-set python to "{pythonapp}"
-set appwithpath to "{g2script}"
-set filename to "{project}"
-set filename to the quoted form of the POSIX path of filename
+#     :param str g2script: file name for the GSASII.py script
+#     :param str project: GSAS-II project (.gpx) file to be opened, default is blank
+#       which opens a new project
+#     '''
+#     if project and os.path.splitext(project)[1] != '.gpx':
+#         print(f'file {project} cannot be used. Not GSAS-II project (.gpx) file')
+#         return
+#     if project and not os.path.exists(project):
+#         print(f'file {project} cannot be found.')
+#         return 
+#     elif project:
+#         project = os.path.abspath(project)
+#         if not os.path.exists(project): 
+#             print(f'lost project {project} with abspath')
+#             raise Exception(f'lost project {project} with abspath')
+#     g2script = os.path.abspath(g2script)
+#     pythonapp = sys.executable
+#     if os.path.exists(pythonapp+'w'): pythonapp += 'w'
+#     script = f'''
+# set python to "{pythonapp}"
+# set appwithpath to "{g2script}"
+# set filename to "{project}"
+# set filename to the quoted form of the POSIX path of filename
 
-tell application "Terminal"
-     activate
-     do script python & " " & appwithpath & " " & filename & "; exit"
-end tell
-'''
-    subprocess.Popen(["osascript","-e",script])
+# tell application "Terminal"
+#      activate
+#      do script python & " " & appwithpath & " " & filename & "; exit"
+# end tell
+# '''
+#     subprocess.Popen(["osascript","-e",script])
 
 def MacRunScript(script):
     '''Start a bash script in a new terminal window.
@@ -2185,6 +2271,7 @@ if os.path.exists(os.path.expanduser('~/.G2local/')):
         print("  "+files)
         print("*"*75)
 
+BinaryPathFailed = False
 BinaryPathLoaded = False
 binaryPath = ''
 IPyBreak = DoNothing
@@ -2426,13 +2513,15 @@ to update/regress repository from git repository:
 
     if gitUpdate:
         # now restart GSAS-II with the new version
-        G2scrpt = os.path.join(path2GSAS2,'GSASII.py')
+        # G2scrpt = os.path.join(path2GSAS2,'GSASII.py')
         if project:
             print(f"Restart GSAS-II with project file {project!r}")
-            subprocess.Popen([sys.executable,G2scrpt,project])
+            # subprocess.Popen([sys.executable,G2scrpt,project])
         else:
             print("Restart GSAS-II without a project file ")
-            subprocess.Popen([sys.executable,G2scrpt])
+            # subprocess.Popen([sys.executable,G2scrpt])
+        import GSASIIctrlGUI
+        GSASIIctrlGUI.openInNewTerm(project)
         print ('exiting update process')
         sys.exit()
         

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Date: 2024-03-06 10:33:02 -0600 (Wed, 06 Mar 2024) $
 # $Author: toby $
-# $Revision: 5577 $
+# $Revision: 5753 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pwd_BrukerRAW.py $
-# $Id: G2pwd_BrukerRAW.py 5577 2023-05-11 23:08:12Z toby $
+# $Id: G2pwd_BrukerRAW.py 5753 2024-03-06 16:33:02Z toby $
 ########### SVN repository information ###################
 '''
 '''
@@ -17,7 +17,7 @@ import numpy as np
 import GSASIIobj as G2obj
 import GSASIIctrlGUI as G2G
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5577 $")
+GSASIIpath.SetVersionNumber("$Revision: 5753 $")
 class raw_ReaderClass(G2obj.ImportPowderData):
     'Routines to import powder data from a binary Bruker .RAW file'
     def __init__(self):
@@ -216,7 +216,7 @@ class brml_ReaderClass(G2obj.ImportPowderData):
     def __init__(self):
         super(self.__class__,self).__init__( # fancy way to self-reference
             extensionlist=('.brml',),
-            strictExtension=False,
+            strictExtension=True,
             formatName = 'Bruker brml',
             longFormatName = 'Bruker .brml powder data file'
             )
@@ -233,7 +233,10 @@ class brml_ReaderClass(G2obj.ImportPowderData):
                 msg = 'Installation of the xmltodict package failed with error:\n' + str(res)
                 G2G.G2MessageBox(self,msg,'Install xmltodict Error')
                 return False
-            import xmltodict as xml
+            try:
+                import xmltodict as xml
+            except:
+                return False
         try:
             import zipfile as ZF        
             with ZF.ZipFile(filename, 'r') as zipObj:

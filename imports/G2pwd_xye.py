@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 ########### SVN repository information ###################
-# $Date: 2023-05-11 18:08:12 -0500 (Thu, 11 May 2023) $
+# $Date: 2024-03-06 17:39:33 -0600 (Wed, 06 Mar 2024) $
 # $Author: toby $
-# $Revision: 5577 $
+# $Revision: 5754 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/imports/G2pwd_xye.py $
-# $Id: G2pwd_xye.py 5577 2023-05-11 23:08:12Z toby $
+# $Id: G2pwd_xye.py 5754 2024-03-06 23:39:33Z toby $
 ########### SVN repository information ###################
 '''
 '''
@@ -17,7 +17,7 @@ import GSASIIpath
 
 asind = lambda x: 180.*np.arcsin(x)/np.pi
 
-GSASIIpath.SetVersionNumber("$Revision: 5577 $")
+GSASIIpath.SetVersionNumber("$Revision: 5754 $")
 class xye_ReaderClass(G2obj.ImportPowderData):
     'Routines to import powder data from a .xye/.chi file'
     def __init__(self):
@@ -31,8 +31,13 @@ class xye_ReaderClass(G2obj.ImportPowderData):
 
     # Validate the contents -- make sure we only have valid lines
     def ContentsValidator(self, filename):
-        'Look through the file for expected types of lines in a valid Topas file'
+        '''Look through the file for expected types of lines in a valid Topas 
+        Fit2D or BNL/pyFAI file. Alas the latter two formats are somewhat in 
+        conflict. 
+        '''
         gotCcomment = False
+        self.minimalHeader = False   # indicates a .chi file from BNL's pyFAI 
+        # which has less header info than from Fit2D
         begin = True
         self.GSAS = False
         self.Chi = False
@@ -46,7 +51,7 @@ class xye_ReaderClass(G2obj.ImportPowderData):
         if2theta = False
         ifQ = False
         for i,S in enumerate(fp):
-            if not S:
+            if not S:     # may not start with a blank line
                 break
             if i > 1000: break
             if begin:
@@ -54,6 +59,9 @@ class xye_ReaderClass(G2obj.ImportPowderData):
                     if i < 4:
                         if  '2-theta' in S.lower():
                             if2theta = True
+                        elif  'chi_2theta' in S.lower(): # probably pyFAI w/o data type, assume 2theta
+                            if2theta = True
+                            self.minimalHeader = True
                         elif  'q ' in S.lower():
                             ifQ = True
                             wave = ''
@@ -130,11 +138,16 @@ class xye_ReaderClass(G2obj.ImportPowderData):
             # or WinPLOTR style, a '!'
             if begin:
                 if self.Chi:
-                    if i < 4:
+                    if self.minimalHeader and S.strip().startswith('#') and i < 6:
+                        self.comments.append(S[:-1])
+                        continue
+                    elif self.minimalHeader:
+                        begin = False
+                    elif i < 4:
                         continue
                     else:
                         begin = False
-                else:        
+                else:
                     if gotCcomment and S.find('*/') > -1:
                         self.comments.append(S[:-1])
                         begin = False

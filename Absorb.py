@@ -6,12 +6,16 @@
 from __future__ import division, print_function
 import platform
 import math
+import sys
 import wx
+# the next line removes the need for pythonw. Thanks to Matt Newville!
+# appears unneaded from wx 4.2.1 on
+if sys.platform.lower() == 'darwin': wx.PyApp.IsDisplayAvailable = lambda _: True
 import numpy as np
 import sys
 import matplotlib as mpl
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5660 $")
+GSASIIpath.SetVersionNumber("$Revision: 5743 $")
 import GSASIIElem as G2elem
 import GSASIIElemGUI as G2elemGUI
 import GSASIIctrlGUI as G2G
@@ -694,3 +698,18 @@ corrected for Kissel & Pratt energy term; Jensen term not included
         '''
         wxadv.AboutBox(info)
 
+if __name__ == "__main__":
+    import GSASIIplot as G2plt
+    app = wx.App()
+    GSASIIpath.InvokeDebugOpts()
+    frm = wx.Frame(None) # create a frame
+    frm.Show(False)
+    size = wx.Size(700,700)
+    frm.plotFrame = wx.Frame(frm,-1,'GSASII Plots',size=size,
+            style=wx.DEFAULT_FRAME_STYLE ^ wx.CLOSE_BOX)
+    frm.plotFrame.Show()
+    frm.G2plotNB = G2plt.G2PlotNoteBook(frm.plotFrame,G2frame=frm)
+    abswin = Absorb(frm)
+    abswin.Show()
+    abswin.Bind(wx.EVT_WINDOW_DESTROY,lambda event: sys.exit())
+    app.MainLoop()

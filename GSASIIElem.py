@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # Copyright: 2008, Robert B. Von Dreele & Brian H. Toby (Argonne National Laboratory)
 ########### SVN repository information ###################
-# $Date: 2024-02-26 08:46:43 -0600 (Mon, 26 Feb 2024) $
+# $Date: 2024-03-07 09:50:37 -0600 (Thu, 07 Mar 2024) $
 # $Author: vondreele $
-# $Revision: 5740 $
+# $Revision: 5757 $
 # $URL: https://subversion.xray.aps.anl.gov/pyGSAS/trunk/GSASIIElem.py $
-# $Id: GSASIIElem.py 5740 2024-02-26 14:46:43Z vondreele $
+# $Id: GSASIIElem.py 5757 2024-03-07 15:50:37Z vondreele $
 ########### SVN repository information ###################
 """
 Routines used to define element settings follow. 
@@ -15,7 +15,7 @@ import math
 import sys
 import os.path
 import GSASIIpath
-GSASIIpath.SetVersionNumber("$Revision: 5740 $")
+GSASIIpath.SetVersionNumber("$Revision: 5757 $")
 import copy
 import numpy as np
 import atmdata
@@ -600,6 +600,7 @@ def ClosedFormFF(Z,SQ,k,N):
     
 def BlenResCW(Els,BLtables,wave):
     ''' Computes resonant scattering lengths - single wavelength version (CW)
+    returns bo+b' and b"'
     '''
     FP = np.zeros(len(Els))
     FPP = np.zeros(len(Els))
@@ -622,6 +623,7 @@ def BlenResCW(Els,BLtables,wave):
     
 def BlenResTOF(Els,BLtables,wave):
     ''' Computes resonant scattering lengths - multiple wavelength version (TOF)
+    returns bo+b' and b"'
     '''
     FP = np.zeros((len(Els),len(wave)))
     FPP = np.zeros((len(Els),len(wave)))
